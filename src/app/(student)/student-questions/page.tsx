@@ -45,7 +45,7 @@ function StudentQuestionsContent() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={tPages("studentQuestions.title")} description={tPages("studentQuestions.description")} />
+      <PageHeader iconHref="/student-questions" title={tPages("studentQuestions.title")} description={tPages("studentQuestions.description")} />
 
       <div className="flex flex-wrap rounded-md border overflow-hidden w-fit">
         {TABS.map((tabItem, i) => (

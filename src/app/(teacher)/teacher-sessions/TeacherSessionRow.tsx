@@ -261,21 +261,21 @@ export function TeacherSessionRow({
               type="button"
               onClick={openEdit}
               disabled={isMutationPending}
-              className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-indigo-200 p-2 text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
               title={tc("edit")}
               aria-label={tc("edit")}
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => onDelete(session.id)}
               disabled={isMutationPending}
-              className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               title={tc("delete")}
               aria-label={tc("delete")}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         </div>

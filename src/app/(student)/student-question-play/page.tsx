@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnyGame, localizeQuestionGames } from "@/lib/question-games-data";
+import { Dices } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentQuestionGameLearningHistory } from "@/components/question-games/StudentQuestionGameLearningHistory";
 import { fetchJson } from "@/lib/client-fetch";
@@ -63,31 +64,19 @@ export default function StudentQuestionPlayPage() {
         <StudentQuestionGameLearningHistory />
       ) : (
         <>
-          {/* 히어로 배너 */}
-          <div
-            className="relative overflow-hidden rounded-3xl mb-10 py-14 px-8 text-center text-white"
-            style={{ background: "linear-gradient(135deg, #6D28D9 0%, #BE185D 50%, #A16207 100%)" }}
-          >
-            <span className="absolute top-4 left-6 text-5xl opacity-20 select-none">⭐</span>
-            <span className="absolute top-8 right-10 text-4xl opacity-20 select-none">🌟</span>
-            <span className="absolute bottom-4 left-20 text-3xl opacity-20 select-none">✨</span>
-            <span className="absolute bottom-6 right-16 text-5xl opacity-20 select-none">💫</span>
-            <span className="absolute top-1/2 left-4 -translate-y-1/2 text-6xl opacity-10 select-none">🎮</span>
-            <span className="absolute top-1/2 right-4 -translate-y-1/2 text-6xl opacity-10 select-none">🎮</span>
-            <div className="relative z-10">
-              <div className="text-7xl mb-4 drop-shadow-lg">🎮</div>
-              <h1
-                className="text-5xl font-black mb-3 tracking-tight"
-                style={{ textShadow: "0 2px 8px rgba(0,0,0,0.3)" }}
-              >
-                {t("title")}
-              </h1>
-              <p className="text-xl font-medium text-white">{t("subtitle")}</p>
-              <div className="mt-4 flex justify-center gap-3">
-                <span className="bg-black/20 backdrop-blur-sm rounded-full px-4 py-1 text-sm font-medium">
+          {/* 활동 선택이 먼저 보이는 간결한 안내 배너 */}
+          <div className="mb-6 flex items-center gap-4 overflow-hidden rounded-3xl p-5 text-white sm:gap-6 sm:p-7" style={{ background: "linear-gradient(135deg, #174a8b 0%, #116b79 100%)" }}>
+            <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-white/10 text-white">
+              <Dices className="h-9 w-9" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("title")}</h1>
+              <p className="mt-2 text-base leading-relaxed text-white">{t("subtitle")}</p>
+              {!isLoading && !loadError && (
+                <span className="mt-3 inline-flex rounded-full border border-white/30 bg-black/20 px-3 py-1 text-sm font-semibold text-white">
                   {t("gameCount", { count: games.length })}
                 </span>
-              </div>
+              )}
             </div>
           </div>
 

@@ -50,7 +50,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="learning-shell student-shell min-h-screen bg-background">
       <AppNav
         pages={pages}
         userName={user.name ?? ""}
@@ -69,7 +69,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
           detailedReportHref: "/student-dashboard?tab=reports",
         }}
       />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="learning-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {children}
         <PageNav pages={pages} />
       </main>

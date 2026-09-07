@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
+import "./learning-theme.css";
 import { Providers } from "@/components/shared/providers";
 import { ROOT_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-namespaces";
 
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#7C3AED" },
+    { media: "(prefers-color-scheme: light)", color: "#195bb8" },
     { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
   ],
   width: "device-width",

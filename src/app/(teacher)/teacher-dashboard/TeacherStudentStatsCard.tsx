@@ -142,33 +142,33 @@ export const TeacherStudentStatsCard = forwardRef<HTMLDivElement, TeacherStudent
                         <StudentClassMeta student={student} />
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-[11px] text-muted-foreground">{t("colTotal")}</p>
+                        <p className="text-sm text-muted-foreground">{t("colTotal")}</p>
                         <p className="text-xl font-bold text-foreground">{student.total}</p>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                       <div className="rounded-md bg-blue-50 px-2 py-2 text-center dark:bg-blue-950/30">
-                        <p className="text-[11px] text-blue-600">{tCls("closed.label")}</p>
+                        <p className="text-sm text-blue-600">{tCls("closed.label")}</p>
                         <p className="text-sm font-semibold text-blue-600">{student.distribution.closed}</p>
                       </div>
                       <div className="rounded-md bg-green-50 px-2 py-2 text-center dark:bg-green-950/30">
-                        <p className="text-[11px] text-green-600">{tCls("open.label")}</p>
+                        <p className="text-sm text-green-600">{tCls("open.label")}</p>
                         <p className="text-sm font-semibold text-green-600">{student.distribution.open}</p>
                       </div>
                       <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
-                        <p className="text-[11px] text-muted-foreground">{tCls("factual.label")}</p>
+                        <p className="text-sm text-muted-foreground">{tCls("factual.label")}</p>
                         <p className="text-sm font-semibold text-foreground">{student.cognitiveDistribution.factual}</p>
                       </div>
                       <div className="rounded-md bg-purple-50 px-2 py-2 text-center dark:bg-purple-950/30">
-                        <p className="text-[11px] text-purple-600">{tCls("conceptual.label")}</p>
+                        <p className="text-sm text-purple-600">{tCls("conceptual.label")}</p>
                         <p className="text-sm font-semibold text-purple-600">{student.cognitiveDistribution.conceptual}</p>
                       </div>
                       <div className="rounded-md bg-orange-50 px-2 py-2 text-center dark:bg-orange-950/30">
-                        <p className="text-[11px] text-orange-600">{tCls("controversial.label")}</p>
+                        <p className="text-sm text-orange-600">{tCls("controversial.label")}</p>
                         <p className="text-sm font-semibold text-orange-600">{student.cognitiveDistribution.controversial}</p>
                       </div>
                       <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
-                        <p className="text-[11px] text-muted-foreground">{t("colTrend")}</p>
+                        <p className="text-sm text-muted-foreground">{t("colTrend")}</p>
                         <span className="inline-flex items-center justify-center gap-1.5">
                           <Sparkline data={student.sparkline} />
                           <TrendBadge trend={student.trend} />

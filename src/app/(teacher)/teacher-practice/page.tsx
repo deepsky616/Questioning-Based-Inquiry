@@ -227,6 +227,7 @@ function TeacherPracticeContent() {
   return (
     <div className="space-y-6">
       <PageHeader
+          iconHref="/teacher-practice"
         title={t("title")}
         description={t("teacherSubtitle")}
         actions={

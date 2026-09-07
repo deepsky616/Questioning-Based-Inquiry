@@ -289,8 +289,7 @@ async function expectPriorityRows(
 ) {
   const card = page
     .getByRole("heading", { name: title, exact: true })
-    .locator("..")
-    .locator("..");
+    .locator('xpath=ancestor::*[@data-ui="card"][1]');
   const rows = card.getByTestId("priority-task-list").getByRole("button");
 
   await expect(rows).toHaveCount(expectedNames.length);
@@ -307,8 +306,7 @@ async function expectScheduleRow(
 ) {
   const card = page
     .getByRole("heading", { name: cardTitle, exact: true })
-    .locator("..")
-    .locator("..");
+    .locator('xpath=ancestor::*[@data-ui="card"][1]');
   const row = card.getByTestId("dashboard-question-class-row");
 
   await expect(row).toBeVisible();

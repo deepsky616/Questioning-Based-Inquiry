@@ -275,7 +275,7 @@ function TeacherSessionsPageContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("teacherSessions.title")} description={tPages("teacherSessions.description")} />
+      <PageHeader iconHref="/teacher-sessions" title={tPages("teacherSessions.title")} description={tPages("teacherSessions.description")} />
 
       <QuestionClassWorkspaceNav activeView={activeView} />
 

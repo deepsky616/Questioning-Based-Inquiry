@@ -52,7 +52,7 @@ export function TeacherShell({ children }: { children: React.ReactNode }) {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="learning-shell teacher-shell min-h-screen bg-background">
       <AppNav
         pages={pages}
         userName={user.name ?? ""}
@@ -72,7 +72,7 @@ export function TeacherShell({ children }: { children: React.ReactNode }) {
           detailedReportHref: "/teacher-dashboard?tab=reports",
         }}
       />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="learning-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {children}
         <PageNav pages={pages} />
       </main>

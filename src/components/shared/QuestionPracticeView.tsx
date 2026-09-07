@@ -504,6 +504,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
           invalidateCheck();
         }}
         placeholder={placeholder}
+        aria-label={placeholder}
         rows={3}
       />
       <div className="flex items-center justify-between gap-3">
@@ -523,7 +524,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="region" aria-label={t("title")}>
       {/* 연습 모드 탭 */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label={t("title")}>
