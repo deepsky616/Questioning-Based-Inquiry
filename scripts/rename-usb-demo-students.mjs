@@ -63,7 +63,7 @@ async function main() {
       }, { timeout: 60_000 });
     }
     console.log(JSON.stringify({ mode: apply ? "적용" : "미리보기", students: users.length, changed: plan.length,
-      primaryName: "학생1", classNames: "학생1~학생28", rankingNames: "학생29~학생405" }, null, 2));
+      primaryName: STUDENT_NAMES[0], classNames: `${STUDENT_NAMES[0]}, ${STUDENT_NAMES[1]}~${STUDENT_NAMES.at(-1)}`, rankingNames: "학생29~학생405" }, null, 2));
   } finally {
     await db.$disconnect();
   }
