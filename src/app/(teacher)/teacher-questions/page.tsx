@@ -413,14 +413,19 @@ function QuestionsContent() {
     <div className="space-y-6">
       <PageHeader iconHref="/teacher-questions" title={tPages("teacherQuestions.title")} description={tPages("teacherQuestions.description")} />
 
-      <TeacherQuestionTopTabs
-        value={topTab}
-        onChange={(tab) => updateViewState({ tab })}
-        labels={{
-          questions: t("tabQuestions"),
-          design: t("tabDesign"),
-        }}
-      />
+      <div className="space-y-3">
+        <TeacherQuestionTopTabs
+          value={topTab}
+          onChange={(tab) => updateViewState({ tab })}
+          labels={{
+            questions: t("tabQuestions"),
+            design: t("tabDesign"),
+          }}
+        />
+        <p id="teacher-question-tab-description" aria-live="polite" className="text-sm leading-relaxed text-muted-foreground">
+          {topTab === "design" ? t("tabDesignDescription") : t("tabQuestionsDescription")}
+        </p>
+      </div>
 
       <>
       <TeacherQuestionSessionSelector
