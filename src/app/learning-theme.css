@@ -60,6 +60,8 @@
   .learning-content [data-ui="button"][data-size="icon"] { min-width: 2.75rem; }
   .student-shell .learning-content [data-ui="button"][data-size="icon"] { min-width: 3rem; }
   .learning-content :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, [role="combobox"]) {
+    min-width: 0;
+    max-width: 100%;
     min-height: 2.75rem;
     font-size: 1rem;
     border-radius: .75rem;

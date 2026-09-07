@@ -544,7 +544,7 @@ export function MyQuestionsView() {
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
         <CardContent className="pt-4">
-          <div className="my-questions-tablet-filters grid grid-cols-1 gap-3 md:grid-cols-[9rem_8rem_minmax(12rem,0.8fr)_minmax(18rem,1fr)] md:items-end">
+          <div className="my-questions-tablet-filters grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end xl:grid-cols-[9rem_8rem_minmax(12rem,0.8fr)_minmax(18rem,1fr)]">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("date")}</label>
               <StudentMonthlyDateSelect

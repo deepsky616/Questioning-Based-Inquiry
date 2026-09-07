@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { preparePage, sessions } from "./helpers/session-filter-page";
+import { expectNoHorizontalPageOverflow } from "./helpers/question-game-room";
 
 for (const role of ["TEACHER", "STUDENT"] as const) {
   test(`${role === "TEACHER" ? "교사" : "학생"} 언어 선택이 메뉴와 수업 제목에 반영된다`, async ({ page, baseURL, browserName }) => {
@@ -25,6 +26,7 @@ for (const role of ["TEACHER", "STUDENT"] as const) {
     await expect(page.locator("#lang-select")).toHaveValue("en");
     if (role === "TEACHER") await page.getByRole("button", {name:/2026-09/}).click();
     await expect(page.locator("main")).toContainText("Weather");
+    await expectNoHorizontalPageOverflow(page);
     await page.goto(role === "TEACHER" ? "/teacher-question-learning" : "/student-question-learning");
     await expect(page.getByRole("heading", {name: "Question Learning", exact:true})).toBeVisible();
     await expect(page.locator(".learning-page-header .lucide-book-open")).toBeVisible();
@@ -99,6 +101,9 @@ for (const role of ["TEACHER", "STUDENT"] as const) {
     await expect(page.getByText("I think it is because the air moves.",{exact:true}).filter({visible:true})).toBeVisible();
     expect(requested.filter(key=>key==="QUESTION:q-auto")).toHaveLength(1);
     expect(requested.filter(key=>key==="COMMENT:c-auto")).toHaveLength(1);
+    await expectNoHorizontalPageOverflow(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.screenshot({path:testInfo.outputPath("영어-질문-댓글.png"),fullPage:true});
     expect(errors).toEqual([]);
   });
