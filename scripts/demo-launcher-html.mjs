@@ -16,7 +16,7 @@ export function createDemoLauncherHtml({ ticket, launchUrl = DEFAULT_LAUNCH_URL 
     return escapeHtml(target.href);
   };
   return `<!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -32,9 +32,6 @@ export function createDemoLauncherHtml({ ticket, launchUrl = DEFAULT_LAUNCH_URL 
   <style>
     :root { color-scheme: light; --bg:#f5f7fc; --surface:#ffffff; --text:#20283e; --muted:#556079; --line:#dce2ee; --teacher:#076d65; --teacher-soft:#e6f5f0; --student:#5d43bd; --student-soft:#f0ebff; --shadow:0 18px 52px #2032510a; }
     :root[data-theme="dark"] { color-scheme:dark; --bg:#111727; --surface:#1b2437; --text:#f0f3ff; --muted:#bbc5dc; --line:#3d4962; --teacher:#8ce5d1; --teacher-soft:#173d3a; --student:#c8b6ff; --student-soft:#33294e; --shadow:0 18px 52px #00000024; }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) { color-scheme:dark; --bg:#111727; --surface:#1b2437; --text:#f0f3ff; --muted:#bbc5dc; --line:#3d4962; --teacher:#8ce5d1; --teacher-soft:#173d3a; --student:#c8b6ff; --student-soft:#33294e; --shadow:0 18px 52px #00000024; }
-    }
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
     body { margin:0; background:var(--bg); color:var(--text); font-family:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; font-size:18px; line-height:1.65; word-break:keep-all; }
@@ -119,15 +116,13 @@ export function createDemoLauncherHtml({ ticket, launchUrl = DEFAULT_LAUNCH_URL 
     (function () {
       var button = document.getElementById("theme-toggle");
       var label = document.getElementById("theme-label");
-      var systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-      function isDark() { return document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : systemTheme.matches; }
+      function isDark() { return document.documentElement.dataset.theme === "dark"; }
       function updateLabel() {
         label.textContent = isDark() ? "밝게" : "어둡게";
         button.setAttribute("aria-label", isDark() ? "밝은 테마로 변경" : "어두운 테마로 변경");
       }
       button.hidden = false;
       updateLabel();
-      systemTheme.addEventListener("change", updateLabel);
       button.addEventListener("click", function () {
         var theme = isDark() ? "light" : "dark";
         document.documentElement.dataset.theme = theme;
