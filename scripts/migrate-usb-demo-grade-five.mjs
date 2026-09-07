@@ -62,7 +62,7 @@ export function buildGradeFiveMigration(snapshot) {
     for (const [index, question] of sharedQuestions.entries()) questions.push({
       id: `usb-demo-shared-question-${blueprint.key}-${String(index + 1).padStart(2,"0")}`,
       authorId: teacherId, sessionId: blueprint.id, content: question.content, context: blueprint.topic,
-      closure: "open", cognitive: question.type, inquiryType: question.type,
+      closure: question.type === "factual" ? "closed" : "open", cognitive: question.type, inquiryType: question.type,
     });
     return {id: old.id, data: {targetGrade: "5", topic: blueprint.topic, sharedQuestions}};
   });
