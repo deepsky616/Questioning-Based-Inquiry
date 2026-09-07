@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { protectDemoAccountSettings } from "@/lib/demo-account-protection";
 import { prisma } from "@/lib/db";
 import {
   AccountDeletionConflictError,
@@ -48,6 +49,8 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
+  const protectedResponse = protectDemoAccountSettings(session.user);
+  if (protectedResponse) return protectedResponse;
 
   const teacherId = (session.user as { id: string }).id;
   const { id: studentId } = await params;

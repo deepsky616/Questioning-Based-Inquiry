@@ -33,7 +33,7 @@ describe("시연 실행 설정", () => {
       studentNumber: DEMO_STUDENT_NUMBER,
     }).toEqual({
       school: "질문초등학교",
-      grade: "4",
+      grade: "5",
       className: "1",
       studentNumber: "1",
     });

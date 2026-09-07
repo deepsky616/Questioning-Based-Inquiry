@@ -16,7 +16,7 @@ import {
 import * as demoSeedModule from "../../scripts/seed-usb-demo.mjs";
 
 describe("USB 시연 학급 자료 생성 명령", () => {
-  it("4학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
+  it("5학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
     expect(STUDENT_NAMES).toHaveLength(28);
     expect(STUDENT_NAMES[0]).toBe("김질문");
     expect(STUDENT_NAMES[27]).toBe("학생28");
@@ -196,7 +196,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     }
   });
 
-  it("김질문 질문탐구에 4학년 1학기 국어와 수학 직접 탐구 수업을 제공한다", () => {
+  it("김질문 질문탐구에 5학년 1학기 국어와 수학 직접 탐구 수업을 제공한다", () => {
     const studentIds = STUDENT_NAMES.map(
       (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
     );
@@ -205,14 +205,14 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       {
         key: "exploreKorean",
         subject: "국어",
-        topic: "질문을 만들며 글 읽기",
-        achievementCode: "[4국02-03]",
+        topic: "글의 구조를 살피며 요약하기",
+        achievementCode: "[6국02-01]",
       },
       {
         key: "exploreMath",
         subject: "수학",
-        topic: "각도를 비교하고 재기",
-        achievementCode: "[4수03-24]",
+        topic: "다각형의 넓이 구하기",
+        achievementCode: "[6수03-14]",
       },
     ];
 
@@ -233,7 +233,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       );
       expect(design).toMatchObject({
         subject: expected.subject,
-        grade: "4",
+        grade: "5",
         achievements: [
           expect.objectContaining({ code: expected.achievementCode }),
         ],
@@ -254,7 +254,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     }
   });
 
-  it("세 학교의 4학년 반과 학생을 추가해 교내와 전체 순위를 고르게 구성한다", () => {
+  it("세 학교의 5학년 반과 학생을 추가해 교내와 전체 순위를 고르게 구성한다", () => {
     const rankingStudents = buildDemoRankingStudents();
     const questionSchoolClasses = DEMO_RANKING_CLASS_BLUEPRINTS
       .filter(({ school }) => school === "질문초등학교")
@@ -464,7 +464,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     });
   });
 
-  it("모든 질문수업에 4학년 수준의 완전한 탐구 참고자료를 연결한다", () => {
+  it("모든 질문수업에 5학년 수준의 완전한 탐구 참고자료를 연결한다", () => {
     expect(DEMO_UNIT_DESIGN_BLUEPRINTS).toHaveLength(8);
     const designById = new Map(
       DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
@@ -475,7 +475,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       const design = designById.get(session.unitDesignId);
       expect(design).toBeDefined();
       if (!design) throw new Error("시연 단원 설계가 없습니다");
-      expect(design?.grade).toBe("4");
+      expect(design?.grade).toBe("5");
       expect(design?.title.trim()).not.toBe("");
       expect(design?.coreIdea.trim()).not.toBe("");
       expect(design?.achievements.length).toBeGreaterThan(0);

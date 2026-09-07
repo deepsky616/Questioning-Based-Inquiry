@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { isAllowedGeminiModel, maskApiKey, resolveGeminiModel } from "@/lib/api-config";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { protectDemoAccountSettings } from "@/lib/demo-account-protection";
 
 const saveConfigSchema = z.object({
   apiKey: z.string().optional(),
@@ -17,6 +18,11 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
+
+  if (session.user.isDemo) {
+    const cfg = await resolveUserAiConfig(userId);
+    return NextResponse.json({ configured: !!cfg.apiKey, maskedApiKey: null, model: cfg.model });
+  }
 
   if (role === "TEACHER") {
     const me = await prisma.user.findUnique({ where: { id: userId }, select: { aiApiKey: true, aiModel: true } });
@@ -38,6 +44,8 @@ export async function POST(req: Request) {
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 설정할 수 있습니다" }, { status: 403 });
+  const protectedResponse = protectDemoAccountSettings(session.user);
+  if (protectedResponse) return protectedResponse;
 
   try {
     const body = await req.json();
@@ -78,6 +86,8 @@ export async function DELETE() {
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 설정을 삭제할 수 있습니다" }, { status: 403 });
+  const protectedResponse = protectDemoAccountSettings(session.user);
+  if (protectedResponse) return protectedResponse;
 
   await prisma.user.update({ where: { id: userId }, data: { aiApiKey: null, aiModel: null } });
   return NextResponse.json({ success: true });

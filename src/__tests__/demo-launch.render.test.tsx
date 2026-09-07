@@ -18,7 +18,7 @@ describe("USB 시연 실행 화면", () => {
     expect(clientSource).toContain('fetch("/api/demo/validate"');
     expect(clientSource).toContain('signIn("demo-launch"');
     expect(clientSource).toContain(
-      'window.location.replace("/student-dashboard")',
+      'window.location.replace(target.dashboard)',
     );
     expect(clientSource).not.toContain("useRouter");
     expect(clientSource).not.toContain("localStorage");

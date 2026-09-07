@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import packageJson from "../../package.json";
+import { createDemoLauncherHtml } from "../../scripts/demo-launcher-html.mjs";
 import { buildUsbDemoBundle } from "../../scripts/build-usb-demo-bundle.mjs";
 
 const tempRoots: string[] = [];
@@ -40,7 +41,13 @@ describe("윈도우 USB 제출 묶음", () => {
     expect(html).toContain(
       "https://questioning-based-inquiry.vercel.app/demo/launch#ticket=test-usb-ticket",
     );
-    expect(html).toContain("질문연구소 열기");
+    expect(html).toContain("교사 로그인");
+    expect(html).toContain("학생 로그인");
+    expect(html).toContain("김탐구 선생님");
+    expect(html).toContain("김질문 학생");
+    expect(html).toContain("&amp;role=teacher");
+    expect(html).toContain("&amp;role=student");
+    expect(html).not.toContain("window.location.replace");
     expect(html).toContain("../media/image/login-inquiry-hero.png");
     expect(html).not.toContain("DEMO_AI_SOURCE_EMAIL");
     expect(html).not.toContain("climbing1126");
@@ -97,5 +104,19 @@ describe("윈도우 USB 제출 묶음", () => {
     expect(packageJson.scripts["demo:usb"]).toBe(
       "node scripts/build-usb-demo-bundle.mjs",
     );
+  });
+});
+
+ describe("시연 시작 파일 링크", () => {
+  it("실행 표의 특수문자를 주소에 안전하게 인코딩한다", () => {
+    const ticket = 'test&role=admin#"<>값';
+    const html = createDemoLauncherHtml({ ticket });
+    expect(html).toContain(`#ticket=${encodeURIComponent(ticket)}&amp;role=teacher`);
+    expect(html).toContain(`#ticket=${encodeURIComponent(ticket)}&amp;role=student`);
+    expect(html).not.toContain(ticket);
+  });
+  it("빈 실행 표와 스크립트 주소를 거절한다", () => {
+    expect(() => createDemoLauncherHtml({ ticket: " " })).toThrow();
+    expect(() => createDemoLauncherHtml({ ticket: "test", launchUrl: "javascript:alert(1)" })).toThrow();
   });
 });

@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 export const DEMO_SCHOOL = "질문초등학교";
-export const DEMO_GRADE = "4";
+export const DEMO_GRADE = "5";
 export const DEMO_CLASS_NAME = "1";
 export const DEMO_STUDENT_NUMBER = "1";
 

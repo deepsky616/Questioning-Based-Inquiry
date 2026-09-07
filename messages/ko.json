@@ -1213,6 +1213,7 @@
     "targetAllClasses": "전체 담당 학급"
   },
   "settings": {
+    "demoSettingsNotice": "시연 계정은 준비된 인공지능 설정을 사용해요. 교사·학생의 연결을 유지하기 위해 계정 관리와 인공지능 설정 변경은 제한됩니다.",
     "apiKeyRequired": "API 키를 입력해 주세요 (10자 이상)",
     "apiKeyMinLen": "API 키는 10자 이상이어야 합니다",
     "connectSuccess": "연결 성공! 모델: {model}",

@@ -5,6 +5,7 @@ import { validateDemoLaunchTicket } from "@/lib/demo-config";
 
 const requestSchema = z.object({
   ticket: z.string().min(1).max(512),
+  role: z.enum(["student", "teacher"]).optional(),
 });
 
 const statusByReason = {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { protectDemoAccountSettings } from "@/lib/demo-account-protection";
 import { sendBulkStudentSummaryEmail } from "@/lib/email";
 import {
   STUDENT_REGISTRATION_LIMITS,
@@ -37,6 +38,8 @@ export async function POST(req: Request) {
   if (!session?.user || session.user.role !== "TEACHER") {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
+  const protectedResponse = protectDemoAccountSettings(session.user);
+  if (protectedResponse) return protectedResponse;
 
   try {
     const body = await req.json();
