@@ -131,6 +131,8 @@ vi.mock("@/lib/app-notifications", () => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientState,
+  // 이 파일은 한국어 질문 작성 흐름을 검사하므로 번역 조회는 비활성 상태다.
+  useQueries: ({ queries }: { queries: unknown[] }) => queries.map(() => ({ data: undefined, error: null })),
 }));
 
 vi.mock("@/components/ui/use-toast", () => ({

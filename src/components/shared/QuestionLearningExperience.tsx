@@ -90,7 +90,7 @@ export function QuestionLearningExperience({ audience }: { audience: QuestionLea
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("subtitle")} />
+      <PageHeader iconHref={`/${audience}-question-learning`} title={t("title")} description={t("subtitle")} />
       {audience === "student" ? (
         <QuestionDetectiveSlides completionActions={completionActions} />
       ) : (

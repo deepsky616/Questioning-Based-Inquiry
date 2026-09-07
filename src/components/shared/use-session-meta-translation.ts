@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocale } from "next-intl";
+import { useCallback, useEffect, useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUserIdentity } from "@/components/shared/current-user-identity";
+import { reportTranslationFailure } from "@/components/shared/translation-feedback";
+import { requestContentTranslations } from "@/lib/content-translation-client";
 import { buildSessionLabel, formatSessionGradeLabel } from "@/lib/sessions";
 import type { TranslatableItem } from "@/components/shared/use-content-translation";
 
@@ -15,7 +19,6 @@ export interface SessionMetaText {
 }
 
 const keyOf = (type: TranslatableItem["type"], id: string) => `${type}:${id}`;
-const BATCH_SIZE = 40;
 
 function uniqueSessions<T extends SessionMetaText>(sessions: T[]): T[] {
   const seen = new Set<string>();
@@ -32,42 +35,37 @@ export function useSessionMetaTranslation<T extends SessionMetaText>(sessions: T
   const locale = useLocale();
   const canTranslate = locale !== "ko";
   const unique = useMemo(() => uniqueSessions(sessions), [sessions]);
-  const [map, setMap] = useState<Record<string, string>>({});
+  const userId = useCurrentUserIdentity();
+  const queryClient = useQueryClient();
+  const t = useTranslations("translate");
+  const queries = useQueries({
+    queries: unique.map(session => ({
+      // 원문 값과 언어·사용자를 키에 포함해 수정되거나 언어가 바뀐 뒤의 낡은 번역을 막는다.
+      queryKey: ["session-meta-translation", userId, locale, session.id, session.subject, session.topic],
+      queryFn: () => {
+        const items: TranslatableItem[] = [{ type: "SESSION_SUBJECT", id: session.id }];
+        if (session.topic.trim()) items.push({ type: "SESSION_TOPIC", id: session.id });
+        return requestContentTranslations(queryClient, userId!, locale, items);
+      },
+      enabled: canTranslate && userId !== null,
+      staleTime: 5 * 60_000,
+      retry: false,
+      retryOnMount: false,
+      refetchOnWindowFocus: false,
+    })),
+  });
+  const map: Record<string, string> = Object.assign({}, ...queries.map(query => query.data ?? {}));
+  const error = queries.find(query => query.error)?.error;
 
   useEffect(() => {
-    if (!canTranslate || unique.length === 0) return;
-    let cancelled = false;
-    const items: TranslatableItem[] = unique.flatMap((session) => {
-      const next: TranslatableItem[] = [{ type: "SESSION_SUBJECT", id: session.id }];
-      if (session.topic.trim()) next.push({ type: "SESSION_TOPIC", id: session.id });
-      return next;
+    if (!error || !canTranslate) return;
+    reportTranslationFailure(error, t("autoFailed"), t("retry"), () => {
+      void queryClient.invalidateQueries({predicate: query =>
+        ["session-meta-translation", "content-translation"].includes(String(query.queryKey[0])) &&
+        query.queryKey[1] === userId && query.queryKey[2] === locale,
+      });
     });
-    const missing = items.filter((item) => !(keyOf(item.type, item.id) in map));
-    if (missing.length === 0) return;
-
-    async function run() {
-      const merged: Record<string, string> = {};
-      for (let start = 0; start < missing.length; start += BATCH_SIZE) {
-        const batch = missing.slice(start, start + BATCH_SIZE);
-        const response = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: batch }),
-        }).catch(() => null);
-        if (!response?.ok) break;
-        const data = await response.json().catch(() => ({}));
-        if (data?.translations) Object.assign(merged, data.translations as Record<string, string>);
-      }
-      if (!cancelled && Object.keys(merged).length > 0) {
-        setMap((previous) => ({ ...previous, ...merged }));
-      }
-    }
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [canTranslate, unique, map]);
+  }, [error, canTranslate, t, queryClient, userId, locale]);
 
   const subject = useCallback(
     (session: SessionMetaText) => (canTranslate ? map[keyOf("SESSION_SUBJECT", session.id)] ?? session.subject : session.subject),

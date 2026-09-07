@@ -60,6 +60,8 @@
   .learning-content [data-ui="button"][data-size="icon"] { min-width: 2.75rem; }
   .student-shell .learning-content [data-ui="button"][data-size="icon"] { min-width: 3rem; }
   .learning-content :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, [role="combobox"]) {
+    min-width: 0;
+    max-width: 100%;
     min-height: 2.75rem;
     font-size: 1rem;
     border-radius: .75rem;
@@ -82,6 +84,38 @@
   .learning-content [role="tablist"] { flex-wrap: wrap; height: auto; gap: .25rem; }
   .learning-content [role="tab"] { min-height: 2.75rem; white-space: normal; }
   .student-shell .learning-content [role="tab"] { min-height: 3rem; }
+
+  /* 터치 기기와 버튼이 세로로 쌓이는 좁은 창에서는 설명을 버튼 아래에 표시한다. */
+  .question-class-help { padding-top: .5rem; }
+  .question-class-help p {
+    margin: 0;
+    padding: 0 .25rem;
+    color: hsl(var(--muted-foreground));
+    font-size: .875rem;
+    line-height: 1.6;
+  }
+}
+
+/* 마우스를 쓰는 넓은 창에서만 띄운 안내를 사용하여 다음 버튼을 가리지 않는다. */
+@media screen and (min-width: 640px) and (hover: hover) and (pointer: fine) {
+  .question-class-help {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 50;
+    width: 20rem;
+    max-width: calc(100vw - 3rem);
+    visibility: hidden;
+  }
+  .question-class-help[data-open="true"] { visibility: visible; }
+  .question-class-help p {
+    border: 1px solid hsl(var(--border));
+    border-radius: .75rem;
+    padding: 1rem;
+    color: hsl(var(--popover-foreground));
+    background: hsl(var(--popover));
+    box-shadow: 0 8px 20px hsl(215 50% 10% / .12);
+  }
 }
 
 @media screen and (prefers-reduced-motion: reduce) {

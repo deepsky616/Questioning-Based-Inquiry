@@ -109,7 +109,6 @@ export function UnitDesignView() {
   const tEx = useTranslations("explore");
   const tc = useTranslations("common");
   const tSess = useTranslations("sessions");
-  const ct = useContentTranslation();
   const { data: authSession } = useSession();
   const user = getSessionUser(authSession);
   const TYPE_KEY: Record<string, string> = {
@@ -166,6 +165,7 @@ export function UnitDesignView() {
     [pubData],
   );
   const likesVisible = pubData?.likesVisible ?? true;
+  const ct = useContentTranslation(published.map(item => ({type: "QUESTION" as const, id: item.id, original: item.content})));
   const commentsVisible = pubData?.commentsVisible ?? true;
 
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;

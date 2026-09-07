@@ -515,6 +515,8 @@
     "flaggedOnly": "⚠️ 부적절 의심만",
     "selectSessionPrompt": "질문수업을 선택해 주세요",
     "sequenceTitle": "질문 중심 탐구설계",
+    "sequenceAlreadyDeployed": "이 수업에는 이미 배포한 탐구설계가 있어요. 배포 목록에서 확인하거나 수정해 주세요.",
+    "viewDeployedDesign": "배포한 설계 보기",
     "deployedTitle": "배포한 탐구설계",
     "deployedDesc": "질문수업별로 학생에게 배포한 탐구 질문 목록입니다. 수정 후 다시 배포하거나 삭제할 수 있어요.",
     "deployedAt": "배포 {time}",
@@ -1123,8 +1125,8 @@
     "createActionsLabel": "질문수업 만들기",
     "createInquiryQuestionClass": "탐구질문으로 수업 만들기",
     "createQuickQuestionClass": "간단 질문수업 만들기",
-    "createInquiryQuestionClassHelp": "교육과정과 성취기준을 바탕으로 수업의 핵심 질문과 탐구 질문을 차근차근 설계합니다. 질문과 참고 자료를 함께 준비하는 수업에 알맞아요.",
-    "createQuickQuestionClassHelp": "날짜, 교과, 주제와 참여할 학생만 정하면 바로 질문을 받을 수 있습니다. 짧은 활동이나 수업 중 떠오른 질문을 모을 때 알맞아요.",
+    "createInquiryQuestionClassHelp": "탐구질문을 만들거나 불러와, 학생들이 질문할 수업을 만들어요.",
+    "createQuickQuestionClassHelp": "날짜·교과·주제를 정하고, 학생들이 질문을 올릴 수업을 빠르게 만들어요.",
     "closeQuickQuestionClass": "간단 질문수업 닫기",
     "workspaceNavLabel": "질문수업 작업공간",
     "listViewTitle": "질문수업 목록",
@@ -2269,7 +2271,9 @@
     "translating": "번역 중...",
     "translateAll": "모두 번역",
     "showAllOriginal": "모두 원문",
-    "translateFailed": "번역에 실패했어요"
+    "translateFailed": "번역에 실패했어요",
+    "autoFailed": "일부 내용을 번역하지 못해 원문을 표시하고 있어요.",
+    "retry": "다시 번역"
   },
   "pointLabel": {
     "award_BEST_QUESTION": "베스트 질문상",

@@ -515,6 +515,8 @@
     "flaggedOnly": "⚠️ Flagged only",
     "selectSessionPrompt": "Please select a question class",
     "sequenceTitle": "Question-centered inquiry design",
+    "sequenceAlreadyDeployed": "This class already has a shared inquiry design. View or edit it in the shared designs list.",
+    "viewDeployedDesign": "View shared design",
     "deployedTitle": "Shared inquiry designs",
     "deployedDesc": "Inquiry questions shared with students by question class. You can edit and re-share or delete them.",
     "deployedAt": "Shared {time}",
@@ -1123,8 +1125,8 @@
     "createActionsLabel": "Create a question class",
     "createInquiryQuestionClass": "Create from an inquiry question",
     "createQuickQuestionClass": "Create a quick question class",
-    "createInquiryQuestionClassHelp": "Build essential and inquiry questions step by step using the curriculum and achievement standards. Choose this when you want to prepare questions and reference materials together.",
-    "createQuickQuestionClassHelp": "Set the date, subject, topic, and students to start collecting questions right away. Choose this for a short activity or questions that come up during a lesson.",
+    "createInquiryQuestionClassHelp": "Create or load inquiry questions, then use them to set up a class for student questions.",
+    "createQuickQuestionClassHelp": "Choose a date, subject, and topic to quickly create a class where students can post questions.",
     "closeQuickQuestionClass": "Close quick question class",
     "workspaceNavLabel": "Question class workspace",
     "listViewTitle": "Question class list",
@@ -2269,7 +2271,9 @@
     "translating": "Translating...",
     "translateAll": "Translate all",
     "showAllOriginal": "Show all original",
-    "translateFailed": "Translation failed"
+    "translateFailed": "Translation failed",
+    "autoFailed": "Some content could not be translated, so the original is shown.",
+    "retry": "Retry translation"
   },
   "pointLabel": {
     "award_BEST_QUESTION": "Best question",

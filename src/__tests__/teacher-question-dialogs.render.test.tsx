@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ko from "../../messages/ko.json";
 
 import { QuestionEditDialog } from "@/app/(teacher)/teacher-questions/QuestionEditDialog";
@@ -19,6 +20,7 @@ function renderWithIntl(ui: React.ReactElement) {
     <NextIntlClientProvider locale="ko" messages={ko as never} timeZone="Asia/Seoul">
       {ui}
     </NextIntlClientProvider>,
+    {wrapper: ({children}) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>},
   );
 }
 

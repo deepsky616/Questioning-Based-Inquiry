@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-
-import { useToast } from "@/components/ui/use-toast";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUserIdentity } from "@/components/shared/current-user-identity";
+import { reportTranslationFailure } from "@/components/shared/translation-feedback";
+import { requestContentTranslations } from "@/lib/content-translation-client";
 
 export interface TranslatableItem {
-  // GAME_INSTRUCTION의 id는 "게임id:안내줄인덱스" 복합 키 (서버 /api/translate와 동일 계약)
   type:
     | "QUESTION"
     | "COMMENT"
@@ -20,148 +21,83 @@ export interface TranslatableItem {
   id: string;
 }
 
-const keyOf = (type: string, id: string) => `${type}:${id}`;
+export interface TranslatableText extends TranslatableItem {
+  original: string;
+}
 
-// 서버 스키마(items.max)와 동일하게 유지 — 넘으면 400으로 거부된다
-const BATCH_SIZE = 40;
+const keyOf = (item: TranslatableItem) => `${item.type}:${item.id}`;
 
-/**
- * 사용자 콘텐츠(질문·댓글) 온디맨드 번역 토글 상태를 관리하는 훅.
- * - 한국어 로케일에서는 비활성(canTranslate=false).
- * - toggle: 항목별 원문/번역 전환(번역 미보유 시 /api/translate 호출).
- * - translateAll/showAllOriginal: 페이지 전체 전환(서버 한도에 맞춰 40개씩 분할 요청).
- * - text(item, original): 현재 상태에 맞는 표시 텍스트 반환.
- * - 실패(레이트 리밋·AI 설정 없음·번역 오류)는 토스트로 알린다.
- */
-export function useContentTranslation() {
+/** 표시 중인 콘텐츠를 선택한 언어로 번역하고 사용자의 원문 보기 선택을 유지한다. */
+export function useContentTranslation(items: TranslatableText[]) {
   const locale = useLocale();
   const canTranslate = locale !== "ko";
-  const { toast } = useToast();
+  const userId = useCurrentUserIdentity();
+  const queryClient = useQueryClient();
   const t = useTranslations("translate");
+  const [automatic, setAutomatic] = useState(true);
+  const [originals, setOriginals] = useState<Set<string>>(new Set());
+  const [requested, setRequested] = useState<TranslatableItem[]>([]);
+  const requestedKeys = new Set(requested.map(keyOf));
+  const unique = Array.from(new Map(items.map(item => [keyOf(item), item])).values());
+  const queries = useQueries({
+    queries: unique.map(item => ({
+      queryKey: ["content-translation", userId, locale, item.type, item.id, item.original],
+      queryFn: () => requestContentTranslations(queryClient, userId!, locale, [{type:item.type,id:item.id}]),
+      enabled: canTranslate && userId !== null && !originals.has(keyOf(item)) && (automatic || requestedKeys.has(keyOf(item))),
+      staleTime: 5 * 60_000,
+      retry: false,
+      retryOnMount: false,
+      refetchOnWindowFocus: false,
+    })),
+  });
+  const map: Record<string, string> = Object.assign({}, ...queries.map(query => query.data ?? {}));
+  const error = queries.find(query => query.error)?.error;
 
-  const [map, setMap] = useState<Record<string, string>>({});
-  const [shown, setShown] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState<Set<string>>(new Set());
-
-  /** 미보유 항목만 번역 요청하고 결과 맵을 반환(상태에도 병합). 오류 메시지는 error로 전달 */
-  const fetchMissing = useCallback(
-    async (items: TranslatableItem[]): Promise<{ translations: Record<string, string>; error: string | null }> => {
-      const need = items.filter((i) => !(keyOf(i.type, i.id) in map));
-      if (need.length === 0) return { translations: {}, error: null };
-      const needKeys = need.map((i) => keyOf(i.type, i.id));
-      setLoading((prev) => {
-        const n = new Set(prev);
-        needKeys.forEach((k) => n.add(k));
-        return n;
+  useEffect(() => {
+    if (!error || !canTranslate) return;
+    reportTranslationFailure(error, t("autoFailed"), t("retry"), () => {
+      void queryClient.invalidateQueries({predicate: query =>
+        ["session-meta-translation", "content-translation"].includes(String(query.queryKey[0])) &&
+        query.queryKey[1] === userId && query.queryKey[2] === locale,
       });
-      const merged: Record<string, string> = {};
-      let error: string | null = null;
-      try {
-        // 서버 items 한도(40)에 맞춰 분할 요청 — 목록이 길어도 '모두 번역'이 동작하도록
-        for (let start = 0; start < need.length; start += BATCH_SIZE) {
-          const batch = need.slice(start, start + BATCH_SIZE);
-          try {
-            const res = await fetch("/api/translate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ items: batch }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              error = typeof data?.error === "string" ? data.error : t("translateFailed");
-              break; // 레이트 리밋 등 — 남은 배치를 계속 보내지 않는다
-            }
-            if (data?.translations) Object.assign(merged, data.translations as Record<string, string>);
-          } catch {
-            error = t("translateFailed");
-            break;
-          }
-        }
-        if (Object.keys(merged).length > 0) {
-          setMap((prev) => ({ ...prev, ...merged }));
-        }
-        return { translations: merged, error };
-      } finally {
-        setLoading((prev) => {
-          const n = new Set(prev);
-          needKeys.forEach((k) => n.delete(k));
-          return n;
-        });
-      }
-    },
-    [map, t],
-  );
+    });
+  }, [error, canTranslate, t, queryClient, userId, locale]);
 
-  const toggle = useCallback(
-    async (item: TranslatableItem) => {
-      const k = keyOf(item.type, item.id);
-      if (shown.has(k)) {
-        setShown((prev) => {
-          const n = new Set(prev);
-          n.delete(k);
-          return n;
-        });
-        return;
-      }
-      if (k in map) {
-        setShown((prev) => new Set(prev).add(k));
-        return;
-      }
-      const { translations, error } = await fetchMissing([item]);
-      if (k in translations) {
-        setShown((prev) => new Set(prev).add(k));
-      } else {
-        // 실패(오류) 또는 권한 등으로 번역 대상에서 제외된 경우 — 조용히 무시하지 않는다
-        toast({ variant: "destructive", description: error ?? t("translateFailed") });
-      }
-    },
-    [shown, map, fetchMissing, toast, t],
-  );
+  const isShown = (item: TranslatableItem) => canTranslate && !originals.has(keyOf(item)) &&
+    (automatic || requestedKeys.has(keyOf(item))) && keyOf(item) in map;
 
-  const translateAll = useCallback(
-    async (items: TranslatableItem[]) => {
-      const { translations, error } = await fetchMissing(items);
-      const ok = items.filter((i) => {
-        const k = keyOf(i.type, i.id);
-        return k in translations || k in map;
-      });
-      if (ok.length > 0) {
-        setShown((prev) => {
-          const n = new Set(prev);
-          ok.forEach((i) => n.add(keyOf(i.type, i.id)));
-          return n;
-        });
-      }
-      if (error && ok.length === 0) {
-        toast({ variant: "destructive", description: error });
-      }
-    },
-    [fetchMissing, map, toast],
-  );
+  const translateAll = async (next: TranslatableItem[]) => {
+    if (!canTranslate) return;
+    const keys = new Set(next.map(keyOf));
+    setOriginals(previous => new Set([...previous].filter(key => !keys.has(key))));
+    setRequested(previous => Array.from(new Map([...previous, ...next].map(item => [keyOf(item), item])).values()));
+    // 실패 뒤에도 번역 버튼으로 명시적으로 다시 시도할 수 있다.
+    await queryClient.invalidateQueries({predicate: query =>
+      query.queryKey[0] === "content-translation" && query.queryKey[1] === userId &&
+      query.queryKey[2] === locale && keys.has(`${query.queryKey[3]}:${query.queryKey[4]}`) && query.state.status === "error",
+    });
+  };
 
-  const showAllOriginal = useCallback(() => setShown(new Set()), []);
+  const toggle = async (item: TranslatableItem) => {
+    if (isShown(item)) setOriginals(previous => new Set(previous).add(keyOf(item)));
+    else await translateAll([item]);
+  };
 
-  const text = useCallback(
-    (item: TranslatableItem, original: string) => {
-      const k = keyOf(item.type, item.id);
-      return shown.has(k) ? map[k] ?? original : original;
-    },
-    [shown, map],
-  );
-
-  const isShown = useCallback((item: TranslatableItem) => shown.has(keyOf(item.type, item.id)), [shown]);
-  const isLoading = useCallback((item: TranslatableItem) => loading.has(keyOf(item.type, item.id)), [loading]);
+  const showAllOriginal = () => {
+    setAutomatic(false);
+    setRequested([]);
+    setOriginals(new Set(unique.map(keyOf)));
+  };
 
   return {
     canTranslate,
     toggle,
     translateAll,
     showAllOriginal,
-    text,
+    text: (item: TranslatableItem, original: string) => isShown(item) ? map[keyOf(item)] ?? original : original,
     isShown,
-    isLoading,
-    anyShown: shown.size > 0,
-    /** 하나라도 번역 요청이 진행 중인가 — '모두 번역' 버튼 로딩 표시용 */
-    busy: loading.size > 0,
+    isLoading: (item: TranslatableItem) => queries[unique.findIndex(candidate => keyOf(candidate) === keyOf(item))]?.isFetching ?? false,
+    anyShown: unique.some(isShown),
+    busy: queries.some(query => query.isFetching),
   };
 }

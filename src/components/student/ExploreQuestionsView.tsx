@@ -285,7 +285,6 @@ function QuestionCard({
 export function ExploreQuestionsView() {
   const t = useTranslations("explore");
   const tAsk = useTranslations("ask");
-  const ct = useContentTranslation();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const user = getSessionUser(session);
@@ -371,6 +370,7 @@ export function ExploreQuestionsView() {
     });
 
   const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
+  const ct = useContentTranslation(displayed.map(item => ({type: "QUESTION" as const, id: item.id, original: item.content})));
 
   // 렌더 본문 안에서 정의한 컴포넌트(<QuestionList/>)는 매 렌더마다 타입이 새로 만들어져
   // React가 하위 트리 전체를 리마운트한다 — 12초 폴링 갱신 때 열어둔 댓글 스레드가 닫히고
