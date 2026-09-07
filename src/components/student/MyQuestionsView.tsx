@@ -206,7 +206,9 @@ export function MyQuestionsView() {
   // 배포 질문 유무와 관계없이 학생에게 배정된 모든 질문수업을 내 질문 조회에 노출한다.
   // 교사가 질문을 묶어 배포한 뒤에도 학생이 앞서 작성한 원본 질문은 그대로 남아 있다.
   const browsableSessions = sessions;
-  const filterOptions = getSessionFilterOptions(browsableSessions);
+  const filterOptions = getSessionFilterOptions(browsableSessions, {
+    date: filterDate, subject: filterSubject, topic: filterTopic,
+  });
   const filteredSessions = filterSessions(browsableSessions, {
     date: filterDate || undefined,
     subject: filterSubject || undefined,

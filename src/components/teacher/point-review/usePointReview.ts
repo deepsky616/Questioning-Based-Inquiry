@@ -226,13 +226,11 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
     () => classFilteredSessions.filter((session) => pendingSessionIds.has(session.id)),
     [classFilteredSessions, pendingSessionIds],
   );
-  const reviewDateOptions = getSessionFilterOptions(pendingSessions).dates;
+  const reviewFilter = { date: reviewFilterDate, subject: reviewFilterSubject, topic: reviewFilterTopic };
+  const { dates: reviewDateOptions, subjects: reviewSubjectOptions, topics: reviewTopicOptions } =
+    getSessionFilterOptions(pendingSessions, reviewFilter);
   const reviewDateMonthGroups = groupSessionDatesByMonth(reviewDateOptions);
-  const reviewSubjectBase = filterSessions(pendingSessions, { date: reviewFilterDate || undefined });
-  const reviewSubjectOptions = getSessionFilterOptions(reviewSubjectBase).subjects;
-  const reviewTopicBase = filterSessions(reviewSubjectBase, { subject: reviewFilterSubject || undefined });
-  const reviewTopicOptions = getSessionFilterOptions(reviewTopicBase).topics;
-  const reviewFilteredSessions = filterSessions(reviewTopicBase, { topic: reviewFilterTopic || undefined });
+  const reviewFilteredSessions = filterSessions(pendingSessions, reviewFilter);
   const reviewSessionMonthGroups = groupSessionsByMonth(reviewFilteredSessions);
   const hasReviewFilter = Boolean(reviewFilterDate || reviewFilterSubject || reviewFilterTopic || reviewSelectedSessionId !== "all");
   const visiblePending = classFilteredPending.filter((p) => {
@@ -367,16 +365,17 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
   }
 
   useEffect(() => {
+    if (reviewFilterDate && !reviewDateOptions.includes(reviewFilterDate)) {
+      setReviewFilterDate("");
+      setReviewSelectedSessionId("all");
+    }
     if (reviewFilterSubject && !reviewSubjectOptions.includes(reviewFilterSubject)) {
       setReviewFilterSubject("");
-      setReviewFilterTopic("");
       setReviewSelectedSessionId("all");
-      return;
     }
     if (reviewFilterTopic && !reviewTopicOptions.includes(reviewFilterTopic)) {
       setReviewFilterTopic("");
       setReviewSelectedSessionId("all");
-      return;
     }
     if (
       reviewSelectedSessionId !== "all" &&
@@ -385,6 +384,8 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
       setReviewSelectedSessionId("all");
     }
   }, [
+    reviewFilterDate,
+    reviewDateOptions,
     reviewFilterSubject,
     reviewFilterTopic,
     reviewFilteredSessions,

@@ -249,7 +249,9 @@ function AskContent() {
   }, [questionSessionIds, scopedTaskDataReady, sessions, taskScope, teacherRequestSessionIds, todayStr]);
 
   // 날짜/교과/주제 필터로 좁힌 세션 목록
-  const filterOptions = useMemo(() => getSessionFilterOptions(scopedSessions), [scopedSessions]);
+  const filterOptions = useMemo(() => getSessionFilterOptions(scopedSessions, {
+    date: filterDate, subject: filterSubject, topic: filterTopic,
+  }), [scopedSessions, filterDate, filterSubject, filterTopic]);
   const searchQuery = searchTerm.trim().toLowerCase();
   const filteredSessions = useMemo(
     () => filterSessions(scopedSessions, {

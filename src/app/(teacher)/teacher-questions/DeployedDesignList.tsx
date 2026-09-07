@@ -102,7 +102,9 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   };
 
   const deployedAll = sessions.filter((s) => (s.sharedQuestions?.length ?? 0) > 0);
-  const deployOptions = getSessionFilterOptions(deployedAll);
+  const deployOptions = getSessionFilterOptions(deployedAll, {
+    date: deployFilterDate, subject: deployFilterSubject, topic: deployFilterTopic,
+  });
   const deployDateMonthGroups = groupSessionDatesByMonth(deployOptions.dates);
   const deployFilteredByControls = filterSessions(deployedAll, {
     date: deployFilterDate || undefined,

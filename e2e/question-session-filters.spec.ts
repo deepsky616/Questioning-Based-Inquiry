@@ -85,7 +85,7 @@ async function preparePage(page: Page, role: "STUDENT" | "TEACHER", baseURL: str
 }
 
 test.describe("학생 질문하기 필터", () => {
-  test("맞는 수업이 없는 조합에서 전체로 돌아와도 화면과 초안을 유지한다", async ({ page, baseURL }) => {
+  test("관련 없는 조건을 제외하고 전체로 돌아와도 화면과 초안을 유지한다", async ({ page, baseURL }) => {
     const { errors } = await preparePage(page, "STUDENT", baseURL!);
     await page.goto("/student-ask?sessionId=filter-weather");
     const input = page.getByLabel("질문", { exact: true });
@@ -97,13 +97,16 @@ test.describe("학생 질문하기 필터", () => {
     await input.fill("구름은 왜 모양이 달라질까요?");
     await subject.selectOption("과학");
     await topic.selectOption("날씨");
-    await date.selectOption("2026-08-01");
+    await expect(date.locator('option[value="2026-08-01"]')).toHaveCount(0);
+    await expect(session).toHaveValue("filter-weather");
+    const search = page.getByRole("searchbox");
+    await search.fill("목록에 없는 수업");
     await expect(session).toBeDisabled();
-    await expect(session).toHaveValue("");
     await expect(page).not.toHaveURL(/sessionId=/);
     await date.selectOption("");
     await subject.selectOption("");
     await topic.selectOption("");
+    await search.fill("");
     await expect(session).toBeEnabled();
     await expect(session.locator("option")).toHaveCount(3);
     await expect(session).toHaveValue("filter-weather");
@@ -157,50 +160,66 @@ for (const [key, label, value, allLabel] of [
 }
 
 for (const role of ["STUDENT", "TEACHER"] as const) {
-  test(`${role === "STUDENT" ? "학생" : "교사"} 필터를 조합하고 전체로 해제하면 조건에 맞는 결과만 표시한다`, async ({ page, baseURL }) => {
-    const { errors } = await preparePage(page, role, baseURL!);
-    await page.goto(role === "STUDENT" ? "/student-ask" : "/teacher-questions");
-    const labels = role === "STUDENT"
-      ? ["날짜로 거르기", "교과로 거르기", "주제(단원)로 거르기"]
-      : ["날짜", "교과", "주제(단원)"];
-    const controls = labels.map((name) => page.getByRole("combobox", { name, exact: true }));
-    await expect(controls[0]).toBeVisible();
-    let previous = ["", "", ""];
-    const cases: Array<[string, string, string, number]> = [
-      ["", "", "", 3],
-      ["2026-08-01", "", "", 1],
-      ["2026-08-01", "과학", "", 0],
-      ["2026-08-01", "과학", "날씨", 0],
-      ["", "과학", "날씨", 1],
-      ["", "", "날씨", 1],
-      ["2026-08-01", "", "날씨", 0],
-      ["", "과학", "", 2],
-      ["", "", "", 3],
-    ];
-    for (const [date, subject, topic, count] of cases) {
-      const values = [date, subject, topic];
-      for (let index = 0; index < values.length; index += 1) {
-        if (values[index] === previous[index]) continue;
-        if (role === "STUDENT" || index === 0) await controls[index].selectOption(values[index]);
-        else {
+  for (const order of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]) {
+    test(`${role === "STUDENT" ? "학생" : "교사"} ${order.map((index) => ["날짜", "교과", "주제"][index]).join(" → ")} 순서로 연동하고 전체로 복구한다`, async ({ page, baseURL }) => {
+      const { errors } = await preparePage(page, role, baseURL!);
+      await page.goto(role === "STUDENT" ? "/student-ask" : "/teacher-questions");
+      const labels = role === "STUDENT"
+        ? ["날짜로 거르기", "교과로 거르기", "주제(단원)로 거르기"]
+        : ["날짜", "교과", "주제(단원)"];
+      const controls = labels.map((name) => page.getByRole("combobox", { name, exact: true }));
+      await expect(controls[0]).toBeVisible();
+      const keys = ["date", "subject", "topic"] as const;
+      const allLabels = ["전체 날짜", "전체 교과", "전체 주제(단원)"];
+      const selected = ["", "", ""];
+      const target = ["2026-09-06", "과학", "날씨"];
+
+      async function verifyOptions() {
+        for (let index = 0; index < 3; index += 1) {
+          const matching = sessions.filter((session) => keys.every((key, other) =>
+            other === index || !selected[other] || session[key] === selected[other],
+          ));
+          const expected = [...new Set(matching.map((session) => session[keys[index]]))].sort();
+          if (index === 0) expected.reverse();
+          if (role === "STUDENT" || index === 0) {
+            await expect.poll(() => controls[index].locator("option").evaluateAll((options) =>
+              options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
+            )).toEqual(expected);
+          } else {
+            await controls[index].click();
+            await expect(page.getByRole("option").filter({ visible: true })).toHaveText([allLabels[index], ...expected]);
+            await page.keyboard.press("Escape");
+          }
+        }
+      }
+
+      await verifyOptions();
+      for (const [index, value] of [...order.map((index) => [index, target[index]] as const), ...order.map((index) => [index, ""] as const)]) {
+        if (role === "STUDENT" || index === 0) {
+          await controls[index].selectOption(value);
+          await expect(controls[index]).toHaveValue(value);
+        } else {
           await controls[index].click();
           await page.getByRole("option", {
-            name: values[index] || (index === 1 ? "전체 교과" : "전체 주제(단원)"), exact: true,
+            name: value || allLabels[index], exact: true,
           }).click();
+          await expect(controls[index]).toHaveText(value || allLabels[index]);
+        }
+        selected[index] = value;
+        await verifyOptions();
+        const count = sessions.filter((session) => keys.every((key, index) => !selected[index] || session[key] === selected[index])).length;
+        if (role === "STUDENT") {
+          const session = page.locator("#session");
+          if (count === 0) await expect(session).toBeDisabled();
+          else {
+            await expect(session).toBeEnabled();
+            await expect(session.locator("option")).toHaveCount(count);
+          }
+        } else {
+          await expect(page.getByText(/에 관한 시험 질문입니다\./).filter({ visible: true })).toHaveCount(count);
         }
       }
-      previous = values;
-      if (role === "STUDENT") {
-        const session = page.locator("#session");
-        if (count === 0) await expect(session).toBeDisabled();
-        else {
-          await expect(session).toBeEnabled();
-          await expect(session.locator("option")).toHaveCount(count);
-        }
-      } else {
-        await expect(page.getByText(/에 관한 시험 질문입니다\./).filter({ visible: true })).toHaveCount(count);
-      }
-    }
-    expect(errors).toEqual([]);
-  });
+      expect(errors).toEqual([]);
+    });
+  }
 }

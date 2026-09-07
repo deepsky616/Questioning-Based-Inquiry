@@ -176,7 +176,9 @@ function QuestionsContent() {
     setExpandedCommentId(null);
     resetBulkState();
   };
-  const filterOptions = getSessionFilterOptions(sessions);
+  const filterOptions = getSessionFilterOptions(sessions, {
+    date: filterDate, subject: filterSubject, topic: filterTopic,
+  });
   // 배포 질문이 있는 설계 수업은 학생의 수업 탐구 질문에서 다룬다.
   const curriculumSessionIds = new Set(
     sessions.filter((s) => s.unitDesignId && !isInquiryDesignSession(s)).map((s) => s.id),

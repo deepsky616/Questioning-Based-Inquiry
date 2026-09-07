@@ -333,7 +333,9 @@ export function ExploreQuestionsView() {
   };
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
-  const filterOptions = getSessionFilterOptions(sessions);
+  const filterOptions = getSessionFilterOptions(sessions, {
+    date: filterDate, subject: filterSubject, topic: filterTopic,
+  });
   // 배포 질문 유무와 관계없이 학생이 참여한 모든 질문수업을 선택할 수 있게 한다.
   // 질문 목록에서는 아래에서 교사 배포 질문만 제외하고 학생 원본 질문은 그대로 보여준다.
   const filteredSessions = filterSessions(sessions, {
