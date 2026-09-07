@@ -240,7 +240,7 @@ async function loadDailyTrend(
       COALESCE(SUM(all_plays."goodQuestions"), 0) AS "goodQuestions"
     FROM days
     LEFT JOIN all_plays
-      ON (all_plays."completedAt" AT TIME ZONE 'Asia/Seoul')::date = days."date"
+      ON (all_plays."completedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul')::date = days."date"
     GROUP BY days."date"
     ORDER BY days."date" ASC
   `);
