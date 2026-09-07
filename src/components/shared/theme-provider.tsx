@@ -16,13 +16,22 @@ const STORAGE_KEY = "question-lab-theme";
 
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch { /* 저장소가 제한된 브라우저에서도 기본 테마로 화면을 연다. */ }
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const root = document.documentElement;
+  const dark = theme === "dark";
+  if (root.classList.contains("dark") === dark) return;
+  // 글씨와 배경의 전환 속도가 달라 잠시 대비가 사라지는 것을 방지한다.
+  root.classList.add("theme-changing");
+  root.classList.toggle("dark", dark);
+  void root.offsetHeight;
+  root.classList.remove("theme-changing");
 }
 
 function isThemeDisabledPath(pathname: string | null) {
@@ -51,7 +60,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (nextTheme: Theme) => {
     setThemeState(nextTheme);
-    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+    try { window.localStorage.setItem(STORAGE_KEY, nextTheme); } catch { /* 저장 실패와 관계없이 테마를 적용한다. */ }
     applyTheme(nextTheme);
   };
 

@@ -1,5 +1,9 @@
 /* 화면에서만 적용하여 학습지와 리포트의 인쇄 배치를 보존한다. */
 @media screen {
+  html.theme-changing *, html.theme-changing *::before, html.theme-changing *::after {
+    transition: none !important;
+  }
+
   .learning-shell {
     --background: 207 70% 98%;
     --foreground: 216 45% 18%;

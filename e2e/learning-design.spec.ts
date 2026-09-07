@@ -49,6 +49,12 @@ for (const width of [375, 768, 1440]) {
       }
       await page.getByRole("button", { name: "어두운 테마로 변경" }).click();
       await expect(page.locator("html")).toHaveClass(/dark/);
+      if (role === "TEACHER") {
+        await expectTextContrast(page.getByText("2026-09-06 · 과학 · 날씨", { exact: true }));
+        await expectTextContrast(page.getByRole("link", { name: "간단 질문수업 만들기", exact: true }));
+      } else {
+        await expectTextContrast(page.locator(".student-ask-reference-panel li").first());
+      }
       await expectNoHorizontalPageOverflow(page);
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: testInfo.outputPath("어두운화면.png"), fullPage: true });
@@ -75,5 +81,28 @@ test("학생 홈의 포인트·순위와 놀이 선택을 유지한다", async (
   await expectNoHorizontalPageOverflow(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath("질문놀이.png"), fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("브라우저가 테마 저장을 막아도 화면과 테마 전환이 동작한다", async ({ page, baseURL }) => {
+  const { errors } = await preparePage(page, "STUDENT", baseURL!);
+  await page.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === "question-lab-theme") throw new DOMException("저장소 접근 제한", "SecurityError");
+      return getItem.call(this, key);
+    };
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "question-lab-theme") throw new DOMException("저장소 접근 제한", "SecurityError");
+      return setItem.call(this, key, value);
+    };
+  });
+  await page.goto("/student-ask");
+  await expect(page.getByLabel("질문", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "어두운 테마로 변경" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("button", { name: "밝은 테마로 변경" }).click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
   expect(errors).toEqual([]);
 });
