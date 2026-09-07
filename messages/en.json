@@ -515,6 +515,8 @@
     "flaggedOnly": "⚠️ Flagged only",
     "selectSessionPrompt": "Please select a question class",
     "sequenceTitle": "Question-centered inquiry design",
+    "sequenceAlreadyDeployed": "This class already has a shared inquiry design. View or edit it in the shared designs list.",
+    "viewDeployedDesign": "View shared design",
     "deployedTitle": "Shared inquiry designs",
     "deployedDesc": "Inquiry questions shared with students by question class. You can edit and re-share or delete them.",
     "deployedAt": "Shared {time}",

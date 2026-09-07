@@ -515,6 +515,8 @@
     "flaggedOnly": "⚠️ 부적절 의심만",
     "selectSessionPrompt": "질문수업을 선택해 주세요",
     "sequenceTitle": "질문 중심 탐구설계",
+    "sequenceAlreadyDeployed": "이 수업에는 이미 배포한 탐구설계가 있어요. 배포 목록에서 확인하거나 수정해 주세요.",
+    "viewDeployedDesign": "배포한 설계 보기",
     "deployedTitle": "배포한 탐구설계",
     "deployedDesc": "질문수업별로 학생에게 배포한 탐구 질문 목록입니다. 수정 후 다시 배포하거나 삭제할 수 있어요.",
     "deployedAt": "배포 {time}",

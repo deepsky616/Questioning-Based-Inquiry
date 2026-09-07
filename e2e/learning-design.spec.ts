@@ -111,6 +111,7 @@ for (const width of [375, 768, 1440]) {
         if (touch) await inquiry.tap(); else await inquiry.click();
         await expect(page).toHaveURL(/\/teacher-curriculum$/);
         await expect(inquiry).toHaveAttribute("aria-current", "page");
+        await expect(page.locator(".learning-page-header .lucide-calendar-days")).toBeVisible();
       }
       expect(errors).toEqual([]);
     });
@@ -124,6 +125,7 @@ test("학생 홈의 포인트·순위와 놀이 선택을 유지한다", async (
   await page.route("**/api/points/leaderboard**", (route) => route.fulfill({ json: { me: { rank: 3, totalPoints: 42 } } }));
   await page.route("**/api/question-games", (route) => route.fulfill({ json: BUILT_IN_GAMES }));
   await page.goto("/student-dashboard");
+  await expect(page.locator(".learning-page-header img")).toHaveCount(0);
   await expect(page.getByText("42", { exact: true })).toBeVisible();
   await expect(page.getByText("3등", { exact: true })).toHaveCount(3);
   await expectNoHorizontalPageOverflow(page);

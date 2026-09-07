@@ -79,11 +79,12 @@ export function QuestionSequencePanel({
     try {
       // 배포 시 선택한 공개 설정 + 배포 대상을 세션에 먼저 반영
       const target = buildClassStudentTargetPayload({ targetClassValue, selectedStudentIds, students });
-      await fetch(`/api/sessions/${sessionId}`, {
+      const settingsResponse = await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...settings, ...target }),
       });
+      if (!settingsResponse.ok) throw new Error();
       const res = await fetch(`/api/sessions/${sessionId}/publish-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

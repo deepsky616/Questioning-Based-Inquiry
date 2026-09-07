@@ -13,6 +13,7 @@ export function InquiryQuestionClassWorkspaceHeader() {
   return (
     <>
       <PageHeader
+        iconHref="/teacher-sessions"
         title={tPages("teacherSessions.title")}
         description={tPages("teacherSessions.description")}
       />

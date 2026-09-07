@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -33,14 +33,17 @@ interface DeployedDesignListProps {
   sessions: QuestionSession[];
   /** 배포 삭제·재배포 후 세션 목록을 최신화한다 */
   onChanged: () => void | Promise<unknown>;
+  revealRequest?: RevealDeployedDesign;
 }
+
+export interface RevealDeployedDesign { sessionId: string }
 
 /**
  * 배포한 탐구설계 목록 (탐구 설계 탭).
  * 조회(날짜·교과·주제)와 정렬, 항목별 접기 토글, 내용별 묶음, 참고자료,
  * 인라인 수정(재배포), 삭제까지 자체 상태로 처리한다.
  */
-export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListProps) {
+export function DeployedDesignList({ sessions, onChanged, revealRequest }: DeployedDesignListProps) {
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
   const tSess = useTranslations("sessions");
@@ -81,6 +84,23 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   const [deployFilterTopic, setDeployFilterTopic] = useState("");
   const [deploySelectedSessionId, setDeploySelectedSessionId] = useState("all");
   const [deploySort, setDeploySort] = useState<"desc" | "asc">("desc");
+  const revealedRequest = useRef<RevealDeployedDesign | undefined>(undefined);
+  const entryButtons = useRef(new Map<string, HTMLButtonElement>());
+  const [focusSessionId, setFocusSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!revealRequest || revealedRequest.current === revealRequest) return;
+    if (!sessions.some(session => session.id === revealRequest.sessionId && (session.sharedQuestions?.length ?? 0) > 0)) return;
+    revealedRequest.current = revealRequest;
+    // 보기 버튼 또는 배포 완료 때만 해당 항목을 찾아 연다. 이후 조회 필터는 그대로 유지한다.
+    setDeployFilterDate("");
+    setDeployFilterSubject("");
+    setDeployFilterTopic("");
+    setDeploySelectedSessionId(revealRequest.sessionId);
+    setEditDeploySessionId(null);
+    setOpenDeploy(previous => new Set(previous).add(revealRequest.sessionId));
+    setFocusSessionId(revealRequest.sessionId);
+  }, [revealRequest, sessions]);
 
   const handleDeleteDeploy = async (sessionId: string) => {
     if (!(await confirm({ description: t("deleteDeployConfirm"), confirmText: tc("delete"), destructive: true }))) return;
@@ -128,10 +148,19 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
     }
   }, [deployFilterDate, deployFilterSubject, deployFilterTopic, deployFilteredByControls, deploySelectedSessionId]);
 
+  useEffect(() => {
+    if (!focusSessionId) return;
+    const button = entryButtons.current.get(focusSessionId);
+    if (!button) return;
+    button.focus({ preventScroll: true });
+    button.scrollIntoView({ block: "center" });
+    setFocusSessionId(null);
+  }, [focusSessionId, deployed]);
+
   if (deployedAll.length === 0) return null;
 
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <section aria-label={t("deployedTitle")} className="rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
           <span>📋</span>
@@ -161,14 +190,14 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
               <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-28"><SelectValue placeholder={tSess("allSubjects")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{tSess("allSubjects")}</SelectItem>
-                {deployOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {deployOptions.subjects.map((s) => <SelectItem key={s} value={s}>{sessionText.subjectOption(s)}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={deployFilterTopic || "__all__"} onValueChange={(v) => setDeployFilterTopic(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-36"><SelectValue placeholder={tSess("allTopics")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{tSess("allTopics")}</SelectItem>
-                {deployOptions.topics.map((tp) => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}
+                {deployOptions.topics.map((tp) => <SelectItem key={tp} value={tp}>{sessionText.topicOption(tp)}</SelectItem>)}
               </SelectContent>
             </Select>
             <select
@@ -242,9 +271,15 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
               const isEditing = editDeploySessionId === s.id;
               const publishedAt = getPublishedAt(s);
               return (
-                <div key={s.id} className="rounded-lg border bg-background">
+                <div key={s.id} data-session-id={s.id} className="rounded-lg border bg-background">
               <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-                <button type="button" onClick={() => toggleDeploy(s.id)} aria-expanded={openDeploy.has(s.id)} className="min-w-0 flex-1 text-left">
+                <button
+                  ref={button => {
+                    if (button) entryButtons.current.set(s.id, button);
+                    else entryButtons.current.delete(s.id);
+                  }}
+                  type="button" onClick={() => toggleDeploy(s.id)} aria-expanded={openDeploy.has(s.id)} className="min-w-0 flex-1 text-left"
+                >
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                     <CollapseChevron open={openDeploy.has(s.id)} />
                     <span className="truncate">{sessionText.label(s)}</span>
@@ -378,7 +413,12 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                       ...(q.flowAxis ? { flowAxis: q.flowAxis } : {}),
                       ...(q.mergedFrom && q.mergedFrom.length > 0 ? { mergedFrom: q.mergedFrom } : {}),
                     }))}
-                    onDeployed={onChanged}
+                    onDeployed={() => {
+                      setEditDeploySessionId(null);
+                      setOpenDeploy(previous => new Set(previous).add(s.id));
+                      setFocusSessionId(s.id);
+                      void onChanged();
+                    }}
                   />
                 </div>
               )}
@@ -388,6 +428,6 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
           </section>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

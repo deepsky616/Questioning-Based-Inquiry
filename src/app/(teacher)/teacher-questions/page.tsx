@@ -4,8 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
-import { QuestionSequencePanel } from "./QuestionSequencePanel";
-import { DeployedDesignList } from "./DeployedDesignList";
+import { TeacherInquiryDesignWorkspace } from "./TeacherInquiryDesignWorkspace";
 import { ParticipationSection } from "./ParticipationSection";
 import { SessionAnalysisCard } from "./SessionAnalysisCard";
 import { QuestionEditDialog } from "./QuestionEditDialog";
@@ -187,7 +186,7 @@ function QuestionsContent() {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
-  }).filter((s) => !curriculumSessionIds.has(s.id));
+  }).filter((s) => topTab === "design" || !curriculumSessionIds.has(s.id));
   useEffect(() => {
     if (!sessionsQuery.isSuccess) return;
     const correctedSessionId = resolveTeacherQuestionSessionSelection({
@@ -572,30 +571,7 @@ function QuestionsContent() {
       )}
 
       {topTab === "design" && (
-        <div className="space-y-6">
-
-      {/* 질문 중심 탐구설계 (항상 열림) */}
-      {currentSession && (
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
-            <span>🧩</span>
-            {t("sequenceTitle")}
-          </div>
-          <div className="mt-3">
-            <QuestionSequencePanel
-              sessionId={currentSession.id}
-              subject={currentSession.subject}
-              topic={currentSession.topic}
-              onDeployed={reloadSessions}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* 배포한 탐구설계 목록 (수업세션별) — 조회·정렬·접기·수정·삭제 포함 */}
-      <DeployedDesignList sessions={sessions} onChanged={reloadSessions} />
-
-        </div>
+        <TeacherInquiryDesignWorkspace currentSession={currentSession} sessions={sessions} onChanged={reloadSessions} />
       )}
 
       <QuestionEditDialog

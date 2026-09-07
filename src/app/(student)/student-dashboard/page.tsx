@@ -7,7 +7,6 @@ import { StudentReportView } from "@/components/reports/StudentReportView";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
@@ -246,7 +245,6 @@ function StudentDashboard() {
           iconHref="/student-dashboard"
           title={tPages("studentDashboard.title")}
           description={tPages("studentDashboard.description")}
-          actions={<Image src="/question-learning-cover.png" alt="" width={160} height={90} className="hidden rounded-2xl border border-sky-100 object-cover sm:block dark:border-sky-900" />}
         />
       )}
 
