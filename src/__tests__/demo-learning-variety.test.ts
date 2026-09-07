@@ -59,6 +59,13 @@ describe('학습 기록이 서로 다른 5학년 시연 자료',()=>{
       expect(question.authorId).not.toBe(like.userId);
     }
   });
+  it('오후에 구성할 때 일부 오늘 기록을 넣되 미래 시각은 만들지 않는다',()=>{
+    const now=new Date('2026-09-07T06:00:00Z');const plan=buildDemoVarietyPlan(snapshot(),now);
+    const today=plan.creates.pointLogs.filter(l=>new Date(l.createdAt!).toISOString().startsWith('2026-09-07'));
+    expect(today.length).toBeGreaterThan(5);
+    expect(new Set(today.map(l=>l.studentId)).size).toBeLessThan(28);
+    for(const log of today)expect(new Date(log.createdAt!).getTime()).toBeLessThan(now.getTime());
+  });
   it('기존 기록과 지급 합계를 보존하고 허용하지 않은 내용 변경을 거절한다',()=>{
     const before={users:[{id:'student',totalPoints:5}],pointLogs:[{id:'old',studentId:'student',points:5,status:'APPROVED'}]};
     const plan={creates:{pointLogs:[{id:'new',studentId:'student',points:3,status:'APPROVED'}]},updates:{users:[{id:'student',data:{totalPoints:8}}]}};

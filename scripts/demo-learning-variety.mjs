@@ -5,6 +5,7 @@ export const VARIETY_STUDENT_IDS = Array.from({length:28},(_,i)=>`usb-demo-stude
 export const GAME_CAPS = {dice:3,relay:3,'mystery-box':24,kaba:3,memory:0,'story-dice':3,ladder:3};
 const gameCounts = [7,4,9,1,6,3,8,0,5,2,7,0,4,6,1,9,3,5,0,8,2,6,1,7,2,5,0,4];
 const practiceCounts = [18,9,25,3,15,7,21,0,13,5,19,1,11,16,4,24,8,14,0,22,6,17,2,20,5,12,0,10];
+const todayPracticeStudents = new Set([2,3,5,6,8,9,11,14,15,17,20,21,23,24]);
 const questionCounts = [0,2,6,0,3,1,5,0,3,1,4,0,2,4,0,6,1,3,0,5,1,3,0,4,1,2,0,2];
 const preferences = [
   ['dice','relay','dice','story-dice'], ['relay','mystery-box','relay'],
@@ -19,7 +20,7 @@ const friendGroups = [
 const quizIds = ['q01','q05','q08','q10','q13','q14','q16','q19','q20','q22','q25'];
 const transformIds = ['t01','t03','t05','t08','t09'];
 const createIds = ['c01','c03','c05','c06','c08'];
-const dayKey = date => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(date);
+const dayKey = date => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date(date));
 const canonical = value => JSON.stringify(value,(_key,item)=>item&&typeof item==='object'&&!Array.isArray(item)&&!(item instanceof Date)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
 export { canonical };
 
@@ -31,6 +32,7 @@ export function buildDemoVarietyPlan(before, anchor = new Date()) {
     const ledger=before.pointLogs.filter(l=>l.studentId===user.id&&l.status==='APPROVED').reduce((n,l)=>n+l.points,0);
     if(ledger!==user.totalPoints)throw new Error('기존 포인트 합계가 지급 기록과 일치하지 않습니다.');
   }
+  const includeToday = anchor.getTime() >= new Date(`${dayKey(anchor)}T14:00:00+09:00`).getTime();
   const at = (days, minute=0) => {
     const date=new Date(`${dayKey(anchor)}T10:00:00+09:00`);
     date.setUTCDate(date.getUTCDate()-days);
@@ -58,7 +60,7 @@ export function buildDemoVarietyPlan(before, anchor = new Date()) {
       const mode=(i%4===0?turn%4===1:i%4===1?turn%3!==0:(turn+i)%3===0)?'AI':'SOLO';
       const recognized=gameId==='memory'?0:gameId==='mystery-box'?3+(i+turn)%7:1+(i+turn)%3;
       const points=recognized*(mode==='AI'?2:1)+(mode==='AI'?3:2);
-      const completedAt=at(1+turn*3+i%3,20+i*3+turn);
+      const completedAt=at(includeToday&&turn===0&&i%3===0?0:1+turn*3+i%3,20+i*3+turn);
       const runId=`${VARIETY_PREFIX}run-${i+1}-${turn+1}`;
       const dailyLimit=mode==='AI'?50:30;
       const lesson=lessons[(i+turn)%lessons.length];
@@ -72,7 +74,7 @@ export function buildDemoVarietyPlan(before, anchor = new Date()) {
       const quizType=mode==='quiz'?((turn+i)%2===0?'closure':'cognitive'):null;
       // 학생마다 성공 비율이 다르고 최근 시도에서 조금 더 나아지는 흐름을 만든다.
       const correct=(turn*7+i*3)%10 < Math.min(9,4+i%5+(turn<6?2:0));
-      const createdAt=at(1+Math.floor(turn/2)+i%3,95+i+turn*2);
+      const createdAt=at(includeToday&&turn===0&&todayPracticeStudents.has(i)?0:1+Math.floor(turn/2)+i%3,95+i+turn*2);
       const id=`${VARIETY_PREFIX}practice-${i+1}-${turn+1}`;
       c.practices.push({id,studentId:user.id,mode,itemId,quizType,correct,createdAt});
       if(correct){
