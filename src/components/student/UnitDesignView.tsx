@@ -193,7 +193,9 @@ export function UnitDesignView() {
   }, [orderedQuestions]);
 
   // 조회(필터)·검색·정렬 적용 + 진행 중/지난 수업 구분
-  const filterOptions = getSessionFilterOptions(sessions);
+  const filterOptions = getSessionFilterOptions(sessions, {
+    date: filterDate, subject: filterSubject, topic: filterTopic,
+  });
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const searchLc = search.trim().toLowerCase();
   const filteredSessions = filterSessions(sessions, {

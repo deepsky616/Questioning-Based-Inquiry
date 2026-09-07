@@ -199,7 +199,9 @@ function TeacherSessionsPageContent() {
     handleToggleSetting(id, "likesVisibleToPeers", currentValue);
 
   // 세션 목록 조회 필터(날짜·교과·주제·참여 상태) + 정렬
-  const filterOptions = getSessionFilterOptions(sessions);
+  const filterOptions = getSessionFilterOptions(sessions, {
+    date: listFilterDate, subject: listFilterSubject, topic: listFilterTopic,
+  });
   const baseVisibleSessions = filterSessions(sessions, {
     date: listFilterDate || undefined,
     subject: listFilterSubject || undefined,
