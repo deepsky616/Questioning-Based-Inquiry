@@ -57,7 +57,6 @@ function QuestionsContent() {
   const tc = useTranslations("common");
   const tSess = useTranslations("sessions");
   const tTarget = useTranslations("targetSelector");
-  const ct = useContentTranslation();
   const { search, setSearch, updateViewState, viewState } = useTeacherQuestionViewState();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -161,6 +160,7 @@ function QuestionsContent() {
   });
   const questionPage = questionsQuery.data ?? EMPTY_QUESTION_PAGE;
   const questions = questionPage.items;
+  const ct = useContentTranslation(questions.map(item => ({type: "QUESTION" as const, id: item.id, original: item.content})));
   const { pageInfo, summary } = questionPage;
   const isLoading = questionsQuery.isPending || questionsQuery.isPlaceholderData;
   const reloadQuestions = () => questionsQuery.refetch();

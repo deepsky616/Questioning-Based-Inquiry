@@ -45,9 +45,9 @@ export function CommentThread({
   const user = getSessionUser(session);
   const t = useTranslations("comment");
   const tc = useTranslations("common");
-  const ct = useContentTranslation();
   const queryClient = useQueryClient();
   const [comments, setComments] = useState<ThreadComment[]>(preloaded ?? []);
+  const ct = useContentTranslation(comments.map(item => ({type: "COMMENT" as const, id: item.id, original: item.content})));
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!preloaded);
   const [text, setText] = useState("");

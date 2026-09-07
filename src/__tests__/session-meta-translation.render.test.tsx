@@ -4,9 +4,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("next-intl", () => ({
   useLocale: () => "ko",
+  useTranslations: () => (key: string) => key,
 }));
 
 function SessionLabelProbe() {
@@ -38,7 +40,7 @@ describe("질문수업 제목 번역 도우미", () => {
   afterEach(cleanup);
 
   it("질문의 축약된 수업 정보에도 전체 수업 목록의 학년을 보완한다", () => {
-    render(<SessionLabelProbe />);
+    render(<QueryClientProvider client={new QueryClient()}><SessionLabelProbe /></QueryClientProvider>);
 
     expect(screen.getByTestId("full-label")).toHaveTextContent(
       "2026-07-28 · 5학년 · 수학 · 6. 평면도형의 둘레와 넓이",

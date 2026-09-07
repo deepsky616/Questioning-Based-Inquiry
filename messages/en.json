@@ -2269,7 +2269,9 @@
     "translating": "Translating...",
     "translateAll": "Translate all",
     "showAllOriginal": "Show all original",
-    "translateFailed": "Translation failed"
+    "translateFailed": "Translation failed",
+    "autoFailed": "Some content could not be translated, so the original is shown.",
+    "retry": "Retry translation"
   },
   "pointLabel": {
     "award_BEST_QUESTION": "Best question",

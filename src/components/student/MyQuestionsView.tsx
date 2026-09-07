@@ -85,7 +85,6 @@ export function MyQuestionsView() {
   const tEx = useTranslations("explore");
   const tAsk = useTranslations("ask");
   const tCls = useTranslations("classification");
-  const ct = useContentTranslation();
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
@@ -246,6 +245,7 @@ export function MyQuestionsView() {
     sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b)
   );
   const summaryLikes = filtered.reduce((sum, question) => sum + (question.likeCount ?? 0), 0);
+  const ct = useContentTranslation(displayed.map(item => ({type: "QUESTION" as const, id: item.id, original: item.content})));
   const summaryComments = filtered.reduce(
     (sum, question) => sum + (commentCountOverride[question.id] ?? question.commentCount ?? question.comments?.length ?? 0),
     0,
