@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-export const STUDENT_NAMES = Array.from({ length: 28 }, (_, index) => `학생${index + 1}`);
+export const STUDENT_NAMES = Array.from({ length: 28 }, (_, index) => index === 0 ? "김질문" : `학생${index + 1}`);
 
 const DEMO = {
   school: "질문초등학교",
@@ -2357,7 +2357,7 @@ export async function seedUsbDemo() {
     }
 
     console.log(
-      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 순위 비교 학생 ${rankingStudentCount}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 학생1 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
+      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 순위 비교 학생 ${rankingStudentCount}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
     );
   } finally {
     await prisma.$disconnect();

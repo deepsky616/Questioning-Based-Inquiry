@@ -17,7 +17,7 @@ describe("기존 시연 학생 가명 변경 범위", () => {
   it("조회 순서와 무관하게 같은 학생에게 같은 번호를 지정한다", () => {
     const plan = buildDemoStudentNamePlan(accounts().reverse());
     expect(plan).toHaveLength(405);
-    expect(plan[0]).toMatchObject({ id: "usb-demo-student-01", after: "학생1" });
+    expect(plan[0]).toMatchObject({ id: "usb-demo-student-01", after: "김질문" });
     expect(plan[27]).toMatchObject({ id: "usb-demo-student-28", after: "학생28" });
     expect(plan[28]).toMatchObject({ id: "usb-demo-rank-01-01", after: "학생29" });
     expect(plan[404]).toMatchObject({ id: "usb-demo-rank-14-29", after: "학생405" });

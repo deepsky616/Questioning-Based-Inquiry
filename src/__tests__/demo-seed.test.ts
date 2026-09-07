@@ -18,7 +18,7 @@ import * as demoSeedModule from "../../scripts/seed-usb-demo.mjs";
 describe("USB 시연 학급 자료 생성 명령", () => {
   it("4학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
     expect(STUDENT_NAMES).toHaveLength(28);
-    expect(STUDENT_NAMES[0]).toBe("학생1");
+    expect(STUDENT_NAMES[0]).toBe("김질문");
     expect(STUDENT_NAMES[27]).toBe("학생28");
   });
 
