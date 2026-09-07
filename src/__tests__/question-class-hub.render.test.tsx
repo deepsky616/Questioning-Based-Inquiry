@@ -143,16 +143,25 @@ afterEach(() => {
 });
 
 describe("질문수업 상단 행동", () => {
-  it("세 작업공간을 모두 표시하고 현재 화면을 알린다", () => {
-    renderWithProviders(<QuestionClassWorkspaceNav activeView="inquiry" />);
+  it.each(["list", "quick", "inquiry"] as const)("세 작업공간을 모두 표시하고 현재 화면 %s을 알린다", (activeView) => {
+    renderWithProviders(<QuestionClassWorkspaceNav activeView={activeView} />);
 
     expect(screen.getByRole("link", { name: ko.sessions.listViewTitle })).toHaveAttribute(
       "href",
       "/teacher-sessions",
     );
+    const links = [
+      ["list", ko.sessions.listViewTitle],
+      ["quick", ko.sessions.createQuickQuestionClass],
+      ["inquiry", ko.sessions.createInquiryQuestionClass],
+    ];
+    for (const [view, label] of links) {
+      const link = screen.getByRole("link", { name: label });
+      if (view === activeView) expect(link).toHaveAttribute("aria-current", "page");
+      else expect(link).not.toHaveAttribute("aria-current");
+    }
     expect(screen.getByRole("link", { name: ko.sessions.createInquiryQuestionClass })).toHaveAttribute(
-      "aria-current",
-      "page",
+      "href", "/teacher-curriculum",
     );
     expect(screen.getByRole("link", { name: ko.sessions.createQuickQuestionClass })).toHaveAttribute(
       "href",

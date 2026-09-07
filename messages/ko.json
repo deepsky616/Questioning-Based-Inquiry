@@ -1122,6 +1122,8 @@
     "createActionsLabel": "질문수업 만들기",
     "createInquiryQuestionClass": "탐구질문으로 수업 만들기",
     "createQuickQuestionClass": "간단 질문수업 만들기",
+    "createInquiryQuestionClassHelp": "교육과정과 성취기준을 바탕으로 수업의 핵심 질문과 탐구 질문을 차근차근 설계합니다. 질문과 참고 자료를 함께 준비하는 수업에 알맞아요.",
+    "createQuickQuestionClassHelp": "날짜, 교과, 주제와 참여할 학생만 정하면 바로 질문을 받을 수 있습니다. 짧은 활동이나 수업 중 떠오른 질문을 모을 때 알맞아요.",
     "closeQuickQuestionClass": "간단 질문수업 닫기",
     "workspaceNavLabel": "질문수업 작업공간",
     "listViewTitle": "질문수업 목록",

@@ -3,36 +3,7 @@ import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-export const STUDENT_NAMES = [
-  "김질문",
-  "이태하",
-  "박서준",
-  "최하윤",
-  "정민준",
-  "강서연",
-  "조지호",
-  "윤지아",
-  "장도윤",
-  "임수아",
-  "한예준",
-  "오채원",
-  "서시우",
-  "신유나",
-  "권주원",
-  "황예린",
-  "안현우",
-  "송다은",
-  "전우진",
-  "홍가은",
-  "문준서",
-  "양나연",
-  "손도현",
-  "배지민",
-  "백하준",
-  "허소율",
-  "남건우",
-  "고서아",
-];
+export const STUDENT_NAMES = Array.from({ length: 28 }, (_, index) => `학생${index + 1}`);
 
 const DEMO = {
   school: "질문초등학교",
@@ -77,16 +48,6 @@ export const DEMO_RANKING_CLASS_BLUEPRINTS = [
   { school: "탐구초등학교", grade: "4", className: "3", studentCount: 27, averagePoints: 25 },
   { school: "탐구초등학교", grade: "4", className: "4", studentCount: 28, averagePoints: 21.5 },
   { school: "탐구초등학교", grade: "4", className: "5", studentCount: 29, averagePoints: 17 },
-];
-
-const RANKING_STUDENT_SURNAMES = [
-  "김", "이", "박", "최", "정", "강", "조", "윤",
-  "장", "임", "한", "오", "서", "신", "권", "황",
-  "안", "송", "전", "홍", "문", "양", "손", "배",
-];
-const RANKING_STUDENT_GIVEN_NAMES = [
-  "가온", "나윤", "다온", "라희", "민재", "서윤", "예준", "지우",
-  "하린", "도현", "수빈", "채민", "유진", "시온", "주아", "현준",
 ];
 
 export const DEMO_SESSION_BLUEPRINTS = [
@@ -215,14 +176,7 @@ export function buildDemoRankingStudents() {
     );
     return pointTotals.map((totalPoints, index) => {
       const number = index + 1;
-      const name = `${
-        RANKING_STUDENT_SURNAMES[studentIndex % RANKING_STUDENT_SURNAMES.length]
-      }${
-        RANKING_STUDENT_GIVEN_NAMES[
-          Math.floor(studentIndex / RANKING_STUDENT_SURNAMES.length)
-          % RANKING_STUDENT_GIVEN_NAMES.length
-        ]
-      }`;
+      const name = `학생${STUDENT_NAMES.length + studentIndex + 1}`;
       studentIndex += 1;
       return {
         id: `usb-demo-rank-${pad(classIndex + 1)}-${pad(number)}`,
@@ -2403,7 +2357,7 @@ export async function seedUsbDemo() {
     }
 
     console.log(
-      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 순위 비교 학생 ${rankingStudentCount}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
+      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 순위 비교 학생 ${rankingStudentCount}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 학생1 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
     );
   } finally {
     await prisma.$disconnect();

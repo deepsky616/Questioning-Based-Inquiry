@@ -121,6 +121,7 @@ import {
   analyzeMysteryQuestion,
   getMysteryItem,
   mysteryQuestionForAttribute,
+  type MysteryKnowledgeVersion,
 } from "@/lib/mystery-box-rules";
 import {
   applyQuestionGameRunAction,
@@ -341,6 +342,7 @@ async function createMystery(
 
 type TestMysteryState = {
   privateItemId: string;
+  knowledgeVersion: MysteryKnowledgeVersion;
   mysteryLocale: "ko" | "en";
   questionCount: number;
   mysteryNextStep: "STUDENT_ACTION" | "AI_TURN" | "COMPLETE";
@@ -4184,7 +4186,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
         question,
         secret,
         "ko",
-        4,
+        storedMysteryState().knowledgeVersion,
       ).answer;
 
       const response = await submitMysteryQuestion(0, 1, question);

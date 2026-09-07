@@ -18,7 +18,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label={isDark ? t("themeLightAria") : t("themeDarkAria")}
       title={isDark ? t("themeLight") : t("themeDark")}
-      className="gap-2"
+      className="gap-2 text-base font-medium"
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       <span className="hidden sm:inline">{isDark ? t("themeLight") : t("themeDark")}</span>

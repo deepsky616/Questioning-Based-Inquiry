@@ -47,7 +47,7 @@ export interface AccountProfile {
 }
 
 const ITEM_GAP = 4; // gap-1
-const MORE_RESERVE = 104; // "더보기/More ▾" 버튼 + 여유 폭
+const MORE_RESERVE = 112; // "더보기/More ▾" 버튼 + 여유 폭
 
 /**
  * 인라인 네비(lg 이상). 남는 폭에 맞춰 들어가는 항목만 보이고,
@@ -108,10 +108,10 @@ function InlineNav({
 
   const linkClass = (page: NavPage) =>
     cn(
-      "shrink-0 whitespace-nowrap px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+      "shrink-0 whitespace-nowrap px-2.5 py-2 rounded-md text-base font-semibold transition-colors",
       isActive(page)
         ? "bg-muted text-primary"
-        : "text-muted-foreground hover:text-primary hover:bg-muted/60",
+        : "text-foreground/80 hover:text-primary hover:bg-muted/60",
     );
 
   return (
@@ -119,7 +119,7 @@ function InlineNav({
       {/* 폭 측정용(보이지 않음, 레이아웃 영향 없음) */}
       <div ref={measureRef} aria-hidden className="invisible pointer-events-none absolute left-0 top-0 flex gap-1">
         {pages.map((p) => (
-          <span key={p.href} className="px-2.5 py-2 text-sm font-medium whitespace-nowrap">
+          <span key={p.href} className="px-2.5 py-2 text-base font-semibold whitespace-nowrap">
             {p.label}
           </span>
         ))}
@@ -137,10 +137,10 @@ function InlineNav({
             <button
               type="button"
               className={cn(
-                "shrink-0 inline-flex items-center gap-0.5 whitespace-nowrap px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+                "shrink-0 inline-flex items-center gap-0.5 whitespace-nowrap px-2.5 py-2 rounded-md text-base font-semibold transition-colors",
                 overflowActive
                   ? "bg-muted text-primary"
-                  : "text-muted-foreground hover:text-primary hover:bg-muted/60",
+                  : "text-foreground/80 hover:text-primary hover:bg-muted/60",
               )}
             >
               {moreLabel}
@@ -154,10 +154,10 @@ function InlineNav({
                 href={p.href}
                 onClick={() => setMoreOpen(false)}
                 className={cn(
-                  "block px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "block px-3 py-2 rounded-md text-base font-semibold transition-colors",
                   isActive(p)
                     ? "bg-muted text-primary"
-                    : "text-muted-foreground hover:text-primary hover:bg-muted/60",
+                    : "text-foreground/80 hover:text-primary hover:bg-muted/60",
                 )}
               >
                 {p.label}
@@ -227,7 +227,7 @@ export function AppNav({
                 <button
                   type="button"
                   aria-label={t("accountMenu")}
-                  className="hidden min-[420px]:inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary xl:max-w-[14rem]"
+                  className="hidden min-[420px]:inline-flex h-11 items-center gap-2 rounded-md px-2 text-base font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary xl:max-w-[14rem]"
                 >
                   <UserCircle className="h-5 w-5 shrink-0" />
                   <span className="hidden xl:inline truncate">
@@ -238,7 +238,7 @@ export function AppNav({
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 p-0">
                 <div className="border-b px-4 py-3">
-                  <p className="truncate text-sm font-semibold text-foreground">{userName} {roleSuffix}</p>
+                  <p className="truncate text-base font-semibold text-foreground">{userName} {roleSuffix}</p>
                   {(accountProfile?.school || classInfo) && (
                     <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                       {accountProfile?.school && <p className="truncate">{accountProfile.school}</p>}
@@ -251,7 +251,7 @@ export function AppNav({
                     <Link
                       href={accountLinks.settingsHref}
                       onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-base text-foreground hover:bg-muted"
                     >
                       <SettingsLinkIcon className="h-4 w-4 text-muted-foreground" />
                       {settingsLabel}
@@ -261,7 +261,7 @@ export function AppNav({
                     <Link
                       href={accountLinks.withdrawalHref}
                       onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-base text-foreground hover:bg-muted"
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
                       {t("withdraw")}
@@ -271,7 +271,7 @@ export function AppNav({
                     <Link
                       href={accountLinks.studentManagementHref}
                       onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-base text-foreground hover:bg-muted"
                     >
                       <Users className="h-4 w-4 text-muted-foreground" />
                       {t("studentManagement")}
@@ -281,7 +281,7 @@ export function AppNav({
                     <Link
                       href={accountLinks.rankingsHref}
                       onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-base text-foreground hover:bg-muted"
                     >
                       <Trophy className="h-4 w-4 text-muted-foreground" />
                       {t("rankings")}
@@ -291,7 +291,7 @@ export function AppNav({
                     <Link
                       href={accountLinks.detailedReportHref}
                       onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-base text-foreground hover:bg-muted"
                     >
                       <BarChart3 className="h-4 w-4 text-muted-foreground" />
                       {t("detailedReport")}
@@ -300,7 +300,7 @@ export function AppNav({
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base text-foreground hover:bg-muted"
                   >
                     <LogOut className="h-4 w-4 text-muted-foreground" />
                     {t("logout")}
@@ -332,10 +332,10 @@ export function AppNav({
                 href={p.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "block px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "block px-3 py-2 rounded-md text-base font-semibold transition-colors",
                   isActive(p)
                     ? "bg-muted text-primary"
-                    : "text-muted-foreground hover:text-primary hover:bg-muted/60",
+                    : "text-foreground/80 hover:text-primary hover:bg-muted/60",
                 )}
               >
                 {p.label}
@@ -345,7 +345,7 @@ export function AppNav({
               <LanguageToggle id="mobile-lang-select" compactOnMobile={false} />
             </div>
             <div className="flex items-center justify-between pt-2 mt-1 border-t">
-              <span className="text-sm text-muted-foreground truncate">{userName} {roleSuffix}</span>
+              <span className="text-base text-muted-foreground truncate">{userName} {roleSuffix}</span>
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 {t("logout")}
               </Button>
@@ -355,7 +355,7 @@ export function AppNav({
                 <Link
                   href={accountLinks.settingsHref}
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                 >
                   <SettingsLinkIcon className="h-4 w-4" />
                   {settingsLabel}
@@ -364,7 +364,7 @@ export function AppNav({
                   <Link
                     href={accountLinks.withdrawalHref}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                   >
                     <Trash2 className="h-4 w-4" />
                     {t("withdraw")}
@@ -374,7 +374,7 @@ export function AppNav({
                   <Link
                     href={accountLinks.studentManagementHref}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                   >
                     <Users className="h-4 w-4" />
                     {t("studentManagement")}
@@ -384,7 +384,7 @@ export function AppNav({
                   <Link
                     href={accountLinks.rankingsHref}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                   >
                     <Trophy className="h-4 w-4" />
                     {t("rankings")}
@@ -394,7 +394,7 @@ export function AppNav({
                   <Link
                     href={accountLinks.detailedReportHref}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                   >
                     <BarChart3 className="h-4 w-4" />
                     {t("detailedReport")}

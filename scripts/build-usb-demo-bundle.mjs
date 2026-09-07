@@ -117,7 +117,7 @@ function createLauncherHtml(targetUrl) {
 <body>
   <main>
     <h1>질문연구소</h1>
-    <p>웹브라우저에서 김질문 학생 화면을 준비하고 있습니다.</p>
+    <p>웹브라우저에서 학생1 화면을 준비하고 있습니다.</p>
     <a href="${safeTarget}">질문연구소 열기</a>
   </main>
   <script>

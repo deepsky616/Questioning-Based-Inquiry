@@ -21,7 +21,7 @@ type LaunchState =
 
 const stateContent = {
   loading: {
-    title: "김질문 학생 화면을 준비하고 있어요",
+    title: "학생1 화면을 준비하고 있어요",
     description: "잠시만 기다려 주세요.",
     icon: LoaderCircle,
   },

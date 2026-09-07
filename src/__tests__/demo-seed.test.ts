@@ -17,18 +17,9 @@ import * as demoSeedModule from "../../scripts/seed-usb-demo.mjs";
 
 describe("USB 시연 학급 자료 생성 명령", () => {
   it("4학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
-    const source = readFileSync("scripts/seed-usb-demo.mjs", "utf8");
-    const namesMatch = source.match(
-      /export const STUDENT_NAMES = \[([\s\S]*?)\];/,
-    );
-    expect(namesMatch?.[1]).toBeTruthy();
-
-    const names = [...(namesMatch?.[1].matchAll(/"([^"]+)"/g) ?? [])]
-      .map((match) => match[1]);
-
-    expect(names).toHaveLength(28);
-    expect(names[0]).toBe("김질문");
-    expect(names[27]).toBe("고서아");
+    expect(STUDENT_NAMES).toHaveLength(28);
+    expect(STUDENT_NAMES[0]).toBe("학생1");
+    expect(STUDENT_NAMES[27]).toBe("학생28");
   });
 
   it("시연 사용자 범위만 초기화하고 반복 실행할 수 있다", () => {
@@ -281,6 +272,9 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     expect(rankingStudents).toHaveLength(377);
     expect(new Set(rankingStudents.map(({ id }) => id)).size).toBe(377);
     expect(new Set(rankingStudents.map(({ name }) => name)).size).toBe(377);
+    expect(rankingStudents[0].name).toBe("학생29");
+    expect(rankingStudents.at(-1)?.name).toBe("학생405");
+    expect(new Set([...STUDENT_NAMES, ...rankingStudents.map(({ name }) => name)]).size).toBe(405);
     expect(
       new Set(DEMO_RANKING_CLASS_BLUEPRINTS.map(({ studentCount }) => studentCount)),
     ).toEqual(new Set([23, 24, 25, 26, 27, 28, 29, 30]));
