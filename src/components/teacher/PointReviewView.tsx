@@ -124,8 +124,6 @@ export function PointReviewView({ classFilter }: { classFilter?: PointReviewClas
                     value={reviewFilterDate}
                     onChange={(event) => {
                       setReviewFilterDate(event.target.value);
-                      setReviewFilterSubject("");
-                      setReviewFilterTopic("");
                       setReviewSelectedSessionId("all");
                     }}
                   >
@@ -146,7 +144,6 @@ export function PointReviewView({ classFilter }: { classFilter?: PointReviewClas
                     value={reviewFilterSubject || "__all__"}
                     onValueChange={(value) => {
                       setReviewFilterSubject(value === "__all__" ? "" : value);
-                      setReviewFilterTopic("");
                       setReviewSelectedSessionId("all");
                     }}
                   >

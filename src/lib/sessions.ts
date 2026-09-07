@@ -237,8 +237,8 @@ export interface SessionFilter {
   topic?: string;
 }
 
-/** 세션 목록에서 날짜/교과/주제의 고유 옵션을 정렬해 추출한다(빈 값 제외). */
-export function getSessionFilterOptions<T extends SessionLike>(sessions: T[]): {
+/** 각 드롭다운은 나머지 두 조건에 맞는 고유 항목을 제공한다. 자기 조건은 제외해 값을 다시 바꿀 수 있다. */
+export function getSessionFilterOptions<T extends SessionLike>(sessions: T[], filter: SessionFilter = {}): {
   dates: string[];
   subjects: string[];
   topics: string[];
@@ -248,9 +248,9 @@ export function getSessionFilterOptions<T extends SessionLike>(sessions: T[]): {
   const uniqDatesDesc = (values: string[]) =>
     Array.from(new Set(values.map((v) => v.trim()).filter(isValidSessionDateString))).sort((a, b) => b.localeCompare(a));
   return {
-    dates: uniqDatesDesc(sessions.map((s) => s.date)),
-    subjects: uniqSorted(sessions.map((s) => s.subject)),
-    topics: uniqSorted(sessions.map((s) => s.topic)),
+    dates: uniqDatesDesc(filterSessions(sessions, { subject: filter.subject, topic: filter.topic }).map((s) => s.date)),
+    subjects: uniqSorted(filterSessions(sessions, { date: filter.date, topic: filter.topic }).map((s) => s.subject)),
+    topics: uniqSorted(filterSessions(sessions, { date: filter.date, subject: filter.subject }).map((s) => s.topic)),
   };
 }
 
