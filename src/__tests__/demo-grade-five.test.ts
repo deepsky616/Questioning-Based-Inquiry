@@ -18,6 +18,11 @@ describe("5학년 수업 내용과 성취기준", () => {
       expect(JSON.stringify(design)).not.toMatch(/4학년|\[4(?:국|수|사|과)/);
     }
   });
+  it("사실적 질문도 응답 범위에 따라 열린 질문과 닫힌 질문으로 나눈다", () => {
+    expect(GRADE_FIVE_LESSONS.pastKorean.questions[1]).toMatchObject({type:"factual",closure:"open"});
+    expect(GRADE_FIVE_LESSONS.pastMath.questions[2]).toMatchObject({type:"factual",closure:"closed"});
+    expect(GRADE_FIVE_LESSONS.pastSocial.questions[0]).toMatchObject({type:"factual",closure:"open"});
+  });
   it("평균, 삼각형, 사다리꼴의 계산 예시가 올바르다", () => {
     expect(GRADE_FIVE_LESSONS.pastMath.questions[2].answer).toContain("24 나누기 4인 6");
     expect(GRADE_FIVE_LESSONS.exploreMath.questions[1].answer).toContain("20제곱센티미터");

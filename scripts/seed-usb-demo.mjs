@@ -212,7 +212,7 @@ const KIM_QUESTION_PLANS = [
   ["exploreKorean", 1], ["exploreKorean", 3], ["exploreMath", 0], ["exploreMath", 1],
 ].map(([sessionKey, questionIndex]) => {
   const item = GRADE_FIVE_LESSONS[sessionKey].questions[questionIndex];
-  return { sessionKey, content: sessionKey.startsWith("explore") ? `직접 확인해 보면 ${item.content}` : item.content, closure: item.type === "factual" ? "closed" : "open", cognitive: item.type,
+  return { sessionKey, content: sessionKey.startsWith("explore") ? `직접 확인해 보면 ${item.content}` : item.content, closure: item.closure, cognitive: item.type,
     ...(!sessionKey.startsWith("explore") ? { similarityIndex: questionIndex } : {}) };
 });
 const STUDENT_ANALYSIS_COPY = Object.fromEntries(ANALYSIS_SESSION_BLUEPRINTS.map((session, index) => [session.key, gradeFiveAnalysis(session.key, index)]));
@@ -298,7 +298,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
         sessionId: session.id,
         content,
         context: session.topic,
-        closure: inquiryType === "factual" ? "closed" : "open",
+        closure: GRADE_FIVE_LESSONS[session.key].questions[bankIndex].closure,
         cognitive: inquiryType,
         inquiryType,
         similarityKey,
@@ -320,7 +320,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
         sessionId: session.id,
         content,
         context: session.topic,
-        closure: SESSION_QUESTION_TYPES[session.key][questionIndex] === "factual" ? "closed" : "open",
+        closure: GRADE_FIVE_LESSONS[session.key].questions[questionIndex].closure,
         cognitive: SESSION_QUESTION_TYPES[session.key][questionIndex],
         inquiryType: SESSION_QUESTION_TYPES[session.key][questionIndex],
         createdDays: 0,
@@ -709,6 +709,7 @@ export function buildDemoClassInquiryQuestions(
         keywords: lesson.keywords.map(([term, meaning]) => ({term, meaning})),
       }} : {}),
       type: group.type,
+      closure: group.questions[0].closure ?? "open",
       content: group.questions[0].content,
       contentGroup: flowStep.contentGroup,
       lessonPhase: flowStep.lessonPhase,
@@ -989,7 +990,7 @@ async function createInquiryLearningData(tx, studentIds) {
           content: question.content,
           normalizedContent: question.content,
           dedupeKey: id,
-          closure: question.type === "factual" ? "closed" : "open",
+          closure: question.closure ?? "open",
           cognitive: question.type,
           closureScore: 0.95,
           cognitiveScore: 0.95,
