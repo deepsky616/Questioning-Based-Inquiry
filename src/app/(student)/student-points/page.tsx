@@ -9,7 +9,7 @@ export default function StudentPointsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("studentPoints.title")} description={tPages("studentPoints.description")} />
+      <PageHeader iconHref="/student-points" title={tPages("studentPoints.title")} description={tPages("studentPoints.description")} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <StudentRankPanel highlightSelf scrollable={false} />

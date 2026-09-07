@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
+import { LearningSectionIcon } from "./LearningSectionIcon";
 import { cn } from "@/lib/utils";
 import { clearQuestionDrafts } from "@/lib/question-draft";
 
@@ -108,7 +109,7 @@ function InlineNav({
 
   const linkClass = (page: NavPage) =>
     cn(
-      "shrink-0 whitespace-nowrap px-2.5 py-2 rounded-md text-base font-semibold transition-colors",
+      "inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap px-2.5 py-2 rounded-xl text-base font-semibold transition-colors",
       isActive(page)
         ? "bg-muted text-primary"
         : "text-foreground/80 hover:text-primary hover:bg-muted/60",
@@ -119,14 +120,16 @@ function InlineNav({
       {/* 폭 측정용(보이지 않음, 레이아웃 영향 없음) */}
       <div ref={measureRef} aria-hidden className="invisible pointer-events-none absolute left-0 top-0 flex gap-1">
         {pages.map((p) => (
-          <span key={p.href} className="px-2.5 py-2 text-base font-semibold whitespace-nowrap">
+          <span key={p.href} className="inline-flex min-h-11 items-center gap-2 px-2.5 py-2 text-base font-semibold whitespace-nowrap">
+            <LearningSectionIcon href={p.href} compact />
             {p.label}
           </span>
         ))}
       </div>
 
       {visible.map((p) => (
-        <Link key={p.href} href={p.href} className={linkClass(p)}>
+        <Link key={p.href} href={p.href} className={linkClass(p)} aria-current={isActive(p) ? "page" : undefined}>
+          <LearningSectionIcon href={p.href} compact />
           {p.label}
         </Link>
       ))}
@@ -153,13 +156,15 @@ function InlineNav({
                 key={p.href}
                 href={p.href}
                 onClick={() => setMoreOpen(false)}
+                aria-current={isActive(p) ? "page" : undefined}
                 className={cn(
-                  "block px-3 py-2 rounded-md text-base font-semibold transition-colors",
+                  "flex min-h-11 items-center gap-2 px-3 py-2 rounded-xl text-base font-semibold transition-colors",
                   isActive(p)
                     ? "bg-muted text-primary"
                     : "text-foreground/80 hover:text-primary hover:bg-muted/60",
                 )}
               >
+                <LearningSectionIcon href={p.href} compact />
                 {p.label}
               </Link>
             ))}
@@ -206,7 +211,7 @@ export function AppNav({
   ].filter(Boolean).join(" ");
 
   return (
-    <header className="bg-card shadow-sm border-b sticky top-0 z-30">
+    <header className="learning-app-nav bg-card shadow-sm border-b sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center gap-3 h-16">
           {/* 왼쪽: 브랜드 + 인라인 네비(남는 공간 내에서 priority-plus) */}
@@ -331,13 +336,15 @@ export function AppNav({
                 key={p.href}
                 href={p.href}
                 onClick={() => setOpen(false)}
+                aria-current={isActive(p) ? "page" : undefined}
                 className={cn(
-                  "block px-3 py-2 rounded-md text-base font-semibold transition-colors",
+                  "flex min-h-11 items-center gap-2 px-3 py-2 rounded-xl text-base font-semibold transition-colors",
                   isActive(p)
                     ? "bg-muted text-primary"
                     : "text-foreground/80 hover:text-primary hover:bg-muted/60",
                 )}
               >
+                <LearningSectionIcon href={p.href} compact />
                 {p.label}
               </Link>
             ))}

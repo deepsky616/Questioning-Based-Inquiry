@@ -2,6 +2,7 @@
 
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "next-intl";
+import { Check, PencilLine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,14 +65,15 @@ export function StudentAskInputCard({
         <CardDescription>{t("inputDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="student-ask-tablet-layout space-y-4">
-        <div className="grid grid-cols-3 gap-2">
+        <ol className="grid grid-cols-3 gap-2">
           {flowSteps.map((item) => {
             const active = item.step === currentStep;
             const done = item.step < currentStep;
             return (
-              <div
+              <li
                 key={item.step}
-                className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
+                aria-current={active ? "step" : undefined}
+                className={`flex flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-center text-sm font-semibold sm:flex-row ${
                   active
                     ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-200"
                     : done
@@ -79,12 +81,15 @@ export function StudentAskInputCard({
                     : "border-border bg-muted/30 text-muted-foreground"
                 }`}
               >
-                <span className="mr-1">{item.step}</span>
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/20 bg-card" aria-hidden="true">
+                  {done ? <Check className="h-5 w-5" /> : item.step}
+                </span>
+                <span className="sr-only">{item.step}. </span>
                 {item.label}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
 
         {/* 1단: 세션 선택 — 전체 폭이라 카드 그리드가 넓게 펼쳐져 세로로 짧아진다 */}
         <div className="student-ask-session-panel min-w-0 rounded-xl border bg-muted/30 p-4">
@@ -107,25 +112,25 @@ export function StudentAskInputCard({
                 밝은 테마: indigo-50 배경 + 흰 칩 / 어두운 테마: indigo-950 배경 + indigo-900 칩 */}
             {selectedSession && (
               <div className="student-ask-current-session flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-500/40 dark:bg-indigo-950/40">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300/80">
+                <span className="text-sm font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300/80">
                   {t("currentSession")}
                 </span>
                 <span className="text-sm font-bold text-indigo-950 dark:text-indigo-50">
                   {sessionText.label(selectedSession)}
                 </span>
                 {selectedSession.unitDesignId && (
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
+                  <span className="rounded-full bg-white px-2 py-0.5 text-sm font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
                     🔍 {t("inquiryClassTag")}
                   </span>
                 )}
-                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
+                <span className="rounded-full bg-white px-2 py-0.5 text-sm font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
                   {selectedSession.defaultQuestionPublic ? `🌐 ${t("public")}` : `🔒 ${t("private")}`}
                 </span>
               </div>
             )}
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="content">{t("questionLabel")}</Label>
+              <Label htmlFor="content" className="flex items-center gap-2 font-semibold"><PencilLine className="h-5 w-5 text-primary" aria-hidden="true" />{t("questionLabel")}</Label>
               {/* 질문은 최대 200자 — 입력창은 6줄 고정 */}
               <Textarea
                 ref={textareaRef}
@@ -147,7 +152,7 @@ export function StudentAskInputCard({
             <Button
               onClick={onAnalyze}
               disabled={isLoading || !canAsk || content.trim().length === 0}
-              variant="gradient"
+              variant="default"
               className="h-12 w-full text-base font-semibold"
             >
               {isLoading ? t("analyzing") : hasAnalysis ? t("reanalyze") : t("analyze")}

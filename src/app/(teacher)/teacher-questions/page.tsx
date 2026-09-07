@@ -412,7 +412,7 @@ function QuestionsContent() {
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("teacherQuestions.title")} description={tPages("teacherQuestions.description")} />
+      <PageHeader iconHref="/teacher-questions" title={tPages("teacherQuestions.title")} description={tPages("teacherQuestions.description")} />
 
       <TeacherQuestionTopTabs
         value={topTab}

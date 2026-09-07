@@ -19,9 +19,9 @@ export function EmptyState({
 }) {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 px-4 py-10 text-center ${className}`}>
-      <div className="text-3xl opacity-80" aria-hidden>{icon}</div>
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-      {description && <p className="text-xs text-muted-foreground max-w-xs">{description}</p>}
+      <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-50 text-3xl text-sky-800 dark:bg-sky-950 dark:text-sky-200" aria-hidden>{icon}</div>
+      <p className="text-lg font-semibold text-foreground">{title}</p>
+      {description && <p className="max-w-sm text-base leading-relaxed text-muted-foreground">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );

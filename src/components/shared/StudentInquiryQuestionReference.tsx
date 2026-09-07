@@ -46,7 +46,7 @@ export function StudentInquiryQuestionReference({
         <span className="mr-1.5 text-xs font-medium text-muted-foreground">[{typeLabel}]</span>
         {question.content}
       </p>
-      {typeHelp && <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{typeHelp}</p>}
+      {typeHelp && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{typeHelp}</p>}
       {guide && (
         <dl data-student-understanding-guide="inquiry-question" className="mt-2 space-y-2 border-t border-border/70 pt-2 text-xs">
           {guide.meaning && (

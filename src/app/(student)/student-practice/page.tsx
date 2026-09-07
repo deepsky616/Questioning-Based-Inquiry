@@ -29,7 +29,7 @@ function StudentPracticeContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("subtitle")} />
+      <PageHeader iconHref="/student-practice" title={t("title")} description={t("subtitle")} />
       <PracticeProgressSummary />
       <QuestionLearningSummary detailsHref="/student-question-learning" />
       <QuestionPracticeView

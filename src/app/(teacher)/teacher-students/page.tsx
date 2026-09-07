@@ -243,7 +243,7 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("teacherStudents.title")} description={tPages("teacherStudents.description")} />
+      <PageHeader iconHref="/teacher-students" title={tPages("teacherStudents.title")} description={tPages("teacherStudents.description")} />
 
       {/* 학생 현황 / 일괄 등록 / 비밀번호 재설정 탭 */}
       <div className="flex w-fit rounded-md border overflow-hidden">

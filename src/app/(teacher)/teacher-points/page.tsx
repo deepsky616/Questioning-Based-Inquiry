@@ -233,7 +233,7 @@ function TeacherPointsContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("teacherPoints.title")} description={tPages("teacherPoints.description")} />
+      <PageHeader iconHref="/teacher-points" title={tPages("teacherPoints.title")} description={tPages("teacherPoints.description")} />
 
       <TeacherPointsTabs
         value={tab}

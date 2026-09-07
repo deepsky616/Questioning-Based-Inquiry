@@ -21,8 +21,8 @@ export function PageNav({ pages }: PageNavProps) {
   const isHome = currentIndex === 0;
 
   return (
-    <div className="mt-8 pt-4 border-t border-border flex items-center justify-between">
-      <div className="flex gap-2">
+    <div className="learning-page-nav mt-8 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap gap-2">
         {!isHome && (
           <Button asChild variant="outline" size="sm">
             <Link href={home.href}>{t("navHome")}</Link>

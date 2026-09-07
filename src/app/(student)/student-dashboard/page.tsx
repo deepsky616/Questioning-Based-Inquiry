@@ -7,6 +7,7 @@ import { StudentReportView } from "@/components/reports/StudentReportView";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
@@ -239,9 +240,14 @@ function StudentDashboard() {
   return (
     <div className="space-y-6">
       {tab === "reports" ? (
-        <PageHeader title={tPages("studentReports.title")} description={tPages("studentReports.description")} />
+        <PageHeader iconHref="/student-dashboard" title={tPages("studentReports.title")} description={tPages("studentReports.description")} />
       ) : (
-        <PageHeader title={tPages("studentDashboard.title")} description={tPages("studentDashboard.description")} />
+        <PageHeader
+          iconHref="/student-dashboard"
+          title={tPages("studentDashboard.title")}
+          description={tPages("studentDashboard.description")}
+          actions={<Image src="/question-learning-cover.png" alt="" width={160} height={90} className="hidden rounded-2xl border border-sky-100 object-cover sm:block dark:border-sky-900" />}
+        />
       )}
 
       {tab === "reports" ? (

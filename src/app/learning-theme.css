@@ -1,0 +1,90 @@
+/* 화면에서만 적용하여 학습지와 리포트의 인쇄 배치를 보존한다. */
+@media screen {
+  .learning-shell {
+    --background: 207 70% 98%;
+    --foreground: 216 45% 18%;
+    --card-foreground: 216 45% 18%;
+    --primary: 215 76% 41%;
+    --primary-foreground: 0 0% 100%;
+    --muted-foreground: 215 20% 36%;
+    --border: 212 32% 87%;
+    --input: 215 17% 51%;
+    --ring: 215 76% 41%;
+    color: hsl(var(--foreground));
+    line-height: 1.65;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  .dark .learning-shell {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card-foreground: 210 40% 98%;
+    --primary: 213 94% 74%;
+    --primary-foreground: 222 47% 11%;
+    --muted-foreground: 215 24% 76%;
+    --border: 217 25% 27%;
+    --input: 215 18% 51%;
+    --ring: 213 94% 74%;
+  }
+
+  .learning-content { min-width: 0; }
+  .student-shell .learning-content { font-size: 1.125rem; }
+  .teacher-shell .learning-content { font-size: 1rem; }
+  .learning-content :where(.text-xs) { font-size: .875rem; line-height: 1.6; }
+  .learning-content :where(.text-sm) { font-size: 1rem; line-height: 1.65; }
+  .student-shell .learning-content :where(.text-base) { font-size: 1.125rem; line-height: 1.65; }
+
+  .learning-page-header { padding-bottom: .25rem; }
+  .learning-page-header h2 { font-size: clamp(1.625rem, 2.5vw, 2rem); line-height: 1.35; }
+  .learning-content [data-ui="card"] {
+    border-radius: 1.125rem;
+    box-shadow: 0 2px 8px hsl(215 50% 25% / .035);
+  }
+  .learning-content [data-ui="card-title"] { font-size: 1.25rem; line-height: 1.45; }
+  .learning-content [data-ui="button"] {
+    min-height: 2.75rem;
+    height: auto;
+    border-radius: .75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    gap: .375rem;
+  }
+  .student-shell .learning-content [data-ui="button"] { min-height: 3rem; }
+  .learning-content [data-ui="button"][data-size="icon"] { min-width: 2.75rem; }
+  .student-shell .learning-content [data-ui="button"][data-size="icon"] { min-width: 3rem; }
+  .learning-content :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, [role="combobox"]) {
+    min-height: 2.75rem;
+    font-size: 1rem;
+    border-radius: .75rem;
+  }
+  .student-shell .learning-content :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, [role="combobox"]) { min-height: 3rem; }
+  /* 사파리의 기본 선택창은 최소 높이만으로 크기가 바뀌지 않아 높이도 지정한다. */
+  .student-shell .learning-content select { height: 3rem; }
+  .learning-content textarea { font-size: 1rem; line-height: 1.7; border-radius: .75rem; }
+  .student-shell .learning-content textarea { font-size: 1.125rem; }
+  .learning-content :where(label) { font-size: 1rem; line-height: 1.5; }
+  .learning-content :where(button, a, input, textarea, select):focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+  .learning-app-nav a:focus-visible { outline: 3px solid hsl(var(--ring)); outline-offset: -3px; }
+  .learning-app-nav [aria-current="page"] { box-shadow: inset 0 -3px 0 hsl(var(--primary)); }
+  .learning-page-nav > span { font-variant-numeric: tabular-nums; }
+  .student-ask-question-panel { border-top: 4px solid hsl(var(--primary)); }
+  .student-ask-current-session { overflow-wrap: anywhere; }
+  .learning-content [role="tablist"] { flex-wrap: wrap; height: auto; gap: .25rem; }
+  .learning-content [role="tab"] { min-height: 2.75rem; white-space: normal; }
+  .student-shell .learning-content [role="tab"] { min-height: 3rem; }
+}
+
+@media screen and (prefers-reduced-motion: reduce) {
+  .learning-shell *, .learning-shell *::before, .learning-shell *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -208,9 +208,7 @@ test.describe("역할별 질문학습 통합 흐름", () => {
     await work.goto("/student-question-learning");
     await openLastLearningSlide(work);
     await work.getByRole("link", { name: "질문연습 시작" }).click();
-    const questionPractice = work
-      .getByRole("tablist", { name: "질문 연습", exact: true })
-      .locator("..");
+    const questionPractice = work.getByRole("region", { name: "질문 연습", exact: true });
     await questionPractice.getByRole("tab", { name: "질문 만들기" }).click();
     await questionPractice.getByRole("textbox").fill(PRACTICE_QUESTION);
     await questionPractice.getByRole("button", { name: "AI에게 확인받기", exact: true }).click();

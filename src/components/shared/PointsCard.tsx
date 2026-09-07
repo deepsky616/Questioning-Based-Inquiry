@@ -115,14 +115,14 @@ export default function PointsCard() {
 
       {/* 내 포인트 + 순위 */}
       <div className="relative overflow-hidden rounded-2xl p-6 text-white md:h-full"
-        style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}>
+        style={{ background: "linear-gradient(135deg, #174a8b 0%, #116b79 100%)" }}>
         <span className="absolute top-2 right-3 text-3xl opacity-20">⭐</span>
         <span className="absolute bottom-2 left-3 text-2xl opacity-20">✨</span>
-        <p className="text-white/80 text-xs font-medium relative">{t("myPoints")}</p>
+        <p className="text-white text-sm font-medium relative">{t("myPoints")}</p>
         <p className="text-5xl font-black mt-1 relative">
           {loaded ? totalPoints : isError ? "-" : "..."}
         </p>
-        <div className="mt-3 relative flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/90">
+        <div className="mt-3 relative flex flex-wrap gap-x-3 gap-y-1 text-sm text-white">
           <span>{t("ourClass")} <b className="font-black">{rankText(ranks.class)}</b></span>
           <span>{t("school")} <b className="font-black">{rankText(ranks.school)}</b></span>
           <span>{t("all")} <b className="font-black">{rankText(ranks.all)}</b></span>
@@ -130,7 +130,7 @@ export default function PointsCard() {
         <button
           type="button"
           onClick={() => setShowGuide(true)}
-          className="mt-3 relative inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
+          className="mt-3 relative inline-flex items-center gap-1 rounded-full min-h-11 bg-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/30 transition-colors"
         >
           {t("howToEarn")}
         </button>
@@ -138,7 +138,7 @@ export default function PointsCard() {
 
       {/* 최근 받은 포인트 */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:col-span-2 md:h-full">
-        <h3 className="font-black text-foreground text-sm mb-3">{t("recentTitle")}</h3>
+        <h3 className="font-black text-foreground text-lg mb-3">{t("recentTitle")}</h3>
         {isError ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             {t("loadError")}

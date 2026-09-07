@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { appNotificationQueryKeys, useAppNotifications } from "@/lib/app-notifications";
 import {
@@ -477,9 +478,7 @@ function AskContent() {
   if (sessionsError || scopedTaskDataError) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
-        </div>
+        <PageHeader iconHref="/student-ask" title={t("title")} />
         <Card className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-950/40">
           <CardContent className="flex flex-col items-center gap-3 p-6 text-center text-red-700 text-sm">
             <p>{t("loadSessionError")}</p>
@@ -505,9 +504,7 @@ function AskContent() {
   if (!sessionsLoaded || !scopedTaskDataReady) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
-        </div>
+        <PageHeader iconHref="/student-ask" title={t("title")} />
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground text-sm">{t("checkingSession")}</CardContent>
         </Card>
@@ -519,9 +516,7 @@ function AskContent() {
   if (sessions.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
-        </div>
+        <PageHeader iconHref="/student-ask" title={t("title")} />
         <Card className="border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/40">
           <CardContent className="p-6 text-center text-yellow-800">
             <p className="font-medium">{t("noSession")}</p>
@@ -536,10 +531,7 @@ function AskContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
-        <p className="text-muted-foreground">{t("subtitle")}</p>
-      </div>
+      <PageHeader iconHref="/student-ask" title={t("title")} description={t("subtitle")} />
 
       {aiConfigured === false && (
         <Card className="border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/40">

@@ -4,6 +4,7 @@
 // 탐구수업 세션: 교사가 배포한 탐구질문 + 설계 참고자료
 // 일반 세션: 좋은 질문 도우미(유형 전환 팁·예시·질문연습 링크)
 import Link from "next/link";
+import { InquiryCompanion } from "@/components/shared/InquiryCompanion";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { StudentInquiryQuestionReference } from "@/components/shared/StudentInquiryQuestionReference";
@@ -50,12 +51,14 @@ export function StudentAskReferencePanel({
   // 참고할 것이 없는 일반 세션 — 좋은 질문 도우미가 이 자리를 채운다
   if (!hasReference) {
     return (
-      <div className="student-ask-reference-panel flex flex-col gap-1.5 rounded-lg border border-dashed border-indigo-200 bg-indigo-50/40 p-4 text-xs text-muted-foreground dark:border-indigo-500/30 dark:bg-indigo-950/20">
-        <p className="text-sm font-semibold text-foreground">💡 {t("helperTitle")}</p>
-        <p>{t("helperTipClosed")}</p>
-        <p>{t("helperTipStage")}</p>
-        <p>{t("helperTipFormula")}</p>
-        <p className="italic">{t("helperExample")}</p>
+      <div className="student-ask-reference-panel flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-base text-foreground dark:border-amber-800 dark:bg-amber-950/20">
+        <div className="flex items-center gap-3"><InquiryCompanion small /><p className="text-lg font-semibold">{t("helperTitle")}</p></div>
+        <ul className="list-disc space-y-3 pl-5 marker:text-amber-700 dark:marker:text-amber-300">
+          <li>{t("helperTipClosed")}</li>
+          <li>{t("helperTipStage")}</li>
+          <li>{t("helperTipFormula")}</li>
+        </ul>
+        <p className="rounded-xl border border-amber-200 bg-card p-3 leading-relaxed dark:border-amber-800">{t("helperExample")}</p>
         <Link href="/student-practice" className="mt-1 font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300">
           {t("helperPracticeLink")} →
         </Link>

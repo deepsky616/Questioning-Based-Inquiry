@@ -1,6 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { InquiryCompanion } from "@/components/shared/InquiryCompanion";
 import {
   PriorityTaskList,
   type PriorityTaskListItem,
@@ -37,9 +38,12 @@ export function StudentDashboardTasksCard({
 
   return (
     <Card className="student-dashboard-task-panel md:h-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{t("todayTasksTitle")}</CardTitle>
-        <p className="mt-1 text-xs text-muted-foreground">{t("todayTasksDesc")}</p>
+      <CardHeader className="flex-row items-center gap-4 space-y-0 pb-3">
+        <InquiryCompanion small />
+        <div className="min-w-0">
+          <CardTitle className="text-base">{t("todayTasksTitle")}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">{t("todayTasksDesc")}</p>
+        </div>
       </CardHeader>
       <CardContent>
         {!(status === "error" && schedule.status === "error") && (

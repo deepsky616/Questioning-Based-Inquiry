@@ -162,7 +162,7 @@ export default function TeacherSettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <PageHeader title={tPages("teacherSettings.title")} description={tPages("teacherSettings.description")} />
+      <PageHeader iconHref="/teacher-settings" title={tPages("teacherSettings.title")} description={tPages("teacherSettings.description")} />
 
       <Tabs defaultValue="account" className="space-y-6">
         <TabsList className="grid h-auto w-full grid-cols-2">
