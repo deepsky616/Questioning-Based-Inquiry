@@ -1,12 +1,11 @@
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createDemoLauncherHtml } from "./demo-launcher-html.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const DEFAULT_TARGET_ROOT = "/Users/youngmini/Documents/QuestionLab";
-const DEMO_LAUNCH_URL =
-  "https://questioning-based-inquiry.vercel.app/demo/launch";
 
 const SOURCE_DIRECTORIES = [
   "messages/",
@@ -69,65 +68,6 @@ function copySourceFiles(sourceRoot, destinationRoot) {
   }
 }
 
-function createLauncherHtml(targetUrl) {
-  const safeTarget = targetUrl
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-
-  return `<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>질문연구소</title>
-  <style>
-    * { box-sizing: border-box; }
-    html, body { min-height: 100%; margin: 0; }
-    body {
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      color: #172033;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        linear-gradient(rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.94)),
-        url("../media/image/login-inquiry-hero.png") center / cover no-repeat fixed;
-    }
-    main { width: min(100%, 520px); text-align: center; }
-    h1 { margin: 0 0 12px; font-size: clamp(30px, 8vw, 48px); line-height: 1.15; }
-    p { margin: 0 0 24px; color: #526077; font-size: 17px; line-height: 1.6; }
-    a {
-      display: inline-flex;
-      min-height: 48px;
-      align-items: center;
-      justify-content: center;
-      padding: 12px 22px;
-      border-radius: 6px;
-      color: #fff;
-      background: #176b52;
-      font-weight: 700;
-      text-decoration: none;
-    }
-    a:focus-visible { outline: 3px solid #e8a317; outline-offset: 3px; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>질문연구소</h1>
-    <p>웹브라우저에서 김질문 학생 화면을 준비하고 있습니다.</p>
-    <a href="${safeTarget}">질문연구소 열기</a>
-  </main>
-  <script>
-    window.location.replace(${JSON.stringify(targetUrl)});
-  </script>
-</body>
-</html>
-`;
-}
-
 export function buildUsbDemoBundle({
   targetRoot = DEFAULT_TARGET_ROOT,
   sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
@@ -157,10 +97,9 @@ export function buildUsbDemoBundle({
   );
   copySourceFiles(sourceRoot, sourceDir);
 
-  const targetUrl = `${DEMO_LAUNCH_URL}#ticket=${encodeURIComponent(normalizedTicket)}`;
   writeFileSync(
     join(programDir, "index.html"),
-    createLauncherHtml(targetUrl),
+    createDemoLauncherHtml({ ticket: normalizedTicket }),
     "utf8",
   );
 

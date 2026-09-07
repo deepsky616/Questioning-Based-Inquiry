@@ -7,12 +7,15 @@ import {
   deleteTeacherAccountData,
 } from "@/lib/account-deletion";
 import { logger } from "@/lib/logger";
+import { protectDemoAccountSettings } from "@/lib/demo-account-protection";
 import { retryPendingQuestionGameRoomSettlementsForUser } from
   "@/lib/account-deletion-room-settlement";
 
 export async function DELETE() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  const protectedResponse = protectDemoAccountSettings(session.user);
+  if (protectedResponse) return protectedResponse;
 
   const user = session.user as { id?: string; role?: string };
   if (!user.id) return NextResponse.json({ error: "사용자 정보를 찾을 수 없습니다" }, { status: 401 });

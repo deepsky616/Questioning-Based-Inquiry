@@ -8,7 +8,7 @@ function expectedStudents() {
   return [
     ...STUDENT_NAMES.map((name, index) => ({
       id: `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
-      name, school: "질문초등학교", grade: "4", className: "1", studentNumber: String(index + 1),
+      name, school: "질문초등학교", grade: "5", className: "1", studentNumber: String(index + 1),
     })),
     ...buildDemoRankingStudents(),
   ];

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Clock3,
@@ -11,6 +11,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DEMO_LAUNCH_TARGETS, parseDemoLaunchRole, type DemoLaunchRole } from "@/lib/demo-launch-target";
 
 type LaunchState =
   | "loading"
@@ -21,7 +22,7 @@ type LaunchState =
 
 const stateContent = {
   loading: {
-    title: "김질문 학생 화면을 준비하고 있어요",
+    title: "시연 화면을 준비하고 있어요",
     description: "잠시만 기다려 주세요.",
     icon: LoaderCircle,
   },
@@ -59,10 +60,17 @@ function failureState(reason: unknown): LaunchState {
 export function DemoLaunchClient() {
   const [state, setState] = useState<LaunchState>("loading");
   const ticketRef = useRef("");
+  const roleRef = useRef<DemoLaunchRole | null>(null);
+  const [role, setRole] = useState<DemoLaunchRole | null>(null);
   const startedRef = useRef(false);
 
   const launch = useCallback(async () => {
     const ticket = ticketRef.current;
+    const launchRole = roleRef.current;
+    if (!launchRole) {
+      setState("invalid");
+      return;
+    }
     if (!ticket) {
       setState("missing");
       return;
@@ -73,7 +81,7 @@ export function DemoLaunchClient() {
       const validationResponse = await fetch("/api/demo/validate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ticket }),
+        body: JSON.stringify({ ticket, role: launchRole }),
       });
       const validationBody = await validationResponse
         .json()
@@ -85,13 +93,20 @@ export function DemoLaunchClient() {
 
       const result = await signIn("demo-launch", {
         ticket,
+        role: launchRole,
         redirect: false,
       });
-      if (result?.error) {
+      if (!result?.ok || result.error) {
         setState("invalid");
         return;
       }
-      window.location.replace("/student-dashboard");
+      const current = await getSession();
+      const target = DEMO_LAUNCH_TARGETS[launchRole];
+      if (current?.user?.id !== target.id || current.user.role !== target.role || !current.user.isDemo) {
+        setState("invalid");
+        return;
+      }
+      window.location.replace(target.dashboard);
     } catch {
       setState("offline");
     }
@@ -103,6 +118,8 @@ export function DemoLaunchClient() {
 
     const params = new URLSearchParams(window.location.hash.slice(1));
     ticketRef.current = params.get("ticket") ?? "";
+    roleRef.current = parseDemoLaunchRole(params.get("role") ?? undefined);
+    setRole(roleRef.current);
     window.history.replaceState(
       null,
       "",
@@ -145,7 +162,8 @@ export function DemoLaunchClient() {
             aria-hidden
           />
           <h2 className="mt-4 text-xl font-semibold sm:text-2xl">
-            {content.title}
+            {state === "loading" && role ?
+              `${role === "teacher" ? "김탐구 선생님" : "김질문 학생"} 화면을 준비하고 있어요` : content.title}
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-200 sm:text-base">
             {content.description}

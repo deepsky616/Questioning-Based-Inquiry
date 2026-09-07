@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TeacherReportsView } from "@/components/teacher/TeacherReportsView";
@@ -111,7 +112,9 @@ function TeacherDashboard() {
   const studentStatsRef = useRef<HTMLDivElement | null>(null);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
-  const [period, setPeriod] = useState("month");
+  const { data: session } = useSession();
+  const [selectedPeriod, setPeriod] = useState<string | null>(null);
+  const period = selectedPeriod ?? (session?.user?.isDemo ? "semester" : "month");
   const [selectedClass, setSelectedClass] = useState("all");
 
   // 집계 자료는 1분 주기와 화면 복귀 시 갱신한다.

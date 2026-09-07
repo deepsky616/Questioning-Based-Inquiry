@@ -37,6 +37,7 @@ export default function TeacherSettingsPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
   const user = session?.user as { name?: string; email?: string; school?: string };
+  const isDemo = session?.user?.isDemo === true;
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
 
   const [apiKey, setApiKey] = useState("");
@@ -149,12 +150,16 @@ export default function TeacherSettingsPage() {
 
     setIsDeleting(true);
     try {
-      await fetch("/api/config", { method: "DELETE" });
+      const res = await fetch("/api/config", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || t("deleteFailed"));
+      }
       setCurrentConfig({ configured: false, maskedApiKey: null, model: DEFAULT_GEMINI_MODEL });
       setSelectedModel(DEFAULT_GEMINI_MODEL);
       toast({ variant: "success", description: t("aiDeleted") });
-    } catch {
-      toast({ variant: "destructive", description: t("deleteFailed") });
+    } catch (error) {
+      toast({ variant: "destructive", description: error instanceof Error ? error.message : t("deleteFailed") });
     } finally {
       setIsDeleting(false);
     }
@@ -163,6 +168,11 @@ export default function TeacherSettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <PageHeader iconHref="/teacher-settings" title={tPages("teacherSettings.title")} description={tPages("teacherSettings.description")} />
+      {isDemo && (
+        <p className="rounded-xl border border-teal-200 bg-teal-50 p-4 text-base leading-7 text-teal-900 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-100">
+          {t("demoSettingsNotice")}
+        </p>
+      )}
 
       <Tabs defaultValue="account" className="space-y-6">
         <TabsList className="grid h-auto w-full grid-cols-2">
@@ -220,7 +230,7 @@ export default function TeacherSettingsPage() {
 
           <PasswordChangeCard />
 
-          <AccountWithdrawalCard role="TEACHER" />
+          {!isDemo && <AccountWithdrawalCard role="TEACHER" />}
         </TabsContent>
 
         <TabsContent value="ai">
@@ -253,7 +263,7 @@ export default function TeacherSettingsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleDelete}
-                    disabled={isDeleting}
+                    disabled={isDemo || isDeleting}
                     className="text-red-600 border-red-200 hover:bg-red-50"
                   >
                     {isDeleting ? t("deleting") : tc("delete")}
@@ -276,6 +286,7 @@ export default function TeacherSettingsPage() {
                   type="password"
                   placeholder="AIza..."
                   value={apiKey}
+                  disabled={isDemo}
                   onChange={(e) => {
                     setApiKey(e.target.value);
                   }}
@@ -289,7 +300,7 @@ export default function TeacherSettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="model">{t("modelLabel")}</Label>
-                <Select value={selectedModel} onValueChange={(v) => {
+                <Select disabled={isDemo} value={selectedModel} onValueChange={(v) => {
                   setSelectedModel(v);
                 }}>
                   <SelectTrigger>
@@ -316,7 +327,7 @@ export default function TeacherSettingsPage() {
                 </Button>
                 <Button
                   onClick={handleSave}
-                  disabled={isSaving || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
+                  disabled={isDemo || isSaving || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
                   variant="gradient"
                   className="h-11 flex-1 text-base font-semibold"
                 >

@@ -14,6 +14,7 @@ import {
   validateDemoLaunchTicket,
 } from "@/lib/demo-config";
 import { rateLimit } from "@/lib/rate-limit";
+import { DEMO_LAUNCH_TARGETS, parseDemoLaunchRole } from "@/lib/demo-launch-target";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -86,8 +87,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "시연 실행",
       credentials: {
         ticket: {},
+        role: {},
       },
       authorize: async (credentials) => {
+        const launchRole = parseDemoLaunchRole(credentials?.role);
+        if (!launchRole) return null;
         const ticket =
           typeof credentials?.ticket === "string" ? credentials.ticket : "";
         const validation = validateDemoLaunchTicket(ticket);
@@ -101,12 +105,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const user = await prisma.user.findFirst({
           where: {
-            role: "STUDENT",
+            id: DEMO_LAUNCH_TARGETS[launchRole].id,
+            role: DEMO_LAUNCH_TARGETS[launchRole].role,
             isDemo: true,
             school: DEMO_SCHOOL,
-            grade: DEMO_GRADE,
-            className: DEMO_CLASS_NAME,
-            studentNumber: DEMO_STUDENT_NUMBER,
+            ...(launchRole === "student" ? {
+              // 고정 시연 계정에 한해 학년 전환 배포 중의 기존 자료도 허용한다.
+              grade: { in: [DEMO_GRADE, "4"] },
+              className: DEMO_CLASS_NAME,
+              studentNumber: DEMO_STUDENT_NUMBER,
+            } : {
+              teacherClasses: { some: { grade: { in: [DEMO_GRADE, "4"] }, className: DEMO_CLASS_NAME } },
+            }),
           },
         });
         if (!user) return null;

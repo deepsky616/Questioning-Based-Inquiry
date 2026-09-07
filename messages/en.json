@@ -1213,6 +1213,7 @@
     "targetAllClasses": "All my classes"
   },
   "settings": {
+    "demoSettingsNotice": "Demo accounts use the prepared AI settings. Account management and AI setting changes are restricted to preserve the connection between the teacher and students.",
     "apiKeyRequired": "Please enter an API key (10+ characters)",
     "apiKeyMinLen": "The API key must be at least 10 characters",
     "connectSuccess": "Connected! Model: {model}",
