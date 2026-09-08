@@ -23,6 +23,7 @@ vi.mock("@/lib/db", () => ({
       create: vi.fn(),
     },
     pointLog: { create: vi.fn() },
+    questionGrowth: { create: vi.fn() },
     appNotification: { updateMany: vi.fn() },
     $queryRaw: vi.fn(),
     $transaction: vi.fn(),
@@ -119,6 +120,23 @@ beforeEach(() => {
 });
 
 describe("질문수업 제출 권한", () => {
+  it("수정한 질문을 저장할 때 성장 기록을 연결하고 기존 질문 포인트만 한 번 지급한다", async () => {
+    mSessionFindUnique.mockResolvedValue({ ...otherTeacherSession, targetType: "STUDENT", targetStudentId: "student-1", teacher: { role: "TEACHER", school: "한빛초", teacherClasses: [] } });
+    const response = await POST(new Request("http://localhost/api/questions", { method: "POST", body: JSON.stringify({ content: "물의 온도에 따라 소금이 녹는 양은 다를까?", sessionId: "session-other", growth: { originalContent: "소금이 녹을까?" } }) }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ awardedPoints: 2, growthRecorded: true });
+    expect(prisma.questionGrowth.create).toHaveBeenCalledWith({ data: { questionId: "question-new", originalContent: "소금이 녹을까?", revisedContent: "물의 온도에 따라 소금이 녹는 양은 다를까?", reflection: "" } });
+    expect(mPointCreate).toHaveBeenCalledOnce();
+    expect(mUserUpdate).toHaveBeenCalledOnce();
+  });
+  it("처음 질문을 그대로 저장하면 성장 기록은 중복 생성하지 않고 기존 점수만 지급한다", async () => {
+    mSessionFindUnique.mockResolvedValue({ ...otherTeacherSession, targetType: "STUDENT", targetStudentId: "student-1", teacher: { role: "TEACHER", school: "한빛초", teacherClasses: [] } });
+    const response = await POST(new Request("http://localhost/api/questions", { method: "POST", body: JSON.stringify({ content: "소금이 녹을까?", sessionId: "session-other", growth: { originalContent: "소금이 녹을까?" } }) }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ awardedPoints: 2, growthRecorded: false });
+    expect(prisma.questionGrowth.create).not.toHaveBeenCalled();
+    expect(mPointCreate).toHaveBeenCalledOnce();
+  });
   it("검사 뒤 수업이 닫히면 질문과 점수를 함께 저장하지 않는다", async () => {
     mSessionFindUnique.mockResolvedValue({
       ...otherTeacherSession,

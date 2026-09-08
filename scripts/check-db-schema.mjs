@@ -55,6 +55,7 @@ const REQUIRED_TEXT_COLUMNS = [
 ];
 
 const REQUIRED_COLUMNS = [
+  ["question_growth", "change_note", "text"],
   ["questions", "dedupe_key", "text"],
   ["comments", "dedupe_key", "text"],
   ["point_logs", "activity_dedupe_key", "text"],

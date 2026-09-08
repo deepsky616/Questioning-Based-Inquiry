@@ -9,6 +9,22 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); window.sessionStorage.clear()
 const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
 
 describe("질문 초안 화면 수명", () => {
+  it("첫 분석 문장은 재분석과 새로고침 후에도 유지하고 새 질문에서는 초기화한다", async () => {
+    const view = renderHook(() => useQuestionDraft("학생1", "수업1"));
+    act(() => view.result.current.setContent("물에 소금이 녹을까?"));
+    expect(view.result.current.markAnalyzed).toBeTypeOf("function");
+    act(() => view.result.current.markAnalyzed("물에 소금이 녹을까?"));
+    act(() => view.result.current.setContent("물의 온도에 따라 소금이 녹는 양이 달라질까?"));
+    act(() => view.result.current.markAnalyzed("물의 온도에 따라 소금이 녹는 양이 달라질까?"));
+    expect(view.result.current.firstAnalyzedContent).toBe("물에 소금이 녹을까?");
+    view.unmount();
+    const reopened = renderHook(() => useQuestionDraft("학생1", "수업1"));
+    await waitFor(() => expect(reopened.result.current.firstAnalyzedContent).toBe("물에 소금이 녹을까?"));
+    act(() => reopened.result.current.setContent(""));
+    act(() => reopened.result.current.setContent("얼음은 왜 녹을까?"));
+    act(() => reopened.result.current.markAnalyzed("얼음은 왜 녹을까?"));
+    expect(reopened.result.current.firstAnalyzedContent).toBe("얼음은 왜 녹을까?");
+  });
   it("수업을 오가거나 화면을 다시 열어도 각 수업의 초안을 보존한다", async () => {
     const first = renderHook(({ sessionId }) => useQuestionDraft("학생1", sessionId), { initialProps: { sessionId: "수업1" }, wrapper });
     act(() => first.result.current.setContent("첫 수업 질문"));

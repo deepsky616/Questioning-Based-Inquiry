@@ -5,10 +5,13 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
+import { QuestionGrowthQuickReflection } from "@/components/reports/QuestionGrowthQuickReflection";
 import type { QuestionSession } from "./types";
 
 interface StudentAskCompletionCardProps {
   selectedSession: QuestionSession | null;
+  questionId?: string;
+  growthRecorded?: boolean;
   onViewMyQuestions: () => void;
   onWriteAnother: () => void;
   onChooseAnotherSession: () => void;
@@ -16,6 +19,8 @@ interface StudentAskCompletionCardProps {
 
 export function StudentAskCompletionCard({
   selectedSession,
+  questionId,
+  growthRecorded = false,
   onViewMyQuestions,
   onWriteAnother,
   onChooseAnotherSession,
@@ -33,7 +38,9 @@ export function StudentAskCompletionCard({
             : t("saveCompleteDesc")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-2 sm:grid-cols-3">
+      <CardContent className="space-y-4">
+        {questionId && <QuestionGrowthQuickReflection key={questionId} questionId={questionId} growthRecorded={growthRecorded} />}
+        <div className="grid gap-2 sm:grid-cols-3">
         <Button type="button" variant="gradient" className="h-11" onClick={onViewMyQuestions}>
           {t("viewMyQuestions")}
         </Button>
@@ -53,6 +60,7 @@ export function StudentAskCompletionCard({
         >
           {t("chooseAnotherSession")}
         </Button>
+        </div>
       </CardContent>
     </Card>
   );
