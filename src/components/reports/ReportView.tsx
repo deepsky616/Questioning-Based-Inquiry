@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "@/components/shared/theme-provider";
@@ -72,6 +72,7 @@ export interface SessionAnalysisResult {
 type SessionTranslationFields = Partial<Record<keyof SessionAnalysisResult, string>>;
 
 export interface ReportViewProps {
+  renderSessionGrowth?: (sessionId: string) => ReactNode;
   referenceDate?: string;
   scope: "student" | "class";
   title: string;
@@ -147,7 +148,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, otherLabel: string, w
 }
 
 export function ReportView({
-  referenceDate, scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
+  renderSessionGrowth, referenceDate, scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
   participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, showAnalysisModel = true, onSaveAnalysis, onBulkComplete,
 }: ReportViewProps) {
   const { toast } = useToast();
@@ -679,6 +680,7 @@ export function ReportView({
                       ) : (
                         <p className="text-muted-foreground">{canAnalyze ? t("notAnalyzedYet") : t("notAnalyzedYetReadonly")}</p>
                       )}
+                      {renderSessionGrowth && <div className="mt-4">{renderSessionGrowth(s.id)}</div>}
                     </div>
                   )}
                     </div>

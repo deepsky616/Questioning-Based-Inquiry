@@ -40,6 +40,7 @@ async function analyzeStudentSession(sessionId: string, failMsg: string): Promis
 /** 학생 본인 활동 리포트 본문 (대시보드 '상세 리포트' 탭에서 사용). */
 export function StudentReportView() {
   const t = useTranslations("reports");
+  const tg = useTranslations("growth");
   const [demoPeriod, setDemoPeriod] = useState("current");
   // 내 리포트는 무거운 집계라 긴 폴링(60초)+포커스 재조회로 신선도만 유지한다.
   const { data, isLoading: loading, error, isFetching, dataUpdatedAt, refetch } = useQuery<StudentReport>({
@@ -64,6 +65,7 @@ export function StudentReportView() {
   return (
     <div className="space-y-3">
       <div className="no-print flex flex-wrap items-center justify-end gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <a href="#question-growth-library" className="mr-auto inline-flex min-h-11 items-center gap-1 font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300"><span aria-hidden="true">🌱</span>{tg("jumpToLibrary")}</a>
         <span>{dataUpdatedAt ? t("lastUpdated", { time: formatClock(new Date(dataUpdatedAt)) }) : t("autoRefreshNote")}</span>
         <button
           type="button"
@@ -76,8 +78,8 @@ export function StudentReportView() {
         </button>
       </div>
       {periodControl}
-      <QuestionGrowthJournal />
       <ReportView
+        renderSessionGrowth={(sessionId) => <QuestionGrowthJournal sessionId={sessionId} />}
         referenceDate={data.referenceDate}
         scope="student"
         title={t("studentReportTitle", { name: s.name })}
@@ -93,6 +95,7 @@ export function StudentReportView() {
         showAnalysisModel={false}
         showPrintButton={false}
       />
+      <QuestionGrowthJournal />
     </div>
   );
 }

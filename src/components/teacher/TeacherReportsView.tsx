@@ -96,6 +96,7 @@ function analyzeStudentSessionFor(studentId: string, failMsg: string) {
 /** 학급/학생 활동 리포트 본문 (대시보드 '상세 리포트' 탭에서 사용). 페이지 헤더는 호출부에서 제공. */
 export function TeacherReportsView() {
   const t = useTranslations("reports");
+  const tg = useTranslations("growth");
   const queryClient = useQueryClient();
   const [demoPeriod, setDemoPeriod] = useState("current");
   const [selected, setSelected] = useState<string>(""); // "grade|className"
@@ -432,6 +433,8 @@ export function TeacherReportsView() {
               </select>
             )}
 
+            {view === "student" && studentReport && <a href="#question-growth-library" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300"><span aria-hidden="true">🌱</span>{tg("jumpToLibrary")}</a>}
+
             <ReportPrintControls
               view={view}
               studentId={studentId}
@@ -488,8 +491,8 @@ export function TeacherReportsView() {
       {/* 학생별 보기 */}
       {!loading && view === "student" && studentReport && (
         <div className="space-y-5">
-          <QuestionGrowthJournal key={studentId} studentId={studentId} />
           <ReportView
+            renderSessionGrowth={(sessionId) => <QuestionGrowthJournal studentId={studentId} sessionId={sessionId} />}
             referenceDate={studentReport.referenceDate}
             scope="student"
             title={t("studentReportTitle", { name: studentReport.student.name })}
@@ -509,6 +512,7 @@ export function TeacherReportsView() {
             participationLabel={t("participationStudent")}
             receptionLabel={t("receptionStudent")}
           />
+          <QuestionGrowthJournal key={studentId} studentId={studentId} />
         </div>
       )}
 

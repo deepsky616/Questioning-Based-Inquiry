@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { isStudentInTeacherScope, loadTeacherStudentScope } from "@/lib/teacher-student-access";
+import { growthJournalQuerySchema, readGrowthJournal } from "@/lib/question-growth-journal";
 
 const inputSchema = z.object({
   questionId: z.string().min(1).max(150),
@@ -27,6 +28,16 @@ export async function GET(request: NextRequest) {
         prisma.user.findUnique({ where: { id: targetId }, select: { role: true, school: true, grade: true, className: true } }),
       ]);
       if (!scope || !student || !isStudentInTeacherScope(scope, student)) return fail(403, "담당 학생의 기록만 볼 수 있습니다");
+    }
+    if (request.nextUrl.searchParams.get("view") === "journal") {
+      const filters = growthJournalQuerySchema.safeParse({
+        page: request.nextUrl.searchParams.get("page") ?? undefined,
+        q: request.nextUrl.searchParams.get("q") ?? undefined,
+        status: request.nextUrl.searchParams.get("status") ?? undefined,
+        sessionId: request.nextUrl.searchParams.get("sessionId") ?? undefined,
+      });
+      if (!filters.success) return fail(400, "성장 기록 검색 조건을 확인해 주세요");
+      return NextResponse.json({ ...await readGrowthJournal(targetId, filters.data), canEdit: user.role === "STUDENT" });
     }
     const [questions, records] = await Promise.all([
       prisma.question.findMany({ where: { authorId: targetId, source: "STUDENT", ...(questionId ? { id: questionId } : {}) }, select: { id: true, content: true, session: { select: { date: true, subject: true, topic: true } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100 }),

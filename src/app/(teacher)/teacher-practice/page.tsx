@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { PracticeRecommendation } from "@/components/teacher/PracticeRecommendation";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuestionLearningSummary } from "@/components/shared/QuestionLearningSummary";
 import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
@@ -72,7 +73,7 @@ const PRACTICE_FOCUSES: PracticeFocus[] = [
   "controversial",
 ];
 const PRACTICE_STATS_GRID_COLUMNS =
-  "md:grid-cols-[minmax(10rem,1.4fr)_minmax(3.75rem,0.55fr)_minmax(4rem,0.6fr)_minmax(4.25rem,0.65fr)_minmax(4.25rem,0.65fr)_minmax(4rem,0.6fr)_minmax(13rem,2fr)]";
+  "lg:grid-cols-[minmax(10rem,1.4fr)_minmax(3.75rem,0.55fr)_minmax(4rem,0.6fr)_minmax(4.25rem,0.65fr)_minmax(4.25rem,0.65fr)_minmax(4rem,0.6fr)_minmax(13rem,2fr)]";
 
 function teacherViewFrom(params: Pick<URLSearchParams, "get">): TeacherPracticeTab {
   const view = params.get("view");
@@ -184,19 +185,7 @@ function TeacherPracticeContent() {
   const metricText = (metric: AccuracyMetric) =>
     metric.attempts === 0 ? t("statsNoSample") : `${metric.accuracy}%`;
 
-  const recommendationText = (diagnostic: PracticeDiagnostic) => {
-    if (diagnostic.recommendation.kind === "collect") {
-      return t("statsRecommendationCollect");
-    }
-    if (diagnostic.recommendation.kind === "advance") {
-      return t("statsRecommendationAdvance");
-    }
-    const focus = diagnostic.recommendation.focus;
-    const type = tCls(`${focus}.label`);
-    return diagnostic.types[focus].attempts < 3
-      ? t("statsRecommendationSample", { type, count: 3 - diagnostic.types[focus].attempts })
-      : t("statsRecommendationWeakest", { type });
-  };
+  const recommendationText = (diagnostic: PracticeDiagnostic) => <PracticeRecommendation diagnostic={diagnostic} />;
 
   const cognitiveChip = (value: "all" | Cognitive, label: string) => (
     <button
@@ -401,6 +390,16 @@ function TeacherPracticeContent() {
               </Button>
             </div>
 
+            <details className="rounded-lg border bg-muted/20 px-4 py-2 text-sm">
+              <summary className="min-h-11 cursor-pointer py-3 font-semibold">{t("statsCriteriaTitle")}</summary>
+              <ul className="mb-3 list-disc space-y-2 pl-5 leading-relaxed text-muted-foreground">
+                <li>{t("statsCriteriaPeriod")}</li>
+                <li>{t("statsCriteriaRepeat")}</li>
+                <li>{t("statsCriteriaSample")}</li>
+                <li>{t("statsCriteriaFocus")}</li>
+              </ul>
+            </details>
+
             {statsQuery.isError ? (
               <div
                 role="alert"
@@ -556,9 +555,9 @@ function TeacherPracticeContent() {
                 <div
                   role="table"
                   aria-label={t("statsStudentTableLabel")}
-                  className="overflow-hidden border-y md:border-x"
+                  className="overflow-hidden border-y lg:border-x"
                 >
-                  <div role="rowgroup" className="hidden bg-muted/40 md:block">
+                  <div role="rowgroup" className="hidden bg-muted/40 lg:block">
                     <div
                       role="row"
                       className={`grid items-center ${PRACTICE_STATS_GRID_COLUMNS}`}
@@ -610,9 +609,9 @@ function TeacherPracticeContent() {
                         >
                           <div
                             role="row"
-                            className={`grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 md:items-center md:gap-0 md:px-0 md:py-0 ${PRACTICE_STATS_GRID_COLUMNS}`}
+                            className={`grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 lg:items-center lg:gap-0 lg:px-0 lg:py-0 ${PRACTICE_STATS_GRID_COLUMNS}`}
                           >
-                            <div role="rowheader" className="col-span-2 min-w-0 md:col-span-1 md:px-3 md:py-3">
+                            <div role="rowheader" className="col-span-2 min-w-0 lg:col-span-1 lg:px-3 lg:py-3">
                               <button
                                 type="button"
                                 aria-expanded={isExpanded}
@@ -658,12 +657,12 @@ function TeacherPracticeContent() {
                               <div
                                 key={label}
                                 role="cell"
-                                className={`flex min-w-0 items-baseline justify-between gap-2 text-sm md:block md:px-2 md:py-3 ${
-                                  index === 5 ? "md:text-left" : "md:text-center"
+                                className={`flex min-w-0 flex-col items-start gap-1 text-sm lg:block lg:px-2 lg:py-3 ${
+                                  index === 5 ? "col-span-2 lg:col-span-1 lg:text-left" : "lg:text-center"
                                 }`}
                               >
-                                <span className="text-xs text-muted-foreground md:hidden">{label}</span>
-                                <span className="min-w-0 font-medium text-foreground md:text-xs">
+                                <span className="break-keep text-xs text-muted-foreground lg:hidden">{label}</span>
+                                <span className={`min-w-0 font-medium text-foreground lg:text-xs ${index < 5 ? "shrink-0 whitespace-nowrap" : ""}`}>
                                   {value}
                                 </span>
                               </div>
