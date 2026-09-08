@@ -9,6 +9,7 @@ import { Sprout } from "lucide-react";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { formatDateOnly } from "@/lib/datetime";
+import { QuestionGrowthContent } from "./QuestionGrowthContent";
 import { growthQuestionHref, type GrowthJournalResponse } from "./question-growth-types";
 
 export function QuestionGrowthJournal({ studentId, sessionId }: { studentId?: string; sessionId: string }) {
@@ -47,8 +48,8 @@ function SessionGrowthRecords({ userId, studentId, sessionId }: { userId: string
     {query.data && records.length === 0 && <p className="mt-4 rounded-lg bg-muted/40 p-4 text-sm leading-relaxed text-muted-foreground">{t("sessionEmpty")}</p>}
     <div className="mt-4 space-y-4">
       {records.map(record => <article key={record.questionId} className="rounded-xl border p-4">
-        <h4 className="whitespace-pre-wrap break-words text-base font-semibold leading-relaxed">{record.revisedContent}</h4>
-        <p className="mt-1 text-xs text-muted-foreground">{t("updatedOn", { date: formatDateOnly(record.updatedAt) })}</p>
+        <p className="mb-3 text-xs text-muted-foreground">{t("updatedOn", { date: formatDateOnly(record.updatedAt) })}</p>
+        <div className="rounded-lg bg-muted/30 p-3 sm:p-4"><QuestionGrowthContent record={record} questionOnly /></div>
         <dl className="mt-4 space-y-4">
           {record.changeNote?.trim() && <div><dt className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("changeNote")}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed">{record.changeNote}</dd></div>}
           {record.reflection.trim() && <div><dt className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("reflection")}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed">{record.reflection}</dd></div>}
