@@ -1,8 +1,9 @@
+import { demoReportReferenceDate } from "./demo-report-period";
 import { prisma } from "@/lib/db";
 import { buildActivityReport } from "@/lib/report-stats";
 import { summarizeStudentSessionActivity } from "@/lib/report-session-activity";
 
-export async function buildStudentReport(targetId: string) {
+export async function buildStudentReport(targetId: string, options: { recentDemo?: boolean } = {}) {
   const student = await prisma.user.findUnique({
     where: { id: targetId },
     select: { id: true, name: true, role: true, grade: true, className: true, studentNumber: true, school: true },
@@ -28,7 +29,8 @@ export async function buildStudentReport(targetId: string) {
     }),
   ]);
 
-  const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived });
+  const referenceDate = demoReportReferenceDate(options.recentDemo === true, "latest", [...questions, ...likesGiven, ...comments, ...likesReceived, ...commentsReceived]);
+  const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived }, { now: referenceDate });
 
   const sessionIds = sessions.map((s) => s.id);
   const analyses = sessionIds.length > 0
@@ -67,6 +69,7 @@ export async function buildStudentReport(targetId: string) {
   }));
 
   return {
+    ...(referenceDate ? { referenceDate: referenceDate.toISOString() } : {}),
     scope: "student",
     student: {
       id: student.id,

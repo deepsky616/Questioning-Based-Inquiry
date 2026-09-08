@@ -192,7 +192,7 @@ describe("교사 학급 연습 진단", () => {
 
     expect(screen.getByText("학급 정답률")).toBeInTheDocument();
     expect(screen.getByText("63%")).toBeInTheDocument();
-    expect(screen.getAllByText("열린 질문 표본이 더 필요해요")).toHaveLength(2);
+    expect(screen.getAllByText("진단 자료 수집: 열린 질문 1문제 더")).toHaveLength(2);
     expect(screen.queryByText("가장 약한 유형: 열린 질문")).not.toBeInTheDocument();
     const studentButton = screen.getByRole("button", { name: /가학생/ });
     expect(studentButton).toHaveAttribute("aria-expanded", "false");

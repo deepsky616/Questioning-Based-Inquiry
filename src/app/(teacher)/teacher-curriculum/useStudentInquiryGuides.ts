@@ -10,6 +10,8 @@ import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { InquiryQuestion } from "./types";
 
 interface UseStudentInquiryGuidesOptions {
+  initialLearningGuides?: StudentLearningGuides;
+  sourceReady?: boolean;
   questions: InquiryQuestion[];
   coreIdea: string;
   achievements?: Achievement[];
@@ -30,6 +32,7 @@ interface StudentGuideSnapshot {
 }
 
 export function useStudentInquiryGuides({
+  initialLearningGuides, sourceReady = true,
   questions,
   coreIdea,
   achievements = [],
@@ -51,7 +54,7 @@ export function useStudentInquiryGuides({
     inquiryQuestions: questions,
   });
   const [loadingStudentGuides, setLoadingStudentGuides] = useState(false);
-  const [learningGuides, setLearningGuides] = useState<StudentLearningGuides | undefined>();
+  const [learningGuides, setLearningGuides] = useState<StudentLearningGuides | undefined>(initialLearningGuides);
   const [generatedSourceSignature, setGeneratedSourceSignature] = useState<string | null>(null);
   const [previousStudentGuides, setPreviousStudentGuides] = useState<StudentGuideSnapshot | null>(null);
   const latestSourceSignatureRef = useRef(sourceSignature);
@@ -83,10 +86,10 @@ export function useStudentInquiryGuides({
     && generatedSourceSignature !== sourceSignature;
 
   useEffect(() => {
-    if (generatedSourceSignature === null && currentBundle.ok) {
+    if (sourceReady && generatedSourceSignature === null && currentBundle.ok) {
       setGeneratedSourceSignature(sourceSignature);
     }
-  }, [currentBundle.ok, generatedSourceSignature, sourceSignature]);
+  }, [currentBundle.ok, generatedSourceSignature, sourceSignature, sourceReady]);
 
   const handleGenerateStudentGuides = async () => {
     const requestSourceSignature = sourceSignature;

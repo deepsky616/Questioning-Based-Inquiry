@@ -174,6 +174,15 @@ export default function StudentsPage() {
     return compareByClassAndNumber(a, b);
   });
 
+  const attentionReason = (student: Student) => {
+    if (!attentionFilterOn || !questionActivityStatsQuery.isSuccess) return null;
+    const reasons = [];
+    if (!activeStudentIdsForFilter.has(student.id)) reasons.push(t("attentionNoQuestion", { period: questionActivityPeriodLabel }));
+    const remaining = student.sessionProgress?.actionableRemaining ?? 0;
+    if (remaining > 0) reasons.push(t("attentionRemaining", { count: remaining }));
+    return reasons.join(" · ");
+  };
+
   const grouped = sortedFiltered.reduce<Record<string, Student[]>>((acc, s) => {
     const key = buildTeacherClassLabel(tCommon, s.grade, s.className);
     if (!acc[key]) acc[key] = [];
@@ -517,6 +526,7 @@ export default function StudentsPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground">{s.name}</p>
+                          {attentionReason(s) && <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">{attentionReason(s)}</p>}
                           <p className="text-xs text-muted-foreground">
                             {s.studentNumber ? t("numberSuffix", { n: s.studentNumber }) : "-"}
                             {" · "}
@@ -566,7 +576,7 @@ export default function StudentsPage() {
                       <TableRow key={s.id} className="cursor-pointer hover:bg-muted/40"
                         onClick={() => setSelected(s)}>
                         <TableCell className="text-center text-muted-foreground">{s.studentNumber}</TableCell>
-                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell className="font-medium">{s.name}{attentionReason(s) && <p className="mt-1 max-w-64 text-sm font-normal text-amber-800 dark:text-amber-200">{attentionReason(s)}</p>}</TableCell>
                         <TableCell className="text-center">
                           <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>
                             {s.questionCount}

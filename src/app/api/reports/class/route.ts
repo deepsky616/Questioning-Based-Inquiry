@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { demoReportReferenceDate } from "@/lib/demo-report-period";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildActivityReport } from "@/lib/report-stats";
@@ -99,7 +100,8 @@ export async function GET(req: NextRequest) {
     prisma.comment.findMany({ where: { question: { authorId: { in: ids } } }, select: { createdAt: true } }),
   ]);
 
-  const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived });
+  const referenceDate = demoReportReferenceDate((session.user as { isDemo?: boolean }).isDemo === true, req.nextUrl.searchParams.get("demoPeriod"), [...questions, ...likesGiven, ...comments, ...likesReceived, ...commentsReceived]);
+  const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived }, { now: referenceDate });
 
   // 학급 학생들이 참여한 수업 세션
   const sessions = await prisma.questionSession.findMany({
@@ -175,6 +177,7 @@ export async function GET(req: NextRequest) {
   }));
 
   return NextResponse.json({
+    ...(referenceDate ? { referenceDate: referenceDate.toISOString() } : {}),
     scope: "class",
     klass: { grade, className, studentCount: students.length, school },
     perStudent,

@@ -50,6 +50,9 @@ export function CommentThread({
   const ct = useContentTranslation(comments.map(item => ({type: "COMMENT" as const, id: item.id, original: item.content})));
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!preloaded);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [postError, setPostError] = useState(false);
   const [text, setText] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -58,28 +61,36 @@ export function CommentThread({
   useEffect(() => {
     if (preloaded) return;
     let active = true;
+    setIsLoading(true);
+    setLoadError(false);
     fetch(`/api/questions/${questionId}/comments`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (active) setComments(Array.isArray(d) ? d : []);
+      .then((r) => {
+        if (!r.ok) throw new Error("댓글 조회 실패");
+        return r.json();
       })
-      .catch(() => {})
+      .then((d) => {
+        if (!Array.isArray(d)) throw new Error("잘못된 댓글 응답");
+        if (active) setComments(d);
+      })
+      .catch(() => { if (active) setLoadError(true); })
       .finally(() => {
         if (active) setIsLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [questionId, preloaded]);
+  }, [questionId, preloaded, retryCount]);
 
   const submit = async () => {
-    if (!text.trim() || isPosting) return;
+    if (!text.trim() || isPosting || isLoading) return;
+    const submittedText = text.trim();
     setIsPosting(true);
+    setPostError(false);
     try {
       const res = await fetch(`/api/questions/${questionId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text.trim() }),
+        body: JSON.stringify({ content: submittedText }),
       });
       if (!res.ok) throw new Error();
       const created: ThreadComment & { awardedPoints?: number } = await res.json();
@@ -91,9 +102,9 @@ export function CommentThread({
       if ((created.awardedPoints ?? 0) > 0) {
         void queryClient.invalidateQueries({ queryKey: ["points-card"] });
       }
-      setText("");
+      setText((current) => current.trim() === submittedText ? "" : current);
     } catch {
-      // 무시
+      setPostError(true);
     } finally {
       setIsPosting(false);
     }
@@ -111,7 +122,7 @@ export function CommentThread({
       // 알림 벨의 부적절 의심 카운트 즉시 갱신
       queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
     } catch {
-      // 무시
+      toast({ variant: "destructive", description: t("updateFailed") });
     }
   };
 
@@ -150,13 +161,16 @@ export function CommentThread({
     }
   };
 
-  if (isLoading) {
-    return <div className="text-sm text-muted-foreground">{t("loading")}</div>;
-  }
-
   return (
     <div className="space-y-3">
-      {comments.length === 0 ? (
+      {isLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">{t("loading")}</p>
+      ) : loadError ? (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <span>{t("loadFailed")}</span>
+          <Button type="button" variant="outline" className="min-h-11" disabled={isPosting} onClick={() => setRetryCount((count) => count + 1)}>{tc("retry")}</Button>
+        </div>
+      ) : comments.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <div className="space-y-2">
@@ -187,11 +201,11 @@ export function CommentThread({
                       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(c.id); }
                       if (e.key === "Escape") { setEditingId(null); setEditText(""); }
                     }}
-                    className="h-8 text-sm"
+                    className="min-h-11 text-sm"
                     autoFocus
                   />
-                  <Button size="sm" onClick={() => saveEdit(c.id)} disabled={!editText.trim()} className="h-8 shrink-0">{tc("save")}</Button>
-                  <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditText(""); }} className="h-8 shrink-0">{tc("cancel")}</Button>
+                  <Button size="sm" onClick={() => saveEdit(c.id)} disabled={!editText.trim()} className="min-h-11 shrink-0">{tc("save")}</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditText(""); }} className="min-h-11 shrink-0">{tc("cancel")}</Button>
                 </div>
               ) : (
                 <>
@@ -208,17 +222,17 @@ export function CommentThread({
               {!isEditing && (isMine || canModerate) && (
                 <div className="mt-1.5 flex items-center gap-3">
                   {isMine && (
-                    <button type="button" onClick={() => { setEditingId(c.id); setEditText(c.content); }} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+                    <button type="button" onClick={() => { setEditingId(c.id); setEditText(c.content); }} className="inline-flex min-h-11 min-w-11 items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200">
                       {t("edit")}
                     </button>
                   )}
                   {canModerate && c.flagged && (
-                    <button type="button" onClick={() => clearFlag(c.id)} className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800">
+                    <button type="button" onClick={() => clearFlag(c.id)} className="inline-flex min-h-11 min-w-11 items-center text-sm font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200">
                       {t("clearFlag")}
                     </button>
                   )}
                   {(isMine || canModerate) && (
-                    <button type="button" onClick={() => deleteComment(c.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">
+                    <button type="button" onClick={() => deleteComment(c.id)} className="inline-flex min-h-11 min-w-11 items-center text-sm font-medium text-red-500 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200">
                       {t("delete")}
                     </button>
                   )}
@@ -229,6 +243,7 @@ export function CommentThread({
           })}
         </div>
       )}
+      {postError && <p role="alert" className="text-sm text-destructive">{t("postFailed")}</p>}
       {user.id && (
         <div className="flex gap-2">
           <Input
@@ -242,9 +257,9 @@ export function CommentThread({
                 submit();
               }
             }}
-            className="h-8 text-sm"
+            className="min-h-11 text-sm"
           />
-          <Button size="sm" onClick={submit} disabled={isPosting || !text.trim()} className="h-8 shrink-0">
+          <Button size="sm" onClick={submit} disabled={isPosting || isLoading || !text.trim()} className="min-h-11 shrink-0">
             {isPosting ? "..." : t("post")}
           </Button>
         </div>

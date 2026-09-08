@@ -72,6 +72,7 @@ export interface SessionAnalysisResult {
 type SessionTranslationFields = Partial<Record<keyof SessionAnalysisResult, string>>;
 
 export interface ReportViewProps {
+  referenceDate?: string;
   scope: "student" | "class";
   title: string;
   subtitle?: string;
@@ -146,7 +147,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, otherLabel: string, w
 }
 
 export function ReportView({
-  scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
+  referenceDate, scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
   participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, showAnalysisModel = true, onSaveAnalysis, onBulkComplete,
 }: ReportViewProps) {
   const { toast } = useToast();
@@ -436,7 +437,7 @@ export function ReportView({
       <ReportHeaderControls
         title={title}
         subtitle={subtitle}
-        basisNote={t("basisNote", { date: formatDateOnly(new Date()) })}
+        basisNote={t("basisNote", { date: formatDateOnly(referenceDate ? new Date(referenceDate) : new Date()) })}
         range={range}
         period={period}
         periods={periods}

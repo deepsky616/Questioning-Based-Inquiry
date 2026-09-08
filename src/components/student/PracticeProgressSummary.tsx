@@ -64,7 +64,8 @@ export function PracticeProgressSummary() {
   const search = practiceSelectionSearch(selection);
   const recommendation =
     data.recommendation.kind === "focus"
-      ? t("progressRecommendationFocus", {
+      ? t(data.types[data.recommendation.focus].attempts < 3 ? "progressRecommendationSample" : "progressRecommendationFocus", {
+          count: Math.max(0, 3 - data.types[data.recommendation.focus].attempts),
           type: tCls(`${data.recommendation.focus}.label`),
         })
       : data.recommendation.kind === "advance"
@@ -85,7 +86,7 @@ export function PracticeProgressSummary() {
           <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">{recommendation}</p>
           {data.capped && <p className="text-xs text-muted-foreground">{t("progressCapped")}</p>}
         </div>
-        <Link className="shrink-0 text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300" href={`/student-practice?${search}`}>
+        <Link className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-indigo-200 px-3 text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300" href={`/student-practice?${search}`}>
           {t("startRecommendation")}
         </Link>
       </div>

@@ -42,7 +42,8 @@ describe("student ask staged layout", () => {
     expect(inputCardSource).toContain("bg-indigo-50");
     expect(inputCardSource).toContain("dark:bg-indigo-950/40");
     expect(inputCardSource).toContain("dark:bg-indigo-900");
-    expect(sessionSelectorSource).not.toContain("currentSession");
+    expect(sessionSelectorSource).toContain("lg:hidden");
+    expect(sessionSelectorSource).toContain("aria-expanded={expanded}");
   });
 
   it("keeps reference material beside the writing panel with a helper fallback", () => {

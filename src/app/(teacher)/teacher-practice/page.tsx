@@ -194,7 +194,7 @@ function TeacherPracticeContent() {
     const focus = diagnostic.recommendation.focus;
     const type = tCls(`${focus}.label`);
     return diagnostic.types[focus].attempts < 3
-      ? t("statsRecommendationSample", { type })
+      ? t("statsRecommendationSample", { type, count: 3 - diagnostic.types[focus].attempts })
       : t("statsRecommendationWeakest", { type });
   };
 

@@ -99,7 +99,7 @@ describe("학생 개인 연습 진단 요약", () => {
 
     expect(screen.getByText("최근 30일 진단")).toBeInTheDocument();
     expect(screen.getByText("정답률 60% · 진단 시도 5회")).toBeInTheDocument();
-    expect(screen.getByText("개념적 질문을 더 연습해 보세요")).toBeInTheDocument();
+    expect(screen.getByText("개념적 질문을 2문제 더 풀면 이 유형을 진단할 수 있어요")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "맞춤 연습 시작" })).toHaveAttribute(
       "href",
       "/student-practice?tab=quiz&quizMode=cognitive&focus=conceptual",

@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoPeriodControl } from "@/components/reports/DemoPeriodControl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -7,6 +8,7 @@ import { QuestionGameLearningHistory } from "@/components/question-games/Questio
 import type { QuestionGameLearningHistory as LearningHistory } from "@/lib/question-game-history";
 
 export function StudentQuestionGameLearningHistory() {
+  const [demoPeriod, setDemoPeriod] = useState("current");
   const t = useTranslations("gamePlay");
   const tc = useTranslations("common");
   const [history, setHistory] = useState<LearningHistory | null>(null);
@@ -19,7 +21,7 @@ export function StudentQuestionGameLearningHistory() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/reports/question-games?summary=1", {
+      const response = await fetch(`/api/reports/question-games?summary=1${demoPeriod === "latest" ? "&demoPeriod=latest" : ""}`, {
         cache: "no-store",
       });
       const data = await response.json().catch(() => null) as
@@ -39,7 +41,7 @@ export function StudentQuestionGameLearningHistory() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [t]);
+  }, [t, demoPeriod]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadHistory(); }, 0);
@@ -49,18 +51,19 @@ export function StudentQuestionGameLearningHistory() {
     };
   }, [loadHistory]);
 
+  const periodControl = <DemoPeriodControl value={demoPeriod} onChange={setDemoPeriod} />;
   if (loading) {
     return (
-      <div role="status" className="flex min-h-32 items-center justify-center rounded-lg border border-border bg-card text-sm text-muted-foreground">
+      <>{periodControl}<div role="status" className="flex min-h-32 items-center justify-center rounded-lg border border-border bg-card text-sm text-muted-foreground">
         <LoaderCircle className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
         {t("loadingHistory")}
-      </div>
+      </div></>
     );
   }
 
   if (error || !history) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+      <>{periodControl}<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
         <p>{error ?? t("couldNotLoadHistory")}</p>
         <button
           type="button"
@@ -69,9 +72,9 @@ export function StudentQuestionGameLearningHistory() {
         >
           {tc("retry")}
         </button>
-      </div>
+      </div></>
     );
   }
 
-  return <QuestionGameLearningHistory audience="student" history={history} />;
+  return <>{periodControl}<QuestionGameLearningHistory key={demoPeriod} audience="student" history={history} /></>;
 }

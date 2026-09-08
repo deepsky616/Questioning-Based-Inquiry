@@ -219,12 +219,16 @@ async function loadSummary(
 async function loadDailyTrend(
   client: HistoryQueryClient,
   studentIds: string[],
+  recentDemo = false,
 ): Promise<QuestionGameDailyPoint[]> {
   if (studentIds.length === 0) return [];
   const rows = await client.$queryRaw<RawDailyRow[]>(Prisma.sql`
     WITH ${playRowsSql(studentIds)},
     bounds AS (
-      SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS "currentDate"
+      SELECT CASE WHEN ${recentDemo} THEN COALESCE(
+        (SELECT MAX(("completedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul')::date) FROM all_plays WHERE "completedAt" <= CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
+      ) ELSE (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date END AS "currentDate"
     ),
     days AS (
       SELECT GENERATE_SERIES(
@@ -339,6 +343,7 @@ function assertLearningHistoryConsistency(history: QuestionGameLearningHistory) 
 export async function loadQuestionGameLearningHistory(
   studentId: string,
   recentLimit = DEFAULT_PAGE_SIZE,
+  recentDemo = false,
 ): Promise<QuestionGameLearningHistory> {
   return prisma.$transaction(async (tx) => {
     const summary = await loadSummary(tx, [studentId]);
@@ -346,7 +351,7 @@ export async function loadQuestionGameLearningHistory(
       studentId,
       limit: recentLimit,
     });
-    const daily = await loadDailyTrend(tx, [studentId]);
+    const daily = await loadDailyTrend(tx, [studentId], recentDemo);
     const history = {
       ...summary,
       recent: page.items,
@@ -360,12 +365,13 @@ export async function loadQuestionGameLearningHistory(
 
 export async function loadQuestionGameClassSummary(
   studentIds: string[],
+  recentDemo = false,
 ): Promise<QuestionGameLearningHistory> {
   const uniqueIds = [...new Set(studentIds)];
   if (uniqueIds.length === 0) return emptyHistory();
   return prisma.$transaction(async (tx) => {
     const summary = await loadSummary(tx, uniqueIds);
-    const daily = await loadDailyTrend(tx, uniqueIds);
+    const daily = await loadDailyTrend(tx, uniqueIds, recentDemo);
     return { ...summary, daily };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }

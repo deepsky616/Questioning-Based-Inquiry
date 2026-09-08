@@ -50,7 +50,10 @@
     "classesRequired": "담당 학년·반을 1개 이상 추가해 주세요",
     "gradeRequired": "학년을 입력해 주세요",
     "classRequired": "반을 입력해 주세요",
-    "duplicateClass": "중복된 학년·반이 있습니다"
+    "duplicateClass": "중복된 학년·반이 있습니다",
+    "actionFailed": "반영하지 못했어요. 다시 눌러 주세요.",
+    "like": "좋아요 누르기",
+    "unlike": "좋아요 취소"
   },
   "classification": {
     "category1": "분류1",
@@ -244,7 +247,7 @@
     "futureBadge": "예정",
     "pastBadge": "지난 수업",
     "emptyTopic": "주제 없음",
-    "currentSession": "현재 질문수업",
+    "currentSession": "선택한 수업",
     "teacherSuffix": "선생님",
     "inquiryClassNotice": "선생님이 만든 탐구 질문 수업입니다. 아래 탐구 질문을 참고해 나만의 질문을 만들어 보세요.",
     "visibilityNotice": "이 수업의 질문은 선생님 설정에 따라 {visibility}로 저장됩니다.",
@@ -323,7 +326,11 @@
     "draft_restored": "이 수업에서 쓰던 질문을 불러왔어요. 이어서 작성해 보세요.",
     "draft_error": "임시 저장을 사용할 수 없어요. 화면을 떠나기 전에 질문을 복사해 주세요.",
     "draft_submitted": "질문 제출을 완료했어요.",
-    "showExample": "먼저 직접 고쳐 보고, 필요하면 예시 보기"
+    "showExample": "먼저 직접 고쳐 보고, 필요하면 예시 보기",
+    "changeSession": "수업 변경",
+    "referenceLoading": "참고 자료를 불러오고 있어요.",
+    "referenceFailed": "참고 자료를 불러오지 못했어요. 질문은 계속 작성할 수 있어요.",
+    "referenceEmpty": "이 수업에 연결된 참고 자료가 아직 없어요."
   },
   "comment": {
     "loading": "댓글 불러오는 중...",
@@ -336,7 +343,10 @@
     "delete": "🗑 삭제",
     "editFailed": "댓글 수정에 실패했습니다",
     "deleteFailed": "댓글 삭제에 실패했습니다",
-    "deleteConfirm": "이 댓글을 삭제하시겠습니까?"
+    "deleteConfirm": "이 댓글을 삭제하시겠습니까?",
+    "loadFailed": "댓글을 불러오지 못했어요. 다시 불러와 주세요.",
+    "postFailed": "댓글을 등록하지 못했어요. 입력한 내용은 남아 있으니 다시 등록해 주세요.",
+    "updateFailed": "변경 사항을 저장하지 못했어요. 다시 시도해 주세요."
   },
   "explore": {
     "likeSelfDisabled": "자신의 질문에는 좋아요를 할 수 없습니다",
@@ -1016,7 +1026,9 @@
     "savedFilterAllUnits": "전체 단원",
     "savedFilterEmpty": "조건에 맞는 탐구질문이 없어요.",
     "deleteConfirm": "이 탐구 설계를 삭제할까요?",
-    "deleteConfirmLinked": "이 설계로 만든 질문수업 {count}개의 학생 참고 자료가 사라집니다. 정말 삭제할까요?"
+    "deleteConfirmLinked": "이 설계로 만든 질문수업 {count}개의 학생 참고 자료가 사라집니다. 정말 삭제할까요?",
+    "curriculumLoadFailed": "교육과정을 불러오지 못했어요. 입력 내용은 유지됩니다. 다시 불러와 주세요.",
+    "pendingDesignUnavailable": "앞서 저장한 설계를 아직 확인하지 못했습니다. 잠시 후 다시 시도하거나 저장된 설계 목록을 확인해 주세요."
   },
   "students": {
     "today": "오늘",
@@ -1060,7 +1072,7 @@
     "summaryValuesNote": "질문·답변은 누적 활동이며 포인트는 현재 보유값입니다.",
     "filterAll": "전체",
     "filterNoQuestionsActive": "{period} 동안 질문이 없는 학생을 선별해 표시합니다. 질문·답변은 누적이며 포인트는 현재 보유값입니다.",
-    "filterAttentionActive": "{period} 동안 질문이 없거나 미작성 수업이 남은 학생을 선별해 표시합니다. 질문·답변은 누적이며 포인트는 현재 보유값입니다.",
+    "filterAttentionActive": "참여 확인: {period} 질문 기록이 없거나 최근 30일 미작성 수업이 있는 학생입니다. 학생을 누르면 수업별 참여 내용을 볼 수 있어요.",
     "studentDataLoadError": "학생 목록과 활동을 불러오지 못했습니다.",
     "filterActivityLoadError": "학생 질문 활동을 불러오지 못했습니다.",
     "filterActivityRetry": "다시 불러오기",
@@ -1113,7 +1125,9 @@
     "presetGoodQuestion": "좋은 질문",
     "presetKindAnswer": "친절한 답변",
     "presetParticipation": "참여 우수",
-    "presetRuleViolation": "규칙 위반"
+    "presetRuleViolation": "규칙 위반",
+    "attentionNoQuestion": "{period} 질문 기록 없음",
+    "attentionRemaining": "최근 30일 미작성 수업 {count}개"
   },
   "sessions": {
     "dateRequired": "날짜, 교과, 주제는 필수입니다",
@@ -1341,7 +1355,7 @@
     "taskPointsDesc": "승인하거나 거절할 추천 포인트가 있습니다.",
     "taskFlaggedTitle": "부적절 의심 활동",
     "taskFlaggedDesc": "질문이나 댓글 중 확인이 필요한 항목입니다.",
-    "taskAttentionTitle": "지도가 필요한 학생",
+    "taskAttentionTitle": "참여 확인이 필요한 학생",
     "taskNoQuestionsTitle": "질문 없는 학생",
     "taskNoQuestionsDesc": "선택 기간 동안 질문을 작성하지 않은 학생입니다.",
     "taskUnfinishedSessionsTitle": "미작성 수업 학생",
@@ -2357,7 +2371,7 @@
     "progressEmpty": "아직 진단할 연습 기록이 없어요",
     "progressTitle": "최근 30일 진단",
     "progressMetric": "정답률 {accuracy}% · 진단 시도 {attempts}회",
-    "progressRecommendationCollect": "여러 질문 유형을 더 풀어 진단 자료를 모아 보세요",
+    "progressRecommendationCollect": "질문 유형마다 3문제 이상 풀어 보면 나에게 맞는 연습을 찾을 수 있어요",
     "progressRecommendationFocus": "{type}을 더 연습해 보세요",
     "progressRecommendationAdvance": "분류를 잘 익혔어요. 질문 바꾸기에 도전해 보세요",
     "progressCapped": "최근 시도 100개를 기준으로 진단했어요",
@@ -2430,9 +2444,9 @@
     "statsDiagnosticAttempts": "진단 시도",
     "statsClassAccuracy": "학급 정답률",
     "statsRecommendation": "진단 추천",
-    "statsRecommendationCollect": "유형별 표본을 더 모아 주세요",
-    "statsRecommendationSample": "{type} 표본이 더 필요해요",
-    "statsRecommendationWeakest": "가장 약한 유형: {type}",
+    "statsRecommendationCollect": "진단 자료 수집 중 · 유형마다 3문제 이상 필요",
+    "statsRecommendationSample": "진단 자료 수집: {type} {count}문제 더",
+    "statsRecommendationWeakest": "집중 연습 추천: {type}",
     "statsRecommendationAdvance": "질문 바꾸기로 나아갈 준비가 됐어요",
     "statsFocusFilter": "진단 유형 선택",
     "statsFilterAll": "전체 유형",
@@ -2498,7 +2512,8 @@
     "activateBtn": "사용",
     "deactivateBtn": "중지",
     "addToMineBtn": "내 문항으로",
-    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%"
+    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%",
+    "progressRecommendationSample": "{type}을 {count}문제 더 풀면 이 유형을 진단할 수 있어요"
   },
   "questionLearning": {
     "title": "질문학습",
@@ -2524,5 +2539,43 @@
     "prompt": "수업에서 먼저 물을 질문",
     "followUp": "학생 답변 뒤 이어서 물을 질문",
     "viewClassDiagnostic": "학급 진단 보기"
+  },
+  "curriculumDraft": {
+    "loading": "작성 중인 수업을 확인하고 있어요.",
+    "foundTitle": "작성하던 수업이 있어요",
+    "foundDescription": "{time} 저장 · {step}단계까지 작성했습니다. 이 브라우저에서 7일 동안 보관합니다.",
+    "restore": "이어서 작성",
+    "startNew": "초안을 지우고 새로 시작",
+    "saved": "이 브라우저에 자동 저장했어요. 같은 교사 계정으로 7일 안에 이어 쓸 수 있어요.",
+    "error": "초안을 자동 저장하지 못했어요. 화면을 닫기 전에 내용을 복사해 주세요."
+  },
+  "growth": {
+    "title": "나의 질문 성장 기록",
+    "description": "대표 질문을 골라 처음 생각과 달라진 생각을 남겨 보세요. 나와 담당 선생님이 함께 볼 수 있어요.",
+    "teacherDescription": "학생이 질문을 고치며 무엇을 배웠는지 살펴보세요. 학생이 직접 남긴 기록입니다.",
+    "loading": "성장 기록을 불러오고 있어요.",
+    "loadFailed": "성장 기록을 불러오지 못했어요.",
+    "choose": "대표 질문 고르기",
+    "choosePlaceholder": "최근 질문 중 하나를 골라 주세요",
+    "original": "처음 질문",
+    "revised": "고친 질문",
+    "reflection": "새롭게 알게 된 점",
+    "revisedHint": "어떤 이유나 근거를 더 알아보고 싶은가요? 5자 이상 적어 보세요.",
+    "reflectionHint": "생각이 어떻게 달라졌나요? 5자 이상 적어 보세요.",
+    "save": "성장 기록 저장",
+    "saving": "저장하고 있어요…",
+    "saved": "성장 기록을 저장했어요.",
+    "saveFailed": "저장하지 못했어요. 입력한 내용은 그대로 있으니 다시 저장해 주세요.",
+    "conflict": "최신 기록을 다시 불러온 뒤 내용을 확인하고 저장해 주세요. 입력한 내용은 유지됩니다.",
+    "empty": "아직 저장한 성장 기록이 없어요. 질문 하나부터 시작해 보세요.",
+    "continue": "이 기록 이어 쓰기",
+    "teacherEmpty": "아직 학생이 작성한 성장 기록이 없습니다.",
+    "savedRefreshFailed": "저장은 완료했지만 새 기록을 불러오지 못했어요. 다시 불러온 뒤 확인해 주세요."
+  },
+  "demoPeriod": {
+    "title": "시연 기간",
+    "current": "현재 날짜 기준",
+    "latest": "최근 기록이 있는 기간",
+    "description": "시연용 조회 기준입니다. 실제 기록 날짜와 포인트는 바뀌지 않아요."
   }
 }

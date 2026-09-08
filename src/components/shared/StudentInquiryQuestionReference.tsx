@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import { hasDistinctExplanation } from "@/lib/student-guide-display";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 
 const TYPE_STYLE: Record<string, string> = {
@@ -49,7 +50,7 @@ export function StudentInquiryQuestionReference({
       {typeHelp && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{typeHelp}</p>}
       {guide && (
         <dl data-student-understanding-guide="inquiry-question" className="mt-2 space-y-2 border-t border-border/70 pt-2 text-xs">
-          {guide.meaning && (
+          {hasDistinctExplanation(guide.meaning, question.content) && (
             <div>
               <dt className="font-semibold text-foreground">{t("questionMeaning")}</dt>
               <dd className="mt-0.5 leading-relaxed text-muted-foreground">{guide.meaning}</dd>
@@ -67,7 +68,7 @@ export function StudentInquiryQuestionReference({
               </dd>
             </div>
           )}
-          {guide.thinkingStart && (
+          {hasDistinctExplanation(guide.thinkingStart, guide.meaning) && (
             <div>
               <dt className="font-semibold text-foreground">{t("thinkingStart")}</dt>
               <dd className="mt-0.5 leading-relaxed text-muted-foreground">{guide.thinkingStart}</dd>

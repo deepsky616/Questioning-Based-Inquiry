@@ -67,7 +67,17 @@ for (const width of [375, 768, 1440]) {
         await input.fill("구름의 모양은 왜 달라질까요?");
         await expect(page.getByRole("button", { name: "질문 분석하기", exact: true })).toBeEnabled();
         await expect(page.locator('li[aria-current="step"]')).toContainText("질문 작성");
+        if (width < 1024) {
+          const changeSession = page.getByRole("button", { name: "수업 변경", exact: true });
+          await expect(changeSession).toHaveAttribute("aria-expanded", "false");
+          await changeSession.click();
+          await expect(changeSession).toHaveAttribute("aria-expanded", "true");
+        }
         expect((await page.getByRole("combobox", { name: "날짜로 거르기" }).boundingBox())!.height).toBeGreaterThanOrEqual(48);
+        if (width < 1024) {
+          await page.getByRole("button", { name: "수업 변경", exact: true }).click();
+          await expect(input).toHaveValue("구름의 모양은 왜 달라질까요?");
+        }
         await expectTextContrast(page.locator(".student-ask-reference-panel li").first());
       } else {
         await page.getByRole("button", { name: /2026-09/ }).click();

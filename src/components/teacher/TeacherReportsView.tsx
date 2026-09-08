@@ -1,5 +1,7 @@
 "use client";
 
+import { DemoPeriodControl } from "@/components/reports/DemoPeriodControl";
+import { QuestionGrowthJournal } from "@/components/reports/QuestionGrowthJournal";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -95,6 +97,7 @@ function analyzeStudentSessionFor(studentId: string, failMsg: string) {
 export function TeacherReportsView() {
   const t = useTranslations("reports");
   const queryClient = useQueryClient();
+  const [demoPeriod, setDemoPeriod] = useState("current");
   const [selected, setSelected] = useState<string>(""); // "grade|className"
   const [view, setView] = useState<"class" | "student">("class");
   const [studentId, setStudentId] = useState<string>("");
@@ -131,10 +134,10 @@ export function TeacherReportsView() {
 
   // 학급 리포트(무거운 집계): 긴 폴링(60초)+포커스 재조회
   const classReportQuery = useQuery<ClassReport>({
-    queryKey: ["class-report", selected],
+    queryKey: ["class-report", selected, demoPeriod],
     queryFn: async () => {
       const [grade, className] = selected.split("|");
-      const r = await fetch(`/api/reports/class?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`);
+      const r = await fetch(`/api/reports/class?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}&demoPeriod=${demoPeriod}`);
       if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
       return r.json();
     },
@@ -146,9 +149,9 @@ export function TeacherReportsView() {
 
   // 학생별 리포트: 학생 선택 시 긴 폴링(60초)+포커스 재조회
   const studentReportQuery = useQuery<StudentReport>({
-    queryKey: ["teacher-student-report", studentId],
+    queryKey: ["teacher-student-report", studentId, demoPeriod],
     queryFn: async () => {
-      const r = await fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}`);
+      const r = await fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}&demoPeriod=${demoPeriod}`);
       if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
       return r.json();
     },
@@ -175,6 +178,7 @@ export function TeacherReportsView() {
     }));
 
   const toItem = (r: StudentReport): PrintReportItem => ({
+    referenceDate: r.referenceDate,
     name: r.student.name, grade: r.student.grade, className: r.student.className,
     studentNumber: r.student.studentNumber, school: r.student.school ?? undefined,
     totals: r.totals, classification: r.classification,
@@ -280,6 +284,7 @@ export function TeacherReportsView() {
     const rk = classRankingQuery.data ?? null;
     showPrintPreview([{
       kind: "class",
+      referenceDate: report.referenceDate,
       name: t("gradeClass", { grade: klass.grade, className: klass.className }),
       grade: klass.grade,
       className: klass.className,
@@ -341,7 +346,7 @@ export function TeacherReportsView() {
         fetch("/api/reports/students", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ grade: klass.grade, className: klass.className }),
+          body: JSON.stringify({ grade: klass.grade, className: klass.className, demoPeriod }),
         }).then(async (r) => {
           const d = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(d.error || t("loadFailed"));
@@ -365,7 +370,7 @@ export function TeacherReportsView() {
   // 일괄 분석 완료 후 현재 학생 리포트를 다시 불러와 새 분석 결과를 화면에 반영
   const refreshStudentReport = () => {
     if (view !== "student" || !studentId) return;
-    queryClient.invalidateQueries({ queryKey: ["teacher-student-report", studentId] });
+    queryClient.invalidateQueries({ queryKey: ["teacher-student-report", studentId, demoPeriod] });
   };
 
   const students = report?.perStudent ?? [];
@@ -379,6 +384,7 @@ export function TeacherReportsView() {
 
   return (
     <div className="space-y-5">
+      <DemoPeriodControl value={demoPeriod} onChange={setDemoPeriod} />
       <div className="no-print">
         {classes.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -459,6 +465,7 @@ export function TeacherReportsView() {
       {!loading && view === "class" && report && (
         <div className="space-y-5">
           <ReportView
+            referenceDate={report.referenceDate}
             scope="class"
             title={t("classReportTitle", { grade: report.klass.grade, className: report.klass.className })}
             subtitle={t("classReportSubtitle", { count: report.klass.studentCount })}
@@ -481,7 +488,9 @@ export function TeacherReportsView() {
       {/* 학생별 보기 */}
       {!loading && view === "student" && studentReport && (
         <div className="space-y-5">
+          <QuestionGrowthJournal key={studentId} studentId={studentId} />
           <ReportView
+            referenceDate={studentReport.referenceDate}
             scope="student"
             title={t("studentReportTitle", { name: studentReport.student.name })}
             subtitle={studentReportSubtitle}

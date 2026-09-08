@@ -111,7 +111,7 @@ export function StudentAskInputCard({
                 또렷하게, 단 예전 정보 카드만큼 부풀리지는 않는다(중복 재발 방지).
                 밝은 테마: indigo-50 배경 + 흰 칩 / 어두운 테마: indigo-950 배경 + indigo-900 칩 */}
             {selectedSession && (
-              <div className="student-ask-current-session flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-500/40 dark:bg-indigo-950/40">
+              <div className="student-ask-current-session hidden lg:flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-500/40 dark:bg-indigo-950/40">
                 <span className="text-sm font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300/80">
                   {t("currentSession")}
                 </span>

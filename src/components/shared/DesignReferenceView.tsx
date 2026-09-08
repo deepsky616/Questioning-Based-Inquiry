@@ -7,6 +7,8 @@ import { splitCoreIdeaLines } from "@/lib/content-selection";
 import { StudentInquiryQuestionReference } from "@/components/shared/StudentInquiryQuestionReference";
 import type { Achievement } from "@/lib/achievement-selection";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import { hasDistinctExplanation } from "@/lib/student-guide-display";
+import { Button } from "@/components/ui/button";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 
 export interface DesignReferenceInquiryQuestion {
@@ -49,6 +51,9 @@ export function DesignReferenceView({
   sourceSessionId?: string | null;
 }) {
   const t = useTranslations("designRef");
+  const tTranslate = useTranslations("translate");
+  const [translationError, setTranslationError] = useState(false);
+  const [translationRetry, setTranslationRetry] = useState(0);
   const tCls = useTranslations("classification");
   const locale = useLocale();
   const [translated, setTranslated] = useState<DesignReference | null>(null);
@@ -56,19 +61,24 @@ export function DesignReferenceView({
   useEffect(() => {
     let cancelled = false;
     setTranslated(null);
+    setTranslationError(false);
     if (locale === "ko" || !sourceSessionId) return;
 
     fetch(`/api/sessions/${sourceSessionId}/design-context/translate`, { method: "POST" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
-        if (!cancelled && payload?.context) setTranslated(payload.context as DesignReference);
+      .then((response) => {
+        if (!response.ok) throw new Error("참고 자료 번역 실패");
+        return response.json();
       })
-      .catch(() => {});
+      .then((payload) => {
+        if (!payload?.context) throw new Error("잘못된 번역 응답");
+        if (!cancelled) setTranslated(payload.context as DesignReference);
+      })
+      .catch(() => { if (!cancelled) setTranslationError(true); });
 
     return () => {
       cancelled = true;
     };
-  }, [locale, sourceSessionId]);
+  }, [locale, sourceSessionId, translationRetry]);
 
   const view = translated ?? data;
   const typeLabel = (ty: string) =>
@@ -116,6 +126,12 @@ export function DesignReferenceView({
 
   return (
     <div className={className}>
+      {translationError && (
+        <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <span>{tTranslate("translateFailed")}</span>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => setTranslationRetry((count) => count + 1)}>{tTranslate("retry")}</Button>
+        </div>
+      )}
       {view.title && (
         <p className="text-sm font-semibold text-foreground">
           <span className="mr-1 text-xs font-medium text-muted-foreground">{t("labelUnit")}</span>
@@ -146,7 +162,7 @@ export function DesignReferenceView({
               </ul>
               {learningGuides?.coreIdea && (
                 <dl data-student-understanding-guide="core-idea" className="mt-3 space-y-2 border-t border-amber-200/70 pt-3 text-xs dark:border-amber-800/50">
-                  {learningGuides.coreIdea.explanation && <div><dt className="font-semibold">{t("easyExplanation")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{learningGuides.coreIdea.explanation}</dd></div>}
+                  {hasDistinctExplanation(learningGuides.coreIdea.explanation, view.coreIdea) && <div><dt className="font-semibold">{t("easyExplanation")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{learningGuides.coreIdea.explanation}</dd></div>}
                   {learningGuides.coreIdea.lifeConnection && <div><dt className="font-semibold">{t("lifeConnection")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{learningGuides.coreIdea.lifeConnection}</dd></div>}
                   {learningGuides.coreIdea.keywords.length > 0 && <div><dt className="font-semibold">{t("keyWords")}</dt><dd className="mt-1 flex flex-wrap gap-1.5">{learningGuides.coreIdea.keywords.map((keyword, index) => <span key={`${keyword.term}-${index}`} className="rounded border border-border bg-background px-2 py-1"><strong>{keyword.term}</strong>{keyword.meaning ? `: ${keyword.meaning}` : ""}</span>)}</dd></div>}
                 </dl>
@@ -178,7 +194,7 @@ export function DesignReferenceView({
                       <span className="shrink-0 font-semibold text-teal-800 dark:text-teal-200">{achievement.code}</span>
                       <p className="leading-relaxed text-foreground">{achievement.content}</p>
                     </div>
-                    {guide?.explanation && (
+                    {guide && hasDistinctExplanation(guide.explanation, achievement.content) && (
                       <div data-student-understanding-guide="achievement" className="mt-3 border-t border-teal-200/70 pt-3 text-xs dark:border-teal-800/50">
                         <p className="font-semibold">{t("easyExplanation")}</p>
                         <p className="mt-0.5 leading-relaxed text-muted-foreground">{guide.explanation}</p>
@@ -211,7 +227,7 @@ export function DesignReferenceView({
                 return (
                   <article key={index} className="rounded-md border border-sky-200/70 bg-background/85 p-3 dark:border-sky-800/50">
                     <p className="font-medium leading-relaxed text-foreground">{sentence}</p>
-                    {guide?.explanation && (
+                    {guide && hasDistinctExplanation(guide.explanation, sentence) && (
                       <div data-student-understanding-guide="core-sentence" className="mt-3 border-t border-sky-200/70 pt-3 text-xs dark:border-sky-800/50">
                         <p className="font-semibold">{t("easySentence")}</p>
                         <p className="mt-0.5 leading-relaxed text-muted-foreground">{guide.explanation}</p>
@@ -247,7 +263,7 @@ export function DesignReferenceView({
                     {guide && (
                       <dl data-student-understanding-guide="essential-question" className="mt-3 space-y-2 border-t border-violet-200/70 pt-3 text-xs dark:border-violet-800/50">
                         {guide.thinkingFocus && <div><dt className="font-semibold">{t("questionFocus")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{guide.thinkingFocus}</dd></div>}
-                        {guide.perspectives.length > 0 && <div><dt className="font-semibold">{t("thinkingPerspectives")}</dt><dd className="mt-1 flex flex-wrap gap-1">{guide.perspectives.map((item) => <span key={item} className="rounded border border-border bg-background px-1.5 py-0.5">{item}</span>)}</dd></div>}
+                        {guide.perspectives.some((item) => hasDistinctExplanation(item, guide.thinkingFocus)) && <div><dt className="font-semibold">{t("thinkingPerspectives")}</dt><dd className="mt-1 flex flex-wrap gap-1">{guide.perspectives.filter((item) => hasDistinctExplanation(item, guide.thinkingFocus)).map((item) => <span key={item} className="rounded border border-border bg-background px-1.5 py-0.5">{item}</span>)}</dd></div>}
                       </dl>
                     )}
                   </article>

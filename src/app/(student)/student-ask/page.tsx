@@ -119,6 +119,8 @@ function AskContent() {
     enabled: Boolean(user.id),
   });
   const [designContext, setDesignContext] = useState<DesignContext | null>(null);
+  const [designContextLoading, setDesignContextLoading] = useState(false);
+  const [designContextError, setDesignContextError] = useState(false);
   const [showRef, setShowRef] = useState(true);
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -184,8 +186,11 @@ function AskContent() {
   // 탐구질문 수업 세션이면 참고 자료(탐구설계 맥락)를 불러온다
   const fetchDesignContext = useCallback(async (sessionId: string) => {
     const requestId = ++designContextRequestRef.current;
+    setDesignContextLoading(true);
+    setDesignContextError(false);
     try {
       const response = await fetch(`/api/sessions/${sessionId}/design-context`);
+      if (!response.ok) throw new Error("참고 자료 조회 실패");
       const data = await response.json();
       if (
         requestId !== designContextRequestRef.current ||
@@ -193,12 +198,17 @@ function AskContent() {
       ) return;
       setDesignContext(data?.context ?? null);
     } catch {
-      // 참고 자료는 질문 작성을 막지 않으며, 다음 수업 선택이나 창 포커스 때 다시 불러온다.
+      if (requestId === designContextRequestRef.current && selectedSessionIdRef.current === sessionId) setDesignContextError(true);
+    } finally {
+      if (requestId === designContextRequestRef.current) setDesignContextLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    designContextRequestRef.current += 1;
     setDesignContext(null);
+    setDesignContextError(false);
+    setDesignContextLoading(false);
     const sel = sessions.find((s) => s.id === selectedSessionId);
     if (selectedSessionId && sel?.unitDesignId) {
       setShowRef(true);
@@ -623,6 +633,9 @@ function AskContent() {
             selectedSession={selectedSession}
             hasDesignReference={hasDesignReference}
             designContext={designContext}
+            referenceLoading={designContextLoading}
+            referenceError={designContextError}
+            onRetryReference={() => selectedSessionId && fetchDesignContext(selectedSessionId)}
             showReference={showRef}
             onToggleReference={() => setShowRef((value) => !value)}
           />
