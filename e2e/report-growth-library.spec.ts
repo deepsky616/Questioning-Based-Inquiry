@@ -16,6 +16,7 @@ const records = Array.from({ length: 17 }, (_, i) => ({
   changeNote: "비교할 조건을 넣었어요.", reflection: i % 2 ? "조건을 같게 해야 비교할 수 있어요." : "", revision: 1,
   updatedAt: "2026-09-08T00:00:00Z", question: { session: lessons[i % 2] },
 }));
+records[2] = { ...records[2], revisedContent: records[2].originalContent };
 records.push({ ...records[0], questionId: "auto-only", revisedContent: "자동으로 저장된 질문만 있는 기록", changeNote: "", reflection: "" });
 
 for (const role of ["STUDENT", "TEACHER"] as const) {
@@ -55,6 +56,15 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     const lessonGrowth = analysis.getByRole("button", { name: /용해와 용액/ }).locator("..").locator("..").getByRole("region", { name: "이 수업의 질문 성장 기록" });
     await expect(lessonGrowth.locator("article")).toHaveCount(8);
     await expect(lessonGrowth.getByText("비교할 조건을 넣었어요.", { exact: true }).first()).toBeVisible();
+    const revisedCard = lessonGrowth.locator("article").first();
+    await expect(revisedCard.getByText("처음 질문", { exact: true })).toBeVisible();
+    await expect(revisedCard.getByText("처음 작성한 질문 1", { exact: true })).toBeVisible();
+    await expect(revisedCard.getByText("고친 질문", { exact: true })).toBeVisible();
+    await expect(revisedCard.getByText("다듬은 나의 질문 1", { exact: true })).toBeVisible();
+    const unchangedCard = lessonGrowth.locator("article").nth(1);
+    await expect(unchangedCard.getByText("나의 질문", { exact: true })).toBeVisible();
+    await expect(unchangedCard.getByText("처음 작성한 질문 3", { exact: true })).toHaveCount(1);
+    await expect(unchangedCard.getByText("고친 질문", { exact: true })).toHaveCount(0);
     await expect(lessonGrowth).not.toContainText("약수와 배수");
     await expect(lessonGrowth).not.toContainText("자동으로 저장된 질문만 있는 기록");
     await expect(lessonGrowth.getByRole("searchbox")).toHaveCount(0);
@@ -67,12 +77,15 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     const mathGrowth = analysis.getByRole("button", { name: /약수와 배수/ }).locator("..").locator("..").getByRole("region", { name: "이 수업의 질문 성장 기록" });
     await expect(mathGrowth.locator("article")).toHaveCount(8);
     await expect(mathGrowth.getByText("조건을 같게 해야 비교할 수 있어요.", { exact: true }).first()).toBeVisible();
+    const completeCard = mathGrowth.locator("article").first();
+    for (const text of ["처음 작성한 질문 2", "다듬은 나의 질문 2", "비교할 조건을 넣었어요.", "조건을 같게 해야 비교할 수 있어요."]) await expect(completeCard.getByText(text, { exact: true })).toBeVisible();
     expect(growthRequests.every(params => params.get("view") === "session" && ["growth-science", "growth-math"].includes(params.get("sessionId")!))).toBe(true);
     const editLink = lessonGrowth.getByRole("link", { name: "성장 기록 이어쓰기" });
     if (role === "STUDENT") await expect(editLink).toHaveAttribute("href", "/student-questions?tab=mine&growth=growth-16");
     else await expect(editLink).toHaveCount(0);
     await expectNoHorizontalPageOverflow(page);
     await testInfo.attach("session-growth", { body: await lessonGrowth.screenshot({ path: testInfo.outputPath("session-growth.png") }), contentType: "image/png" });
+    await testInfo.attach("complete-growth", { body: await completeCard.screenshot({ path: testInfo.outputPath("complete-growth.png") }), contentType: "image/png" });
     expect(errors).toEqual([]);
   });
 }

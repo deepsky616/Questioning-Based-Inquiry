@@ -12,7 +12,10 @@ it("수업 안에서는 검색 없이 학생이 직접 쓴 내용을 바로 보�
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(response()))));
   renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
   expect(await screen.findByText(record.changeNote)).toBeVisible();
+  expect(screen.getByText(record.originalContent)).toBeVisible();
   expect(screen.getByText(record.revisedContent)).toBeVisible();
+  expect(screen.getByText("처음 질문", { exact: true })).toBeVisible();
+  expect(screen.getByText("고친 질문", { exact: true })).toBeVisible();
   expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("group", { name: "성장 기록 작성 상태" })).not.toBeInTheDocument();
   expect(screen.queryByText("탐구 후 배운 점을 이어 쓸 수 있어요.")).not.toBeInTheDocument();
@@ -42,4 +45,24 @@ it("기록이 많은 수업도 다음 쪽으로 이동해 학생이 쓴 배운 �
   fireEvent.click(screen.getByRole("button", { name: "다음 기록" }));
   expect(await screen.findByText("실험 조건을 같게 맞추어야 해요.")).toBeVisible();
   expect(screen.queryByText("첫 번째 배운 점")).not.toBeInTheDocument();
+});
+
+it("질문을 고치지 않은 기록은 나의 질문 하나와 학생이 직접 작성한 배운 점을 보여 준다", async () => {
+  const unchanged = { ...record, revisedContent: record.originalContent, changeNote: "", reflection: "실험에서 비교할 조건을 정해야 해요." };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(response([unchanged])))));
+  renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
+  expect(await screen.findByText("나의 질문", { exact: true })).toBeVisible();
+  expect(screen.getAllByText(unchanged.originalContent, { exact: true })).toHaveLength(1);
+  expect(screen.queryByText("처음 질문", { exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByText("고친 질문", { exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByText("한 줄 돌아보기", { exact: true })).not.toBeInTheDocument();
+  expect(screen.getByText(unchanged.reflection)).toBeVisible();
+});
+it("처음 질문과 고친 질문에 작성한 돌아보기와 배운 점을 모두 연결하며 실제 저장된 문장을 유지한다", async () => {
+  const completed = { ...record, reflection: "온도 외의 조건을 같게 맞추어야 비교할 수 있어요." };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(response([completed])))));
+  renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
+  expect(await screen.findByText(completed.originalContent)).toBeVisible();
+  for (const text of [completed.revisedContent, completed.changeNote, completed.reflection]) expect(screen.getByText(text, { exact: true })).toBeVisible();
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 });
