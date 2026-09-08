@@ -150,14 +150,14 @@ describe("교사 학급 연습 진단", () => {
       ["닫힌 질문", 1, "100%"],
       ["열린 질문", 2, "50%"],
       ["사실적 질문", 3, "67%"],
-      ["개념적 질문", 0, "표본 없음"],
+      ["개념적 질문", 0, "풀이 기록 없음"],
       ["논쟁적 질문", 4, "25%"],
     ] as const) {
       const typeMetric = within(classSummary as HTMLElement)
         .getByText(label, { exact: true })
         .closest("div");
       expect(typeMetric).not.toBeNull();
-      expect(within(typeMetric as HTMLElement).getByText(`시도 ${attempts}회`)).toBeVisible();
+      expect(within(typeMetric as HTMLElement).getByText(`풀이 ${attempts}회`)).toBeVisible();
       expect(within(typeMetric as HTMLElement).getByText(accuracy)).toBeVisible();
     }
   });
@@ -182,7 +182,7 @@ describe("교사 학급 연습 진단", () => {
         .closest("div");
       expect(modeMetric).not.toBeNull();
       expect(within(modeMetric as HTMLElement).getByText(accuracy)).toBeVisible();
-      expect(within(modeMetric as HTMLElement).getByText(`시도 ${attempts}회`)).toBeVisible();
+      expect(within(modeMetric as HTMLElement).getByText(`풀이 ${attempts}회`)).toBeVisible();
       expect(within(modeMetric as HTMLElement).getByText(`성공 ${successes}회`)).toBeVisible();
     }
   });
@@ -192,7 +192,9 @@ describe("교사 학급 연습 진단", () => {
 
     expect(screen.getByText("학급 정답률")).toBeInTheDocument();
     expect(screen.getByText("63%")).toBeInTheDocument();
-    expect(screen.getAllByText("진단 자료 수집: 열린 질문 1문제 더")).toHaveLength(2);
+    expect(screen.getAllByText("열린 질문 2회 / 기준 3회 · 1회 추가 필요")).toHaveLength(2);
+    expect(screen.getAllByText("풀이 기록 추가 필요")).toHaveLength(2);
+    expect(screen.queryByText("열린 질문 보충 연습 추천")).not.toBeInTheDocument();
     expect(screen.queryByText("가장 약한 유형: 열린 질문")).not.toBeInTheDocument();
     const studentButton = screen.getByRole("button", { name: /가학생/ });
     expect(studentButton).toHaveAttribute("aria-expanded", "false");

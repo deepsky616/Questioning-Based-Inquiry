@@ -14,4 +14,11 @@ export interface GrowthResponse {
   canEdit: boolean;
 }
 
+export interface GrowthJournalResponse {
+  records: Array<GrowthRecord & { question: { session: { id: string; date: string; subject: string; topic: string } | null } }>;
+  canEdit: boolean;
+  pageInfo: { page: number; pageSize: number; total: number; totalPages: number };
+  summary: { total: number; complete: number; pending: number };
+}
+
 export const growthQuestionHref = (questionId: string) => `/student-questions?tab=mine&growth=${encodeURIComponent(questionId)}`;
