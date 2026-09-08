@@ -84,7 +84,7 @@ it("성장 기록이 100개를 넘어도 페이지를 바꾸어 지난 기록을
   const response = await GET(new NextRequest("http://localhost/api/question-growth?view=journal&sessionId=lesson-1&page=14"));
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ records: [{ questionId: "old-105" }], pageInfo: { page: 14, pageSize: 8, total: 105, totalPages: 14 }, summary: { total: 105, complete: 5, pending: 100 }, canEdit: true });
-  expect(prisma.questionGrowth.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { AND: [{ question: { authorId: "s1", source: "STUDENT", sessionId: "lesson-1" } }] }, skip: 104, take: 8 }));
+  expect(prisma.questionGrowth.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { AND: [{ question: { authorId: "s1", source: "STUDENT", sessionId: "lesson-1" }, OR: [{ changeNote: { not: "" } }, { reflection: { not: "" } }] }] }, skip: 104, take: 8 }));
 });
 it("성장 기록 검색과 작성 상태를 함께 적용하고 다른 학생의 기록은 검색할 수 없다", async () => {
   vi.mocked(prisma.questionGrowth.count).mockResolvedValueOnce(10).mockResolvedValueOnce(3).mockResolvedValueOnce(1);
@@ -96,4 +96,23 @@ it("성장 기록 검색과 작성 상태를 함께 적용하고 다른 학생�
   expect(args?.where?.AND).toEqual(expect.arrayContaining([{ question: { authorId: "s1", source: "STUDENT" } }, { reflection: "" }]));
   expect(args?.where?.AND).toEqual(expect.arrayContaining([expect.objectContaining({ OR: expect.arrayContaining([{ revisedContent: { contains: "소금", mode: "insensitive" } }]) })]));
   expect((await GET(new NextRequest("http://localhost/api/question-growth?view=journal&studentId=s2"))).status).toBe(403);
+});
+
+it("수업별 성장 기록 조회는 수업을 지정하지 않으면 전체 목록으로 넘어가지 않고 거절한다", async () => {
+  for (const query of ["view=session", "view=session&sessionId=", "view=session&sessionId=lesson-1&page=-1"]) {
+    expect((await GET(new NextRequest(`http://localhost/api/question-growth?${query}`))).status).toBe(400);
+  }
+  expect(prisma.questionGrowth.findMany).not.toHaveBeenCalled();
+});
+it("수업별 조회는 해당 학생·수업의 직접 작성한 돌아보기 또는 배운 점이 있는 기록으로 제한한다", async () => {
+  vi.mocked(prisma.questionGrowth.count).mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+  vi.mocked(prisma.questionGrowth.findMany).mockResolvedValue([{ questionId: "written-q", changeNote: "비교할 조건을 넣었어요.", reflection: "" }] as never);
+  const response = await GET(new NextRequest("http://localhost/api/question-growth?view=session&sessionId=lesson-1"));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ canEdit: true, pageInfo: { total: 2 } });
+  expect(prisma.questionGrowth.findMany).toHaveBeenCalledWith(expect.objectContaining({
+    where: { AND: [{ question: { authorId: "s1", source: "STUDENT", sessionId: "lesson-1" }, OR: [{ changeNote: { not: "" } }, { reflection: { not: "" } }] }] },
+    take: 8,
+  }));
+  expect((await GET(new NextRequest("http://localhost/api/question-growth?view=session&sessionId=lesson-1&studentId=s2"))).status).toBe(403);
 });

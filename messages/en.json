@@ -2596,7 +2596,7 @@
     "libraryTitle": "My question growth records",
     "sessionTitle": "Growth records for this lesson",
     "libraryDescription": "Browse growth records from all lessons, regardless of the report’s selected period. Expand a record to see the original question and what was learned.",
-    "sessionDescription": "Review how questions changed and what was learned in this lesson. These records were written by the student.",
+    "sessionDescription": "Reflections and learning notes the student wrote for questions in this class.",
     "searchLabel": "Search growth records",
     "searchHint": "Search questions, subjects, topics, or reflections",
     "search": "Search",
@@ -2614,7 +2614,8 @@
     "previousPage": "Previous records",
     "nextPage": "Next records",
     "pageCount": "Page {page} of {pages}",
-    "jumpToLibrary": "Browse growth records"
+    "jumpToLibrary": "Browse growth records",
+    "sessionEmpty": "The student has not written any reflections or learning notes for this class yet."
   },
   "demoPeriod": {
     "title": "Demo period",
