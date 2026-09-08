@@ -1,5 +1,7 @@
 "use client";
 
+import { ReportAnalysisMetadata } from "./ReportAnalysisMetadata";
+
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,7 +13,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
-import { formatDateOnly, formatDateTime, formatMonthOnly } from "@/lib/datetime";
+import { formatDateOnly, formatMonthOnly } from "@/lib/datetime";
 import { groupSessionsByMonth } from "@/lib/sessions";
 import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
 import { ReportClassificationGuide } from "@/components/reports/ReportClassificationGuide";
@@ -614,6 +616,7 @@ export function ReportView({
                       </>
                     )}
                   </div>
+                  {r && <ReportAnalysisMetadata analysis={r} showAnalysisModel={showAnalysisModel} />}
                   {open[s.id] && (
                     <div className="border-t px-3 py-2 text-sm">
                       {busy[s.id] ? (
@@ -652,20 +655,6 @@ export function ReportView({
                               {freshness.hasNewActivity && (
                                 <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                                   {t("analysisStale", { questions: freshness.newQuestions, likes: freshness.newLikes, comments: freshness.newComments })}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {(rv?.analyzedAt || (showAnalysisModel && rv?.analysisModel)) && (
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              {rv.analyzedAt && (
-                                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
-                                  {t("analysisTime", { time: formatDateTime(rv.analyzedAt) })}
-                                </span>
-                              )}
-                              {showAnalysisModel && rv.analysisModel && (
-                                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
-                                  {t("analysisModel", { model: rv.analysisModel })}
                                 </span>
                               )}
                             </div>

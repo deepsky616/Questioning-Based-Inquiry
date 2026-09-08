@@ -1374,6 +1374,7 @@
   "reports": {
     "analysisFailed": "Analysis failed",
     "printClass": "🖨️ Print class",
+    "printLoadFailed": "The print report could not be loaded. Please try the print button again.",
     "printIndividual": "🖨️ Print student",
     "printAll": "🖨️ Print all students",
     "previewTitle": "Print preview",
@@ -1518,6 +1519,9 @@
     "statComments": "{count} comments",
     "currentBasis": "Current: {questions} questions · {likes} likes · {comments} comments",
     "analysisStale": "Since analysis: +{questions} questions · +{likes} likes · +{comments} comments",
+    "aiAnalysisLabel": "AI analysis",
+    "latestAnalysisTime": "Last analyzed {time}",
+    "analysisInfo": "Analysis details",
     "analysisTime": "Analyzed {time}",
     "analysisModel": "Model {model}"
   },
@@ -2577,6 +2581,7 @@
     "conflict": "Reload the latest record, review your text, and save again. Your text has been kept.",
     "empty": "No reflections yet. Start with one question.",
     "continue": "Continue growth record",
+    "viewEdit": "View or edit growth record",
     "teacherEmpty": "This student has not saved a growth record yet.",
     "savedRefreshFailed": "Your record was saved, but could not be reloaded. Please reload it to check.",
     "myQuestion": "My question",

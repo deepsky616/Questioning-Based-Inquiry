@@ -3,7 +3,7 @@
 import { DemoPeriodControl } from "@/components/reports/DemoPeriodControl";
 import { QuestionGrowthJournal } from "@/components/reports/QuestionGrowthJournal";
 import { useEffect, useState } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
@@ -105,6 +105,7 @@ export function TeacherReportsView() {
   const [previewItems, setPreviewItems] = useState<PrintReportItem[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [printBusy, setPrintBusy] = useState(false);
+  const [printError, setPrintError] = useState(false);
 
   // 학급 목록(가벼움): 포커스 재조회만
   const { data: classes = [] } = useQuery<ClassItem[]>({
@@ -324,13 +325,22 @@ export function TeacherReportsView() {
   const printOneStudent = async () => {
     if (!studentReport || !studentId || printBusy) return;
     setPrintBusy(true);
+    setPrintError(false);
     try {
       const grade = studentReport.student.grade ?? "";
       const className = studentReport.student.className ?? "";
-      const rk = grade && className ? await fetchRanking(grade, className) : null;
-      const item = toItem(studentReport);
+      const [freshReport, rk] = await Promise.all([
+        fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}&demoPeriod=${demoPeriod}&view=print`).then(async response => {
+          if (!response.ok) throw new Error(t("loadFailed"));
+          return response.json() as Promise<StudentReport>;
+        }),
+        grade && className ? fetchRanking(grade, className) : Promise.resolve(null),
+      ]);
+      const item = toItem(freshReport);
       if (rk) item.ranking = studentRanking(rk, studentId);
       showPrintPreview([item]);
+    } catch {
+      setPrintError(true);
     } finally {
       setPrintBusy(false);
     }
@@ -340,6 +350,7 @@ export function TeacherReportsView() {
   const printAllStudents = async () => {
     if (!report || printBusy) return;
     setPrintBusy(true);
+    setPrintError(false);
     try {
       const klass = report.klass as { grade: string; className: string };
       const [data, rk] = await Promise.all([
@@ -362,6 +373,8 @@ export function TeacherReportsView() {
         items.push(item);
       });
       showPrintPreview(items);
+    } catch {
+      setPrintError(true);
     } finally {
       setPrintBusy(false);
     }
@@ -385,6 +398,7 @@ export function TeacherReportsView() {
   return (
     <div className="space-y-5">
       <DemoPeriodControl value={demoPeriod} onChange={setDemoPeriod} />
+      {printError && <p role="alert" className="no-print text-sm text-destructive">{t("printLoadFailed")}</p>}
       <div className="no-print">
         {classes.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -513,9 +527,7 @@ export function TeacherReportsView() {
       )}
 
       {/* 인쇄 전용 문서(화면엔 숨김, print-doc-mode 인쇄 시에만 출력) */}
-      <div className="print-root" aria-hidden>
-        {printItems.length > 0 && <ReportPrintDoc items={printItems} />}
-      </div>
+      {printItems.length > 0 && createPortal(<div className="print-root" aria-hidden><ReportPrintDoc items={printItems} /></div>, document.body)}
 
       {previewOpen && previewItems.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6">

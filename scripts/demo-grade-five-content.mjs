@@ -1,4 +1,5 @@
 import { GRADE_FIVE_GUIDES } from "./demo-grade-five-guides.mjs";
+import { GRADE_FIVE_COMMENT_VARIANTS } from "./demo-grade-five-comments.mjs";
 import { readFileSync } from "node:fs";
 
 // 2022 개정 교육과정: 교육청의 2026학년도 5~6학년 수업·평가 계획 연결표로 5학년 배치를 확인했다.
@@ -192,6 +193,14 @@ export function gradeFiveComment(question, index = 0) {
   const item = lesson.questions.find((item) => question.content.includes(item.content));
   if (!item) throw new Error("답변과 연결할 5학년 질문을 찾을 수 없습니다.");
   return index % 2 === 0 ? item.answer : `이렇게 살펴보면 좋겠어요. ${item.hint}`;
+}
+
+export function gradeFiveVariedComment(question, index = 0) {
+  const entry = Object.entries(GRADE_FIVE_LESSONS).find(([, lesson]) => lesson.topic === question.context);
+  const questionIndex = entry?.[1].questions.findIndex(item => question.content.includes(item.content));
+  const variants = entry && GRADE_FIVE_COMMENT_VARIANTS[entry[0]]?.[questionIndex];
+  if (!variants?.length) throw new Error("댓글과 연결할 5학년 질문을 찾을 수 없습니다.");
+  return variants[index % variants.length];
 }
 
 export function gradeFiveAnalysis(key, index, originalQuestion) {

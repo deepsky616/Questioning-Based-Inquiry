@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
   }
 
   const recentDemo = (session.user as { isDemo?: boolean }).isDemo === true && req.nextUrl.searchParams.get("demoPeriod") === "latest";
-  const report = await (recentDemo ? buildStudentReport(targetId, { recentDemo: true }) : buildStudentReport(targetId));
+  const includeGrowth = req.nextUrl.searchParams.get("view") === "print";
+  const report = await (includeGrowth ? buildStudentReport(targetId, { recentDemo, includeGrowth: true }) : recentDemo ? buildStudentReport(targetId, { recentDemo: true }) : buildStudentReport(targetId));
   if (!report) {
     return NextResponse.json({ error: "학생을 찾을 수 없습니다" }, { status: 404 });
   }

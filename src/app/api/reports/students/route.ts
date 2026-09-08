@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   });
   students.sort((a, b) => compareStudentNumber(a.studentNumber, b.studentNumber));
 
-  const reports = (await Promise.all(students.map((student) => getSessionUser(session).isDemo && body.demoPeriod === "latest" ? buildStudentReport(student.id, { recentDemo: true }) : buildStudentReport(student.id))))
+  const reports = (await Promise.all(students.map((student) => buildStudentReport(student.id, { recentDemo: Boolean(getSessionUser(session).isDemo && body.demoPeriod === "latest"), includeGrowth: true }))))
     .filter((report): report is NonNullable<typeof report> => Boolean(report));
 
   return NextResponse.json({ reports });

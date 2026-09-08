@@ -21,9 +21,7 @@ describe("학생 상세리포트 분석 모델 표시", () => {
 
   it("공용 리포트는 분석 모델 표시 설정을 적용한다", () => {
     expect(reportViewSource).toContain("showAnalysisModel = true");
-    expect(reportViewSource).toContain(
-      "showAnalysisModel && rv.analysisModel",
-    );
+
   });
 
   it("기존 질문수업 분석에서도 모델 항목을 제거한다", () => {

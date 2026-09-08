@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { GRADE_FIVE_LESSONS, buildGradeFiveDesign, gradeFiveComment, gradeFiveAnalysis } from "./demo-grade-five-content.mjs";
+import { GRADE_FIVE_LESSONS, buildGradeFiveDesign, gradeFiveVariedComment, gradeFiveAnalysis } from "./demo-grade-five-content.mjs";
 
 export const STUDENT_NAMES = Array.from({ length: 28 }, (_, index) => index === 0 ? "김질문" : `학생${index + 1}`);
 
@@ -396,8 +396,14 @@ export function buildDemoLearningActivityPlans(studentIds) {
     [...questions, ...classInquiryQuestions]
       .map((question) => [question.id, question]),
   );
-  for (const [index, comment] of comments.entries()) {
-    comment.content = gradeFiveComment(questionById.get(comment.questionId), index);
+  const commentVariants = new Map();
+  for (const comment of comments) {
+    const question = questionById.get(comment.questionId);
+    const lesson = Object.entries(GRADE_FIVE_LESSONS).find(([, item]) => item.topic === question.context);
+    const key = `${lesson[0]}:${lesson[1].questions.findIndex(item => question.content.includes(item.content))}`;
+    const index = commentVariants.get(key) ?? 0;
+    comment.content = gradeFiveVariedComment(question, index);
+    commentVariants.set(key, index + 1);
   }
   const analyses = ANALYSIS_SESSION_BLUEPRINTS.map((session, index) => {
     const totalQuestions = questions.filter(
