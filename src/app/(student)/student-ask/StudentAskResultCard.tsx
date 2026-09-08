@@ -28,6 +28,7 @@ export function StudentAskResultCard({
   onSave,
 }: StudentAskResultCardProps) {
   const t = useTranslations("ask");
+  const tg = useTranslations("growth");
   const tCls = useTranslations("classification");
   const cognitiveLabel = (value: string) =>
     value === "factual" ? tCls("factual.label")
@@ -132,6 +133,8 @@ export function StudentAskResultCard({
         <div className="p-4 border rounded-lg bg-muted/40 text-sm text-muted-foreground">
           {t("visibilityByTeacher")}
         </div>
+
+        {!saveComplete && <p className="rounded-lg bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">{tg("reviseGuide")}</p>}
 
         <div className="flex gap-2">
           <Button variant="outline" className="h-11 flex-1" disabled={isSaving} onClick={onRewrite}>

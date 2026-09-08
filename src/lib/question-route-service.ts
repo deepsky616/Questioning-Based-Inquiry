@@ -31,6 +31,7 @@ const createQuestionSchema = z.object({
   sessionId: z.string().optional(),
   flagged: z.boolean().optional(),
   flagReason: z.string().optional(),
+  growth: z.object({ originalContent: z.string().trim().min(1).max(200) }).strict().optional(),
 });
 
 export class QuestionRouteError extends Error {
@@ -827,12 +828,22 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
       flagReason: data.flagReason || null,
     };
     const question = await tx.question.create({ data: createData, include: questionInclude });
+    const growthRecorded = currentViewer.role === "STUDENT" && Boolean(data.growth)
+      && data.growth!.originalContent.replace(/\s+/g, " ") !== data.content.trim().replace(/\s+/g, " ");
+    if (growthRecorded) {
+      await tx.questionGrowth.create({ data: {
+        questionId: question.id,
+        originalContent: data.growth!.originalContent,
+        revisedContent: data.content.trim(),
+        reflection: "",
+      } });
+    }
     const shouldAward =
       currentViewer.role === "STUDENT" &&
       Boolean(question.sessionId) &&
       question.source !== "TEACHER_SHARED";
     if (!shouldAward) {
-      return { question, awardedPoints: 0, viewerRole: currentViewer.role };
+      return { question, awardedPoints: 0, viewerRole: currentViewer.role, growthRecorded };
     }
 
     await tx.pointLog.create({
@@ -855,9 +866,10 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
       question,
       awardedPoints: ACTIVITY_BASE_POINTS.QUESTION_WRITE,
       viewerRole: currentViewer.role,
+      growthRecorded,
     };
   });
-  const { question, awardedPoints, viewerRole } = result;
+  const { question, awardedPoints, viewerRole, growthRecorded } = result;
 
   if (viewerRole === "STUDENT" && question.sessionId && question.source !== "TEACHER_SHARED") {
 
@@ -890,5 +902,5 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
     }
   }
 
-  return { ...question, awardedPoints };
+  return { ...question, awardedPoints, ...(data.growth ? { growthRecorded } : {}) };
 }

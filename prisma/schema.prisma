@@ -230,6 +230,7 @@ model QuestionGrowth {
   question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   originalContent String   @map("original_content")
   revisedContent  String   @map("revised_content")
+  changeNote      String   @default("") @map("change_note")
   reflection      String
   revision        Int      @default(1)
   createdAt       DateTime @default(now()) @map("created_at")

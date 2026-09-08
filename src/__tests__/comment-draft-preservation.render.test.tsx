@@ -28,6 +28,8 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   value: NoopResizeObserver,
 });
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+
 vi.mock("next-auth/react", () => ({
   useSession: () => ({
     data: { user: { id: "stu-1", name: "학생일", role: "STUDENT" } },

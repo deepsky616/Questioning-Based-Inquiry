@@ -7,6 +7,7 @@ export interface QuestionDraft {
   studentId: string;
   sessionId: string;
   content: string;
+  firstAnalyzedContent?: string;
   updatedAt: number;
 }
 
@@ -28,6 +29,7 @@ export function readQuestionDraft(
     if (
       draft?.version === 1 && draft.studentId === studentId && draft.sessionId === sessionId &&
       typeof draft.content === "string" && draft.content.trim() && draft.content.length <= 200 &&
+      (draft.firstAnalyzedContent === undefined || (typeof draft.firstAnalyzedContent === "string" && draft.firstAnalyzedContent.length <= 200)) &&
       Number.isFinite(draft.updatedAt) && now >= draft.updatedAt && now - draft.updatedAt <= MAX_AGE_MS
     ) return draft;
   } catch {

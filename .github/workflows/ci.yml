@@ -73,7 +73,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Learning design and session filter regression E2E
-        run: npx playwright test e2e/question-session-filters.spec.ts e2e/learning-design.spec.ts e2e/locale-switch.spec.ts e2e/inquiry-design-deployment.spec.ts --project=chromium
+        run: npx playwright test e2e/question-session-filters.spec.ts e2e/learning-design.spec.ts e2e/locale-switch.spec.ts e2e/inquiry-design-deployment.spec.ts e2e/question-growth-flow.spec.ts --project=chromium
 
       - name: Question games desktop reliability E2E
         run: npm run test:e2e:question-games

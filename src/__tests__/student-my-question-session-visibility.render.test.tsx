@@ -26,6 +26,8 @@ const sessions = [
   },
 ];
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+
 vi.mock("next-auth/react", () => ({
   useSession: () => ({
     data: { user: { id: "student-1", role: "STUDENT", name: "김질문" } },

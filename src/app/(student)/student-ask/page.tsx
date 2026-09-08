@@ -90,13 +90,15 @@ function AskContent() {
       : null;
 
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
-  const { content, setContent, draftStatus, markSubmitted } = useQuestionDraft(user.id, selectedSessionId);
+  const { content, setContent, draftStatus, markSubmitted, markAnalyzed, firstAnalyzedContent } = useQuestionDraft(user.id, selectedSessionId);
   const [draftAnnouncement, setDraftAnnouncement] = useState<string | null>(null);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisSnapshot<ClassificationResult> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
+  const [savedGrowth, setSavedGrowth] = useState<{ questionId: string; recorded: boolean } | null>(null);
+  const saveRequestRef = useRef(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const sessionsQuery = useStudentSessions<QuestionSession>({ userId: user.id });
   const { data: sessions = [], isError: sessionsError } = sessionsQuery;
@@ -372,6 +374,7 @@ function AskContent() {
         analysisRequestRef.current !== requestId ||
         selectedSessionIdRef.current !== analysisSessionId
       ) return;
+      markAnalyzed(normalized);
       setAnalysis({ content: normalized, sessionId: analysisSessionId, result: data });
     } catch (error: unknown) {
       if (analysisRequestRef.current !== requestId) return;
@@ -383,6 +386,7 @@ function AskContent() {
   };
 
   const handleSave = async () => {
+    if (saveRequestRef.current) return;
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk || !analysis || !isAnalysisCurrent(content, selectedSessionId, analysis)) {
       toast({ variant: "destructive", description: t("reanalyzeBeforeSave") });
@@ -391,6 +395,7 @@ function AskContent() {
     const savedAnalysis = analysis;
     const savedSessionId = selectedSessionId;
 
+    saveRequestRef.current = true;
     setIsSaving(true);
     try {
       const res = await fetch("/api/questions", {
@@ -405,6 +410,7 @@ function AskContent() {
           sessionId: savedSessionId,
           flagged: savedAnalysis.result.inappropriate ?? false,
           flagReason: savedAnalysis.result.inappropriateReason ?? "",
+          ...(firstAnalyzedContent ? { growth: { originalContent: firstAnalyzedContent } } : {}),
         }),
       });
 
@@ -449,10 +455,13 @@ function AskContent() {
         selectedSessionIdRef.current !== savedSessionId ||
         !isAnalysisCurrent(contentRef.current, selectedSessionIdRef.current, savedAnalysis)
       ) return;
+      setSavedGrowth(typeof saved?.id === "string" ? { questionId: saved.id, recorded: saved.growthRecorded === true } : null);
+      void queryClient.invalidateQueries({ queryKey: ["question-growth"] });
       setSaveComplete(true);
     } catch {
       toast({ variant: "destructive", description: t("saveError") });
     } finally {
+      saveRequestRef.current = false;
       setIsSaving(false);
     }
   };
@@ -665,7 +674,9 @@ function AskContent() {
       {saveComplete && (
         <StudentAskCompletionCard
           selectedSession={selectedSession}
-          onViewMyQuestions={() => router.push("/student-questions")}
+          questionId={savedGrowth?.questionId}
+          growthRecorded={savedGrowth?.recorded}
+          onViewMyQuestions={() => router.push("/student-questions?tab=mine")}
           onWriteAnother={writeAnotherInSameSession}
           onChooseAnotherSession={chooseAnotherSession}
         />
