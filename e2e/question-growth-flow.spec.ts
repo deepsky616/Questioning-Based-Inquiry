@@ -52,17 +52,19 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-for (const width of [768, 1440]) {
+for (const width of [375, 768, 1440]) {
 test(`${width} 화면의 나의 질문에서 배운 점을 이어 쓰고 기존 돌아보기를 보존한다`, async ({ page, baseURL }, testInfo) => {
   const { errors } = await preparePage(page, "STUDENT", baseURL!);
   await page.setViewportSize({ width, height: 1024 });
+  let writes = 0;
   let record = { questionId: "growth-old", originalContent: "소금이 녹을까?", revisedContent: "온도에 따라 녹는 양은 어떻게 달라질까?", changeNote: "온도를 비교하기로 했어요.", reflection: "", revision: 1, updatedAt: new Date().toISOString() };
-  await page.route("**/api/questions?**", route => route.fulfill({ json: [{ id: record.questionId, content: record.revisedContent, closure: "open", cognitive: "conceptual", isPublic: true, createdAt: record.updatedAt, likeCount: 2, commentCount: 1, session: null }] }));
+  await page.route("**/api/questions?**", route => route.fulfill({ json: [{ id: record.questionId, content: record.revisedContent, closure: "open", cognitive: "conceptual", isPublic: true, createdAt: record.updatedAt, likeCount: 2, commentCount: 1, session: null, growthComplete: Boolean(record.changeNote && record.reflection) }] }));
   await page.route("**/api/question-growth**", route => {
     if (route.request().method() === "PUT") {
       const body = route.request().postDataJSON();
-      expect(body).toEqual({ questionId: record.questionId, revision: 1, reflection: "물의 양을 같게 해야 공정하게 비교할 수 있어요." });
-      record = { ...record, reflection: body.reflection, revision: 2 };
+      expect(body).toEqual({ questionId: record.questionId, revision: writes + 1, reflection: writes === 0 ? "물의 양을 같게 해야 공정하게 비교할 수 있어요." : "" });
+      writes += 1;
+      record = { ...record, reflection: body.reflection, revision: writes + 1 };
       return route.fulfill({ json: { saved: true } });
     }
     return route.fulfill({ json: { questions: [{ id: record.questionId, content: record.revisedContent, session: null }], records: [record], canEdit: true } });
@@ -80,6 +82,18 @@ test(`${width} 화면의 나의 질문에서 배운 점을 이어 쓰고 기존 
   await expect(dialog.getByRole("textbox", { name: /한 줄 돌아보기/ })).toHaveValue(record.changeNote);
   await expectNoHorizontalPageOverflow(page);
   await testInfo.attach(`growth-editor-${width}`, { body: await page.screenshot({ path: testInfo.outputPath(`growth-editor-${width}.png`) }), contentType: "image/png" });
+  await page.keyboard.press("Escape");
+  const completedLink = page.getByRole("link", { name: "성장 기록 보기·수정", exact: true }).filter({ visible: true });
+  await expect(completedLink).toHaveCount(1);
+  await expect(growthLink).toHaveCount(0);
+  await completedLink.click();
+  await expect(dialog.getByRole("textbox", { name: /새롭게 알게 된 점/ })).toHaveValue(record.reflection);
+  await dialog.getByRole("textbox", { name: /새롭게 알게 된 점/ }).fill("");
+  await dialog.getByRole("button", { name: "성장 기록 저장", exact: true }).click();
+  await expect(dialog.getByText("성장 기록을 저장했어요.", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(growthLink).toHaveCount(1);
+  await expect(completedLink).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 }

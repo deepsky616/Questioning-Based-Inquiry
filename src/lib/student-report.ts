@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { buildActivityReport } from "@/lib/report-stats";
 import { summarizeStudentSessionActivity } from "@/lib/report-session-activity";
 
-export async function buildStudentReport(targetId: string, options: { recentDemo?: boolean } = {}) {
+export async function buildStudentReport(targetId: string, options: { recentDemo?: boolean; includeGrowth?: boolean } = {}) {
   const student = await prisma.user.findUnique({
     where: { id: targetId },
     select: { id: true, name: true, role: true, grade: true, className: true, studentNumber: true, school: true },
@@ -33,6 +33,14 @@ export async function buildStudentReport(targetId: string, options: { recentDemo
   const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived }, { now: referenceDate });
 
   const sessionIds = sessions.map((s) => s.id);
+  // 출력은 화면의 페이지 위치와 관계없이 학생이 직접 쓴 기록을 모두 포함한다.
+  const growthRecords = options.includeGrowth && sessionIds.length > 0
+    ? await prisma.questionGrowth.findMany({
+        where: { question: { authorId: targetId, source: "STUDENT", sessionId: { in: sessionIds } }, OR: [{ changeNote: { not: "" } }, { reflection: { not: "" } }] },
+        select: { questionId: true, originalContent: true, revisedContent: true, changeNote: true, reflection: true, revision: true, updatedAt: true, question: { select: { sessionId: true } } },
+        orderBy: [{ updatedAt: "desc" }, { questionId: "desc" }],
+      })
+    : [];
   const analyses = sessionIds.length > 0
     ? await prisma.sessionAnalysis.findMany({
         where: { sessionId: { in: sessionIds }, scope: "student", studentId: targetId },
@@ -66,6 +74,7 @@ export async function buildStudentReport(targetId: string, options: { recentDemo
     grade: student.grade,
     ...(activityBySession.get(s.id) ?? {}),
     analysis: analysisBySession.get(s.id) ?? null,
+    ...(options.includeGrowth ? { growthRecords: growthRecords.filter(record => record.question.sessionId === s.id && (record.changeNote.trim() || record.reflection.trim())).map(({ question: _question, ...record }) => ({ ...record, updatedAt: record.updatedAt.toISOString() })) } : {}),
   }));
 
   return {

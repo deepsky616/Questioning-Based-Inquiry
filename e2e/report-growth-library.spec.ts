@@ -3,7 +3,7 @@ import { preparePage } from "./helpers/session-filter-page";
 import { expectNoHorizontalPageOverflow } from "./helpers/question-game-room";
 
 const lessons = [
-  { id: "growth-science", date: "2026-09-01", subject: "과학", topic: "용해와 용액", analysis: { summary: "온도를 비교하는 질문을 잘 만들었어요." } },
+  { id: "growth-science", date: "2026-09-01", subject: "과학", topic: "용해와 용액", analysis: { summary: "온도를 비교하는 질문을 잘 만들었어요.", analysisModel: "stored-analysis-model", analyzedAt: "2026-09-08T00:00:00Z" } },
   { id: "growth-math", date: "2026-09-02", subject: "수학", topic: "약수와 배수", analysis: null },
 ];
 const student = { id: "growth-student", name: "김질문", grade: "5", className: "1", studentNumber: "1" };
@@ -25,9 +25,14 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     await page.setViewportSize({ width: role === "STUDENT" ? 375 : 1440, height: 900 });
     const growthRequests: URLSearchParams[] = [];
     await page.addInitScript(theme => localStorage.setItem("question-lab-theme", theme), role === "TEACHER" ? "dark" : "light");
+    let printFails = false;
+    const printableReport = { ...report, sessions: lessons.map(lesson => ({ ...lesson, growthRecords: records.filter(record => record.question.session.id === lesson.id) })) };
+    const otherReport = { ...report, student: { ...student, id: "student-2", name: "학생2" }, sessions: [{ ...lessons[0], growthRecords: [{ ...records[0], questionId: "other-q", changeNote: "학생2가 직접 작성한 돌아보기" }] }] };
     await page.route("**/api/reports/**", route => {
       const url = new URL(route.request().url());
       if (url.pathname === "/api/reports/class") return route.fulfill({ json: url.searchParams.has("grade") ? { ...report, klass: { grade: "5", className: "1", studentCount: 1 }, perStudent: [{ ...student, questions: 17, likesGiven: 1, comments: 1 }] } : { classes: [{ grade: "5", className: "1", studentCount: 1 }] } });
+      if (url.pathname === "/api/reports/students") return route.fulfill({ json: { reports: [printableReport, otherReport] } });
+      if (url.searchParams.get("view") === "print") return route.fulfill({ status: printFails ? 500 : 200, json: printFails ? { error: "조회 실패" } : printableReport });
       return route.fulfill({ json: report });
     });
     await page.route("**/api/stats?**", route => route.fulfill({ json: { total: 17, byClosure: { closed: 7, open: 10 }, byCognitive: { factual: 7, conceptual: 10, controversial: 0 }, byStudent: [], timeline: [], teacherClasses: [{ grade: "5", className: "1" }] } }));
@@ -52,6 +57,16 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     await expect(page.locator("#question-growth-library")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "성장 기록 모아보기", exact: true })).toHaveCount(0);
     expect(growthRequests).toEqual([]);
+    await expect(analysis.getByText("인공지능 분석", { exact: true })).toBeVisible();
+    await expect(analysis.getByText(/최근 분석일/)).toBeVisible();
+    if (role === "TEACHER") {
+      await expect(analysis.getByText(/stored-analysis-model/)).not.toBeVisible();
+      await analysis.getByText("분석 정보", { exact: true }).click();
+      await expect(analysis.getByText(/stored-analysis-model/)).toBeVisible();
+    } else {
+      await expect(analysis.getByText(/stored-analysis-model/)).toHaveCount(0);
+      await expect(analysis.getByText("분석 정보", { exact: true })).toHaveCount(0);
+    }
     await analysis.getByRole("button", { name: /용해와 용액/ }).click();
     const lessonGrowth = analysis.getByRole("button", { name: /용해와 용액/ }).locator("..").locator("..").getByRole("region", { name: "이 수업의 질문 성장 기록" });
     await expect(lessonGrowth.locator("article")).toHaveCount(8);
@@ -86,6 +101,35 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     await expectNoHorizontalPageOverflow(page);
     await testInfo.attach("session-growth", { body: await lessonGrowth.screenshot({ path: testInfo.outputPath("session-growth.png") }), contentType: "image/png" });
     await testInfo.attach("complete-growth", { body: await completeCard.screenshot({ path: testInfo.outputPath("complete-growth.png") }), contentType: "image/png" });
-    expect(errors).toEqual([]);
+    if (role === "TEACHER") {
+      await page.getByRole("button", { name: /학생 개별 출력/ }).click();
+      const preview = page.getByRole("dialog", { name: "출력 미리보기", exact: true });
+      await expect(preview.locator("article")).toHaveCount(17);
+      await expect(preview.getByText("돌아보기", { exact: true })).toHaveCount(0);
+      await expect(preview.getByText("다듬은 나의 질문 17", { exact: true })).toBeVisible();
+      await expect(preview.getByRole("heading", { name: /약수와 배수/ })).toBeVisible();
+      await expect(preview).not.toContainText("자동으로 저장된 질문만 있는 기록");
+      await expect(preview).not.toContainText("stored-analysis-model");
+      await page.evaluate(() => { window.print = () => { document.body.dataset.printedGrowth = String(document.querySelectorAll(".print-root article").length); }; });
+      await preview.getByRole("button", { name: "인쇄하기", exact: true }).click();
+      await expect(page.locator("body")).toHaveAttribute("data-printed-growth", "17");
+      await page.emulateMedia({ media: "print" });
+      await page.evaluate(() => document.body.classList.add("print-doc-mode"));
+      await testInfo.attach("growth-print", { body: await page.pdf({ format: "A4", printBackground: true, path: testInfo.outputPath("growth-print.pdf") }), contentType: "application/pdf" });
+      await page.emulateMedia({ media: "screen" });
+      await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+      await preview.getByRole("button", { name: "닫기", exact: true }).click();
+      await page.getByRole("button", { name: /전체 학생 출력/ }).click();
+      await expect(preview.locator("article")).toHaveCount(18);
+      const pages = preview.locator(".rdoc > .rdoc-page");
+      await expect(pages.nth(1)).not.toContainText("학생2가 직접 작성한 돌아보기");
+      await expect(pages.nth(2)).toContainText("학생2가 직접 작성한 돌아보기");
+      await preview.getByRole("button", { name: "닫기", exact: true }).click();
+      printFails = true;
+      await page.getByRole("button", { name: /학생 개별 출력/ }).click();
+      await expect(page.getByRole("alert").filter({ hasText: "출력 자료를 불러오지 못했습니다" })).toBeVisible();
+      await expect(preview).toHaveCount(0);
+    }
+    expect(errors.filter(error => !error.includes("500 (Internal Server Error)"))).toEqual([]);
   });
 }

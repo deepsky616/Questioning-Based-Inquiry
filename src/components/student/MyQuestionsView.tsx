@@ -58,6 +58,7 @@ interface QuestionSession {
 
 interface Question {
   id: string;
+  growthComplete?: boolean;
   content: string;
   closure: string;
   cognitive: string;
@@ -319,7 +320,7 @@ export function MyQuestionsView() {
                   ) : (
                     <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                   )}
-                  <Link href={growthQuestionHref(q.id)} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{tg("continue")}</Link>
+                  <Link href={growthQuestionHref(q.id)} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{tg(q.growthComplete ? "viewEdit" : "continue")}</Link>
                   {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
                 </div>
               </div>
@@ -451,7 +452,7 @@ export function MyQuestionsView() {
                     ) : (
                       <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                     )}
-                    <Link href={growthQuestionHref(q.id)} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{tg("continue")}</Link>
+                    <Link href={growthQuestionHref(q.id)} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{tg(q.growthComplete ? "viewEdit" : "continue")}</Link>
                     {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                     {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -695,7 +696,7 @@ export function MyQuestionsView() {
               />
               <TranslateAllButton items={displayed.map((q) => ({ type: "QUESTION" as const, id: q.id }))} ct={ct} />
             </div>
-            <div className="shrink-0">
+            <div className="min-w-0 max-w-full md:shrink-0">
               <QuestionSortControl
                 field={sortField}
                 dir={sortDir}

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
+import { isQuestionGrowthComplete } from "@/lib/question-growth-status";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, QUESTION_LIST_MAX } from "@/lib/questions";
 import { isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { sendQuestionNotificationEmail } from "@/lib/email";
@@ -603,6 +604,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
   );
 
   const userId = requireUserId(sessionUser);
+  const includeGrowth = role === "STUDENT" && searchParams.get("authorId") === userId;
   const likeSortParam = searchParams.get("likeSort") as "asc" | "desc" | null;
   const commentSortParam = searchParams.get("commentSort") as "asc" | "desc" | null;
   const studentSortParam = searchParams.get("studentSort") as "asc" | "desc" | null;
@@ -610,6 +612,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
   const questions = await prisma.question.findMany({
     where,
     include: {
+      growth: includeGrowth ? { select: { changeNote: true, reflection: true } } : false,
       author: {
         select: { id: true, name: true, className: true, grade: true, studentNumber: true },
       },
@@ -640,7 +643,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
     take: QUESTION_LIST_MAX,
   });
 
-  const enriched = questions.map((q) => {
+  const enriched = questions.map(({ growth, ...q }) => {
     const commentsVisible = q.session?.commentsVisibleToPeers ?? true;
     const visibleComments = q.comments.filter((c) =>
       isCommentVisibleToViewer({
@@ -654,6 +657,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
     );
     return {
       ...q,
+      ...(includeGrowth && q.authorId === userId ? { growthComplete: isQuestionGrowthComplete(growth) } : {}),
       session: q.session
         ? {
             ...q.session,

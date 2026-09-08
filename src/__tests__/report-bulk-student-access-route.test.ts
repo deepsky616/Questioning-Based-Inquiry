@@ -87,6 +87,6 @@ describe("묶음 학생 보고서 접근 경계", () => {
       },
       select: { id: true, studentNumber: true },
     });
-    expect(mockBuildStudentReport).toHaveBeenCalledWith("student-1");
+    expect(mockBuildStudentReport).toHaveBeenCalledWith("student-1", { recentDemo: false, includeGrowth: true });
   });
 });

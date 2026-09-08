@@ -8,6 +8,7 @@ vi.mock("@/lib/db", () => ({
     comment: { findMany: vi.fn() },
     questionSession: { findMany: vi.fn() },
     sessionAnalysis: { findMany: vi.fn() },
+    questionGrowth: { findMany: vi.fn() },
   },
 }));
 
@@ -52,6 +53,14 @@ beforeEach(() => {
 });
 
 describe("학생 상세리포트 질문수업 학년", () => {
+  it("출력 자료는 해당 학생의 성장 기록을 수업에 연결하고 백 개 이후 기록도 보존한다", async () => {
+    const records = Array.from({ length: 105 }, (_, i) => ({ questionId: `q${i}`, originalContent: "소금이 녹을까?", revisedContent: "온도에 따라 다를까?", changeNote: `돌아보기 ${i}`, reflection: "", revision: 1, updatedAt: new Date(), question: { sessionId: "session-1" } }));
+    vi.mocked(prisma.questionGrowth.findMany).mockResolvedValue(records as never);
+    const report = await buildStudentReport("student-kim", { includeGrowth: true });
+    expect(report?.sessions[0].growthRecords).toHaveLength(105);
+    expect(report?.sessions[0].growthRecords?.[104].changeNote).toBe("돌아보기 104");
+    expect(prisma.questionGrowth.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { question: { authorId: "student-kim", source: "STUDENT", sessionId: { in: ["session-1"] } }, OR: [{ changeNote: { not: "" } }, { reflection: { not: "" } }] } }));
+  });
   it("질문수업별 분석 자료에 학생의 학년을 포함한다", async () => {
     const report = await buildStudentReport("student-kim");
 

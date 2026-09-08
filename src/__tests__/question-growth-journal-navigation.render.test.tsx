@@ -64,5 +64,7 @@ it("처음 질문과 고친 질문에 작성한 돌아보기와 배운 점을 �
   renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
   expect(await screen.findByText(completed.originalContent)).toBeVisible();
   for (const text of [completed.revisedContent, completed.changeNote, completed.reflection]) expect(screen.getByText(text, { exact: true })).toBeVisible();
+  expect(screen.getByRole("link", { name: "성장 기록 보기·수정" })).toHaveAttribute("href", "/student-questions?tab=mine&growth=q1");
+  expect(screen.queryByRole("link", { name: "성장 기록 이어쓰기" })).not.toBeInTheDocument();
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 });

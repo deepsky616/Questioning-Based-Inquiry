@@ -69,6 +69,8 @@ function AccountGrowthEditor({ userId, questionId, quick }: { userId: string; qu
         body: JSON.stringify({ questionId, revision: draft.revision, ...draft.changes }),
       });
       if (!response.ok) { setMessage(response.status === 409 ? "conflict" : "saveFailed"); return; }
+      void client.invalidateQueries({ queryKey: ["my-questions", userId] });
+      void client.invalidateQueries({ queryKey: ["my-questions-all-sessions", userId] });
       const refreshed = await query.refetch();
       if (refreshed.isError) { setMessage("savedRefreshFailed"); return; }
       setDraft(null);
