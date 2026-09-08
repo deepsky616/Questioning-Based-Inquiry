@@ -1,35 +1,45 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, expect, it, vi } from "vitest";
 import { renderWithIntl } from "./test-utils/render-with-intl";
 import { QuestionGrowthJournal } from "@/components/reports/QuestionGrowthJournal";
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "s1", role: "STUDENT" } } }) }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-const record = { questionId: "q1", originalContent: "소금이 녹을까?", revisedContent: "물의 온도에 따라 소금이 녹는 양은 어떻게 달라질까?", reflection: "온도를 같게 하고 비교해야 해요.", revision: 1, updatedAt: "2026-09-08T00:00:00Z", question: { session: { id: "science-1", date: "2026-09-01", subject: "과학", topic: "용해와 용액" } } };
-const response = (records = [record]) => ({ canEdit: true, records, pageInfo: { page: 1, pageSize: 8, total: records.length, totalPages: 1 }, summary: { total: 1, complete: 1, pending: 0 } });
-it("목록에서 수업과 작성 상태를 확인하고 기록을 펼쳐 해당 질문의 이어쓰기로 연결한다", async () => {
+const record = { questionId: "q1", originalContent: "소금이 녹을까?", revisedContent: "물의 온도에 따라 소금이 녹는 양은 어떻게 달라질까?", changeNote: "온도를 비교하는 질문으로 고쳤어요.", reflection: "", revision: 1, updatedAt: "2026-09-08T00:00:00Z", question: { session: { id: "science-1", date: "2026-09-01", subject: "과학", topic: "용해와 용액" } } };
+const response = (records = [record]) => ({ canEdit: true, records, pageInfo: { page: 1, pageSize: 8, total: records.length, totalPages: 1 }, summary: { total: records.length, complete: 0, pending: records.length } });
+it("수업 안에서는 검색 없이 학생이 직접 쓴 내용을 바로 보여 주고 비어 있는 항목은 표시하지 않는다", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(response()))));
-  renderWithIntl(<QuestionGrowthJournal />);
-  const summary = await screen.findByText(record.revisedContent, { exact: true, selector: "summary p" });
-  expect(screen.getByText(/용해와 용액/)).toBeInTheDocument();
-  expect(screen.getByText(record.reflection)).not.toBeVisible();
-  fireEvent.click(summary.closest("summary")!);
-  expect(screen.getByText(record.reflection)).toBeVisible();
-  expect(screen.getByRole("link", { name: /성장 기록 이어쓰기/ })).toHaveAttribute("href", "/student-questions?tab=mine&growth=q1");
+  renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
+  expect(await screen.findByText(record.changeNote)).toBeVisible();
+  expect(screen.getByText(record.revisedContent)).toBeVisible();
+  expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "성장 기록 작성 상태" })).not.toBeInTheDocument();
+  expect(screen.queryByText("탐구 후 배운 점을 이어 쓸 수 있어요.")).not.toBeInTheDocument();
+  expect(screen.queryByText("새롭게 알게 된 점")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "성장 기록 이어쓰기" })).toHaveAttribute("href", "/student-questions?tab=mine&growth=q1");
 });
-it("검색 결과가 없어도 검색과 상태 필터를 해제하면 전체 기록으로 돌아온다", async () => {
-  const fetcher = vi.fn(async (url: string) => {
+it("수업을 바꾸면 해당 수업의 기록만 조회하고 학생이 쓴 내용이 없을 때 전체 검색을 제공하지 않는다", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     const params = new URL(url, "http://localhost").searchParams;
-    return new Response(JSON.stringify(response(params.get("q") ? [] : [record])));
-  });
-  vi.stubGlobal("fetch", fetcher);
-  renderWithIntl(<QuestionGrowthJournal />);
-  await screen.findByText(record.revisedContent, { exact: true, selector: "summary p" });
-  fireEvent.change(screen.getByRole("searchbox", { name: "성장 기록 검색" }), { target: { value: "없는 기록" } });
-  fireEvent.click(screen.getByRole("button", { name: "검색" }));
-  await screen.findByText("조건에 맞는 성장 기록이 없어요.");
-  fireEvent.click(screen.getByRole("button", { name: "전체 기록 보기" }));
-  await screen.findByText(record.revisedContent, { exact: true, selector: "summary p" });
-  await waitFor(() => expect(new URL(fetcher.mock.calls.at(-1)![0], "http://localhost").searchParams.get("q")).toBeNull());
+    return new Response(JSON.stringify(response(params.get("view") === "session" && params.get("sessionId") === "math-1" ? [] : [record])));
+  }));
+  const view = renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
+  await screen.findByText(record.changeNote);
+  view.rerender(<QuestionGrowthJournal sessionId="math-1" />);
+  await screen.findByText("이 수업에 학생이 직접 남긴 성장 기록이 아직 없어요.");
+  expect(screen.queryByText(record.changeNote)).not.toBeInTheDocument();
+  expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "나의 질문에서 성장 기록 남기기" })).not.toBeInTheDocument();
+});
+it("기록이 많은 수업도 다음 쪽으로 이동해 학생이 쓴 배운 점을 읽는다", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const page = Number(new URL(url, "http://localhost").searchParams.get("page") ?? 1);
+    return new Response(JSON.stringify({ ...response([{ ...record, questionId: `q${page}`, changeNote: "", reflection: page === 2 ? "실험 조건을 같게 맞추어야 해요." : "첫 번째 배운 점" }]), pageInfo: { page, pageSize: 8, total: 9, totalPages: 2 } }));
+  }));
+  renderWithIntl(<QuestionGrowthJournal sessionId="science-1" />);
+  expect(await screen.findByText("첫 번째 배운 점")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "다음 기록" }));
+  expect(await screen.findByText("실험 조건을 같게 맞추어야 해요.")).toBeVisible();
+  expect(screen.queryByText("첫 번째 배운 점")).not.toBeInTheDocument();
 });

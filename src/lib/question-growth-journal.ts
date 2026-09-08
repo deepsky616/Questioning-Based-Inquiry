@@ -9,12 +9,16 @@ export const growthJournalQuerySchema = z.object({
   sessionId: z.string().min(1).max(150).optional(),
 });
 
+export const sessionGrowthQuerySchema = growthJournalQuerySchema.extend({
+  sessionId: z.string().trim().min(1).max(150),
+});
+
 // 호출자가 학생 본인 또는 담당 교사 권한을 확인한 뒤 전달하는 학생 범위이다.
 export async function readGrowthJournal(studentId: string, filters: z.infer<typeof growthJournalQuerySchema>) {
   const pageSize = 8;
   const base: Prisma.QuestionGrowthWhereInput = { question: {
     authorId: studentId, source: "STUDENT", ...(filters.sessionId ? { sessionId: filters.sessionId } : {}),
-  } };
+  }, ...(filters.sessionId ? { OR: [{ changeNote: { not: "" } }, { reflection: { not: "" } }] } : {}) };
   const conditions: Prisma.QuestionGrowthWhereInput[] = [base];
   if (filters.status === "pending") conditions.push({ reflection: "" });
   if (filters.status === "complete") conditions.push({ reflection: { not: "" } });

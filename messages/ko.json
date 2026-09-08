@@ -2596,7 +2596,7 @@
     "libraryTitle": "나의 질문 성장 기록 모아보기",
     "sessionTitle": "이 수업의 질문 성장 기록",
     "libraryDescription": "모든 수업의 성장 기록을 모아 보세요. 리포트의 기간 선택과 관계없이 지난 기록도 검색할 수 있어요. 기록을 펼치면 처음 질문부터 배운 점까지 볼 수 있어요.",
-    "sessionDescription": "이 수업에서 질문을 다듬은 과정과 탐구하며 배운 점을 살펴보세요. 학생이 직접 남긴 기록입니다.",
+    "sessionDescription": "이 수업의 질문에 학생이 직접 남긴 한 줄 돌아보기와 배운 점을 보여 줍니다.",
     "searchLabel": "성장 기록 검색",
     "searchHint": "질문·교과·단원·배운 점 검색",
     "search": "검색",
@@ -2614,7 +2614,8 @@
     "previousPage": "이전 기록",
     "nextPage": "다음 기록",
     "pageCount": "{page} / {pages}쪽",
-    "jumpToLibrary": "성장 기록 모아보기"
+    "jumpToLibrary": "성장 기록 모아보기",
+    "sessionEmpty": "이 수업에 학생이 직접 남긴 성장 기록이 아직 없어요."
   },
   "demoPeriod": {
     "title": "시연 기간",
