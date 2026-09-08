@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { DemoPeriodControl } from "./DemoPeriodControl";
+import { QuestionGrowthJournal } from "./QuestionGrowthJournal";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -37,11 +40,12 @@ async function analyzeStudentSession(sessionId: string, failMsg: string): Promis
 /** 학생 본인 활동 리포트 본문 (대시보드 '상세 리포트' 탭에서 사용). */
 export function StudentReportView() {
   const t = useTranslations("reports");
+  const [demoPeriod, setDemoPeriod] = useState("current");
   // 내 리포트는 무거운 집계라 긴 폴링(60초)+포커스 재조회로 신선도만 유지한다.
   const { data, isLoading: loading, error, isFetching, dataUpdatedAt, refetch } = useQuery<StudentReport>({
-    queryKey: ["student-report"],
+    queryKey: ["student-report", demoPeriod],
     queryFn: async () => {
-      const r = await fetch("/api/reports/student");
+      const r = await fetch(`/api/reports/student?demoPeriod=${demoPeriod}`);
       if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
       return r.json();
     },
@@ -49,8 +53,9 @@ export function StudentReportView() {
     refetchOnWindowFocus: true,
   });
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">{t("loadingReport")}</div>;
-  if (error || !data) return <div className="py-16 text-center text-red-600">{error instanceof Error ? error.message : t("loadError")}</div>;
+  const periodControl = <DemoPeriodControl value={demoPeriod} onChange={setDemoPeriod} />;
+  if (loading) return <>{periodControl}<div role="status" className="py-16 text-center text-muted-foreground">{t("loadingReport")}</div></>;
+  if (error || !data) return <>{periodControl}<div role="alert" className="py-16 text-center text-destructive"><p>{error instanceof Error ? error.message : t("loadError")}</p><button className="mt-3 min-h-11 rounded-lg border px-4" disabled={isFetching} onClick={() => refetch()}>{t("refreshReport")}</button></div></>;
 
   const s = data.student;
   const sub = [s.grade && t("gradeLabel", { grade: s.grade }), s.className && t("classLabel", { className: s.className }), s.studentNumber && t("numberLabel", { n: s.studentNumber })]
@@ -70,7 +75,10 @@ export function StudentReportView() {
           {isFetching ? t("refreshingReport") : t("refreshReport")}
         </button>
       </div>
+      {periodControl}
+      <QuestionGrowthJournal />
       <ReportView
+        referenceDate={data.referenceDate}
         scope="student"
         title={t("studentReportTitle", { name: s.name })}
         subtitle={sub || undefined}

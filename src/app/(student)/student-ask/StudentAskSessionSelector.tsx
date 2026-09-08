@@ -70,6 +70,15 @@ export function StudentAskSessionSelector({
   getSessionDateBadge,
 }: StudentAskSessionSelectorProps) {
   const t = useTranslations("ask");
+  const [expanded, setExpanded] = useState(false);
+  const selected = filteredSessions.find((session) => session.id === selectedSessionId);
+  const chooseSession = (id: string) => {
+    onSelectSession(id);
+    setExpanded(false);
+    if (window.matchMedia?.("(max-width: 1023px)").matches) {
+      requestAnimationFrame(() => document.getElementById("content")?.focus());
+    }
+  };
   const sessionText = useSessionMetaTranslation(filteredSessions);
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   // 학생의 용무는 대부분 오늘·예정 수업 — 지난 세션은 월별로 접어 소음을 줄인다
@@ -90,7 +99,13 @@ export function StudentAskSessionSelector({
 
   return (
     <>
-      <div className="space-y-2">
+      {selected && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-800 dark:bg-indigo-950/25 lg:hidden">
+          <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-muted-foreground">{t("currentSession")}</p><p className="break-words text-sm font-semibold">{sessionText.label(selected)}</p></div>
+          <Button type="button" variant="outline" className="min-h-11" aria-expanded={expanded} aria-controls="student-session-options" onClick={() => setExpanded(!expanded)}>{t("changeSession")}</Button>
+        </div>
+      )}
+      <div id="student-session-options" className={`space-y-2 ${selected && !expanded ? "hidden lg:block" : ""}`}>
         <Label htmlFor="session">{t("sessionSelectLabel")} <span className="text-red-500">*</span></Label>
 
         {taskScope && (
@@ -166,7 +181,7 @@ export function StudentAskSessionSelector({
           id="session"
           className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           value={selectedSessionId}
-          onChange={(event) => onSelectSession(event.target.value)}
+          onChange={(event) => chooseSession(event.target.value)}
           disabled={filteredSessions.length === 0}
         >
           {filteredSessions.length === 0 ? (
@@ -223,7 +238,7 @@ export function StudentAskSessionSelector({
                     type="button"
                     data-session-id={session.id}
                     aria-pressed={active}
-                    onClick={() => onSelectSession(session.id)}
+                    onClick={() => chooseSession(session.id)}
                     className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                       active
                         ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
@@ -296,7 +311,7 @@ export function StudentAskSessionSelector({
                               return next;
                             })
                           }
-                          className="sticky top-0 z-10 flex w-full items-center justify-between border-b bg-background/95 py-2 text-left text-xs font-semibold text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                          className="sticky top-0 z-10 flex min-h-11 w-full items-center justify-between border-b bg-background/95 py-2 text-left text-xs font-semibold text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
                         >
                           <span className="flex items-center gap-1.5">
                             <CollapseChevron open={open} />

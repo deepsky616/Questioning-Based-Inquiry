@@ -50,7 +50,10 @@
     "classesRequired": "Add at least one grade and class",
     "gradeRequired": "Enter the grade",
     "classRequired": "Enter the class",
-    "duplicateClass": "Duplicate grade and class"
+    "duplicateClass": "Duplicate grade and class",
+    "actionFailed": "The change could not be saved. Please try again.",
+    "like": "Like",
+    "unlike": "Unlike"
   },
   "classification": {
     "category1": "Type 1",
@@ -244,7 +247,7 @@
     "futureBadge": "Upcoming",
     "pastBadge": "Past",
     "emptyTopic": "No topic",
-    "currentSession": "Current question class",
+    "currentSession": "Selected class",
     "teacherSuffix": "Teacher",
     "inquiryClassNotice": "This is an inquiry-question lesson created by your teacher. Use the inquiry questions below to create your own.",
     "visibilityNotice": "Questions in this class are saved as {visibility} based on your teacher's settings.",
@@ -323,7 +326,11 @@
     "draft_restored": "Your draft for this class has been restored. Keep writing!",
     "draft_error": "Draft saving is unavailable. Copy your question before leaving this page.",
     "draft_submitted": "Your question has been submitted.",
-    "showExample": "Try rewriting first, then view an example if needed"
+    "showExample": "Try rewriting first, then view an example if needed",
+    "changeSession": "Change class",
+    "referenceLoading": "Loading reference material.",
+    "referenceFailed": "Reference material could not be loaded. You can keep writing your question.",
+    "referenceEmpty": "No reference material is linked to this lesson yet."
   },
   "comment": {
     "loading": "Loading comments...",
@@ -336,7 +343,10 @@
     "delete": "🗑 Delete",
     "editFailed": "Failed to edit the comment",
     "deleteFailed": "Failed to delete the comment",
-    "deleteConfirm": "Delete this comment?"
+    "deleteConfirm": "Delete this comment?",
+    "loadFailed": "Comments could not be loaded. Please try again.",
+    "postFailed": "Your comment was not posted. Your text is still here; please try posting again.",
+    "updateFailed": "Your changes could not be saved. Please try again."
   },
   "explore": {
     "likeSelfDisabled": "You can't like your own question",
@@ -1016,7 +1026,9 @@
     "savedFilterAllUnits": "All units",
     "savedFilterEmpty": "No saved inquiry designs match the filters.",
     "deleteConfirm": "Delete this inquiry design?",
-    "deleteConfirmLinked": "This will remove student reference materials from {count} question classes created from this design. Delete anyway?"
+    "deleteConfirmLinked": "This will remove student reference materials from {count} question classes created from this design. Delete anyway?",
+    "curriculumLoadFailed": "The curriculum could not be loaded. Your work is still here. Please reload it.",
+    "pendingDesignUnavailable": "The design saved earlier is not available yet. Try again shortly or check your saved designs."
   },
   "students": {
     "today": "Today",
@@ -1060,7 +1072,7 @@
     "summaryValuesNote": "Questions and answers are cumulative; points are current balances.",
     "filterAll": "All",
     "filterNoQuestionsActive": "Students are selected for having no questions during {period}. Questions and answers are cumulative; points are current balances.",
-    "filterAttentionActive": "Students are selected for no questions during {period} or unfinished classes. Questions and answers are cumulative; points are current balances.",
+    "filterAttentionActive": "Participation check: no questions in {period}, or unfinished classes in the last 30 days. Select a student to view class participation.",
     "studentDataLoadError": "The student list and activity could not be loaded.",
     "filterActivityLoadError": "Student question activity could not be loaded.",
     "filterActivityRetry": "Reload",
@@ -1113,7 +1125,9 @@
     "presetGoodQuestion": "Good question",
     "presetKindAnswer": "Kind answer",
     "presetParticipation": "Great participation",
-    "presetRuleViolation": "Rule violation"
+    "presetRuleViolation": "Rule violation",
+    "attentionNoQuestion": "No questions in {period}",
+    "attentionRemaining": "{count} unfinished classes in the last 30 days"
   },
   "sessions": {
     "dateRequired": "Date, subject, and topic are required",
@@ -1341,7 +1355,7 @@
     "taskPointsDesc": "Recommended points waiting for approval or rejection.",
     "taskFlaggedTitle": "Flagged activity",
     "taskFlaggedDesc": "Questions or comments that need review.",
-    "taskAttentionTitle": "Students needing guidance",
+    "taskAttentionTitle": "Students to check participation",
     "taskNoQuestionsTitle": "Students with no questions",
     "taskNoQuestionsDesc": "Students who have not written a question in the selected period.",
     "taskUnfinishedSessionsTitle": "Students with unfinished classes",
@@ -2357,7 +2371,7 @@
     "progressEmpty": "There are no practice records to diagnose yet",
     "progressTitle": "Last 30 days",
     "progressMetric": "{accuracy}% correct · {attempts} diagnostic attempts",
-    "progressRecommendationCollect": "Try more question types to build your diagnostic",
+    "progressRecommendationCollect": "Try at least 3 questions of each type to find practice that fits you",
     "progressRecommendationFocus": "Practice more {type} questions",
     "progressRecommendationAdvance": "You've learned classification. Try transforming questions next",
     "progressCapped": "This diagnostic uses your 100 most recent attempts",
@@ -2430,9 +2444,9 @@
     "statsDiagnosticAttempts": "Diagnostic attempts",
     "statsClassAccuracy": "Class accuracy",
     "statsRecommendation": "Diagnostic recommendation",
-    "statsRecommendationCollect": "Collect more samples across the question types",
-    "statsRecommendationSample": "{type} needs more samples",
-    "statsRecommendationWeakest": "Weakest type: {type}",
+    "statsRecommendationCollect": "Collecting evidence · at least 3 attempts per type needed",
+    "statsRecommendationSample": "Collecting evidence: {count} more {type} questions",
+    "statsRecommendationWeakest": "Recommended focus: {type}",
     "statsRecommendationAdvance": "Ready to advance to question transformation",
     "statsFocusFilter": "Diagnostic type selection",
     "statsFilterAll": "All types",
@@ -2498,7 +2512,8 @@
     "activateBtn": "Enable",
     "deactivateBtn": "Disable",
     "addToMineBtn": "Add to my items",
-    "attemptStat": "{students} students · {count} attempts · {rate}% correct"
+    "attemptStat": "{students} students · {count} attempts · {rate}% correct",
+    "progressRecommendationSample": "Try {count} more {type} questions to assess this type"
   },
   "questionLearning": {
     "title": "Question Learning",
@@ -2524,5 +2539,43 @@
     "prompt": "Opening classroom prompt",
     "followUp": "Follow-up after a student response",
     "viewClassDiagnostic": "View class diagnostics"
+  },
+  "curriculumDraft": {
+    "loading": "Checking your lesson draft…",
+    "foundTitle": "You have an unfinished lesson",
+    "foundDescription": "Saved {time} · Step {step}. Drafts are kept in this browser for 7 days.",
+    "restore": "Continue writing",
+    "startNew": "Discard draft and start new",
+    "saved": "Saved in this browser. Continue with the same teacher account within 7 days.",
+    "error": "Your draft could not be saved. Copy your work before closing this page."
+  },
+  "growth": {
+    "title": "My question growth journal",
+    "description": "Choose a question and reflect on how your thinking has changed. You and your teacher can see this journal.",
+    "teacherDescription": "See what the student learned while improving their questions. These reflections were written by the student.",
+    "loading": "Loading your growth journal…",
+    "loadFailed": "Your growth journal could not be loaded.",
+    "choose": "Choose a question",
+    "choosePlaceholder": "Choose one of your recent questions",
+    "original": "My first question",
+    "revised": "My improved question",
+    "reflection": "What I learned",
+    "revisedHint": "What reasons or evidence would you like to explore? Write at least 5 characters.",
+    "reflectionHint": "How has your thinking changed? Write at least 5 characters.",
+    "save": "Save reflection",
+    "saving": "Saving…",
+    "saved": "Your reflection has been saved.",
+    "saveFailed": "Your reflection was not saved. Your text is still here; please try again.",
+    "conflict": "Reload the latest record, review your text, and save again. Your text has been kept.",
+    "empty": "No reflections yet. Start with one question.",
+    "continue": "Continue this reflection",
+    "teacherEmpty": "This student has not saved a growth record yet.",
+    "savedRefreshFailed": "Your record was saved, but could not be reloaded. Please reload it to check."
+  },
+  "demoPeriod": {
+    "title": "Demo period",
+    "current": "Current date",
+    "latest": "Period with recent records",
+    "description": "This changes only the demo viewing period. Recorded dates and points stay the same."
   }
 }

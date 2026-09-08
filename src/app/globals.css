@@ -883,3 +883,11 @@ html {
     padding-right: 0 !important;
   }
 }
+
+/* 터치 기기에서는 작은 필터·펼치기 조작의 누르는 영역을 확보한다. */
+@media (pointer: coarse) {
+  main button, main [role="tab"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}

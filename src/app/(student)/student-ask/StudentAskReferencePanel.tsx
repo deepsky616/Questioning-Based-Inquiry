@@ -16,6 +16,9 @@ interface StudentAskReferencePanelProps {
   selectedSession: QuestionSession | null;
   hasDesignReference: boolean;
   designContext: DesignContext | null;
+  referenceLoading?: boolean;
+  referenceError?: boolean;
+  onRetryReference?: () => void;
   showReference: boolean;
   onToggleReference: () => void;
 }
@@ -24,11 +27,15 @@ export function StudentAskReferencePanel({
   selectedSession,
   hasDesignReference,
   designContext,
+  referenceLoading = false,
+  referenceError = false,
+  onRetryReference,
   showReference,
   onToggleReference,
 }: StudentAskReferencePanelProps) {
   const t = useTranslations("ask");
   const tCls = useTranslations("classification");
+  const tc = useTranslations("common");
   const typeLabel = (type: string) =>
     type === "factual" ? tCls("factual.label")
       : type === "conceptual" ? tCls("conceptual.label")
@@ -48,10 +55,17 @@ export function StudentAskReferencePanel({
     : null;
   const hasReference = Boolean(mergedReference) || sharedQuestions.length > 0;
 
+  const referenceStatus = hasDesignReference && (referenceLoading
+    ? <p role="status" className="rounded-lg border bg-card p-3 text-sm text-muted-foreground">{t("referenceLoading")}</p>
+    : referenceError
+      ? <div role="alert" className="rounded-lg border border-destructive/30 bg-card p-3 text-sm text-destructive"><p>{t("referenceFailed")}</p><Button variant="outline" className="mt-2 min-h-11" onClick={onRetryReference}>{tc("retry")}</Button></div>
+      : !designContext && <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground">{t("referenceEmpty")}</p>);
+
   // 참고할 것이 없는 일반 세션 — 좋은 질문 도우미가 이 자리를 채운다
   if (!hasReference) {
     return (
       <div className="student-ask-reference-panel flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-base text-foreground dark:border-amber-800 dark:bg-amber-950/20">
+        {referenceStatus}
         <div className="flex items-center gap-3"><InquiryCompanion small /><p className="text-lg font-semibold">{t("helperTitle")}</p></div>
         <ul className="list-disc space-y-3 pl-5 marker:text-amber-700 dark:marker:text-amber-300">
           <li>{t("helperTipClosed")}</li>
@@ -67,7 +81,8 @@ export function StudentAskReferencePanel({
   }
 
   return (
-    <div className="student-ask-reference-panel max-h-[34rem] space-y-3 overflow-y-auto pr-1">
+    <div className="student-ask-reference-panel space-y-3 lg:max-h-[34rem] lg:overflow-y-auto lg:pr-1">
+      {referenceStatus}
       {!mergedReference && sharedQuestions.length > 0 && (
         <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
           <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">{t("teacherInquiryQuestions")}</p>
@@ -95,7 +110,7 @@ export function StudentAskReferencePanel({
             <Button
               type="button"
               variant="outline"
-              className="h-8 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
+              className="min-h-11 shrink-0 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
               onClick={onToggleReference}
             >
               {showReference ? t("hideReference") : t("showReference")}

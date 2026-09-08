@@ -43,6 +43,7 @@ const REQUIRED_TABLES = [
   "unit_designs",
   "translations",
   "session_analyses",
+  "question_growth",
   "system_configs",
 ];
 
@@ -294,6 +295,7 @@ export const REQUIRED_CHECK_CONSTRAINTS = [
 ];
 
 const REQUIRED_RLS_TABLES = [
+  "question_growth",
   "game_runs",
   "game_activities",
   "activity_award_claims",

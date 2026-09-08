@@ -1,3 +1,4 @@
+import { GRADE_FIVE_GUIDES } from "./demo-grade-five-guides.mjs";
 import { readFileSync } from "node:fs";
 
 // 2022 개정 교육과정: 교육청의 2026학년도 5~6학년 수업·평가 계획 연결표로 5학년 배치를 확인했다.
@@ -159,6 +160,7 @@ const rewriteQuestions = {
 
 export function buildGradeFiveDesign(session) {
   const lesson = GRADE_FIVE_LESSONS[session.key];
+  const guide = GRADE_FIVE_GUIDES[session.key];
   const achievements = lesson.codes.map((code) => {
     const value = achievementByCode.get(code);
     if (!value) throw new Error(`성취기준을 찾을 수 없습니다: ${code}`);
@@ -173,13 +175,13 @@ export function buildGradeFiveDesign(session) {
       [...lesson.questions, ...(extraDesignQuestions[session.key] ?? [])].filter((item) => item.type === type).slice(0, type === "controversial" ? 1 : 2)
     ).map((item) => ({
       type: item.type, content: item.content, closure: item.closure,
-      studentGuide: { meaning: item.hint, keywords: lesson.keywords.map(([term, meaning]) => ({term, meaning})), thinkingStart: item.hint },
+      studentGuide: { meaning: guide.meanings[lesson.questions.indexOf(item)] ?? "자료에서 직접 확인할 수 있는 정보와 그 근거를 찾아보는 질문이에요.", keywords: lesson.keywords.map(([term, meaning]) => ({term, meaning})), thinkingStart: item.hint },
     })),
     learningGuides: {
-      coreIdea: { explanation: lesson.coreIdea, lifeConnection: lesson.life, keywords: lesson.keywords.map(([term, meaning]) => ({term, meaning})) },
-      achievements: achievements.map((_, index) => ({ index, explanation: index === 0 ? lesson.coreIdea : lesson.sentences.at(-1) })),
-      coreSentences: lesson.sentences.map((explanation, index) => ({ index, explanation })),
-      essentialQuestions: lesson.essential.map((_, index) => ({ index, thinkingFocus: lesson.questions[index * 2].hint, perspectives: [lesson.questions[index * 2].hint, lesson.life] })),
+      coreIdea: { explanation: guide.core, lifeConnection: lesson.life, keywords: lesson.keywords.map(([term, meaning]) => ({term, meaning})) },
+      achievements: achievements.map((_, index) => ({ index, explanation: index === 0 ? guide.core : guide.sentences.at(-1) })),
+      coreSentences: guide.sentences.map((explanation, index) => ({ index, explanation })),
+      essentialQuestions: lesson.essential.map((_, index) => ({ index, thinkingFocus: lesson.questions[index * 2].hint, perspectives: [lesson.life] })),
     },
   };
 }

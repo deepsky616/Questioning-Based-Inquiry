@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
+  const recentDemo = (session.user as { isDemo?: boolean }).isDemo === true && params.get("demoPeriod") === "latest";
   const summaryRequested = params.get("summary") === "1";
   const grade = params.get("grade")?.trim() || undefined;
   const className = params.get("className")?.trim() || undefined;
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
     return questionGameHistoryResponse(() =>
-      loadQuestionGameClassSummary(students.map(({ id }) => id))
+      recentDemo ? loadQuestionGameClassSummary(students.map(({ id }) => id), true) : loadQuestionGameClassSummary(students.map(({ id }) => id))
     );
   }
 
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (summaryRequested) {
-    return questionGameHistoryResponse(() => loadQuestionGameLearningHistory(studentId));
+    return questionGameHistoryResponse(() => recentDemo ? loadQuestionGameLearningHistory(studentId, undefined, true) : loadQuestionGameLearningHistory(studentId));
   }
 
   const modeValue = params.get("mode")?.trim() || undefined;

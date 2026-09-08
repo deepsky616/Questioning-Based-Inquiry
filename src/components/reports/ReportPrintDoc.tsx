@@ -19,6 +19,7 @@ const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
 ];
 
 export interface PrintReportItem {
+  referenceDate?: string;
   kind?: "student" | "class";
   name: string;
   grade?: string | null;
@@ -234,6 +235,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             <div className="rdoc-band">
               <div className="rdoc-eyebrow">{idLine(it)}</div>
               <h1 className="rdoc-title">{it.name} <span className="rdoc-accent">{t("docTitle")}</span></h1>
+              {it.referenceDate && <div className="rdoc-gen">{t("basisNote", { date: formatDateOnly(it.referenceDate) })}</div>}
               <div className="rdoc-gen">{t("docGenerated", { date: today })}</div>
             </div>
 

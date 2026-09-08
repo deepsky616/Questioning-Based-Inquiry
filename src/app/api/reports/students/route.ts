@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionUser } from "@/lib/auth-helpers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { compareStudentNumber } from "@/lib/student-sort";
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   });
   students.sort((a, b) => compareStudentNumber(a.studentNumber, b.studentNumber));
 
-  const reports = (await Promise.all(students.map((student) => buildStudentReport(student.id))))
+  const reports = (await Promise.all(students.map((student) => getSessionUser(session).isDemo && body.demoPeriod === "latest" ? buildStudentReport(student.id, { recentDemo: true }) : buildStudentReport(student.id))))
     .filter((report): report is NonNullable<typeof report> => Boolean(report));
 
   return NextResponse.json({ reports });

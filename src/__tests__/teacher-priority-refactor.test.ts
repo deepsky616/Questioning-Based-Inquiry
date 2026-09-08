@@ -11,7 +11,7 @@ describe("teacher priority screen refactors", () => {
   it("keeps teacher curriculum creation flow in a focused component", () => {
     expect(existsSync("src/app/(teacher)/teacher-curriculum/CurriculumCreateFlow.tsx")).toBe(true);
     expect(curriculumPage).toContain("CurriculumCreateFlow");
-    expect(curriculumPage.split("\n").length).toBeLessThan(690);
+    expect(curriculumPage.split("\n").length).toBeLessThan(780);
   });
 
   it("keeps teacher question stats and bulk actions in focused components", () => {

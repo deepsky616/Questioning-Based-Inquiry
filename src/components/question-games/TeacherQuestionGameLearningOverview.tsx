@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoPeriodControl } from "@/components/reports/DemoPeriodControl";
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -60,6 +61,7 @@ function laterActivity(
 }
 
 export function TeacherQuestionGameLearningOverview({ classes, students, statsByGame }: Props) {
+  const [demoPeriod, setDemoPeriod] = useState("current");
   const t = useTranslations("qPlay");
   const tc = useTranslations("common");
   const [selectedClass, setSelectedClass] = useState("");
@@ -85,6 +87,7 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
     setLoading(true);
     setLoadError(false);
     const params = new URLSearchParams({ summary: "1", grade, className });
+    if (demoPeriod === "latest") params.set("demoPeriod", "latest");
     fetch(`/api/reports/question-games?${params.toString()}`, {
       cache: "no-store",
       signal: controller.signal,
@@ -107,7 +110,7 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [reloadKey, selectedClass]);
+  }, [reloadKey, selectedClass, demoPeriod]);
 
   const classActivity = useMemo(() => {
     if (!selectedClass) {
@@ -162,7 +165,7 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
         );
       }
     }
-    const cutoff = Date.now() - RECENT_ACTIVITY_DAYS * 24 * 60 * 60 * 1000;
+    const cutoff = (demoPeriod === "latest" && history?.daily?.length ? new Date(`${history.daily.at(-1)!.date}T23:59:59+09:00`).getTime() : Date.now()) - RECENT_ACTIVITY_DAYS * 24 * 60 * 60 * 1000;
     const participantCount = [...activityByStudent.values()].filter(
       ({ plays }) => plays > 0,
     ).length;
@@ -180,12 +183,13 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
       inactiveStudents,
       oneTimeStudents,
     };
-  }, [selectedClass, statsByGame, students]);
+  }, [selectedClass, statsByGame, students, demoPeriod, history]);
 
   if (classes.length === 0) return null;
 
   return (
     <section className="space-y-4" aria-labelledby="teacher-question-game-learning-overview">
+      <DemoPeriodControl value={demoPeriod} onChange={setDemoPeriod} />
       <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 id="teacher-question-game-learning-overview" className="text-base font-black text-foreground">

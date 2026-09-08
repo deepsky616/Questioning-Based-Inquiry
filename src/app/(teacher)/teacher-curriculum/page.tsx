@@ -1,5 +1,7 @@
 "use client";
 
+import { CurriculumDraftGate } from "./CurriculumDraftGate";
+import type { CurriculumDraft } from "@/lib/curriculum-draft";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -56,69 +58,75 @@ import { useStudentInquiryGuides } from "./useStudentInquiryGuides";
 import { InquiryQuestionClassWorkspaceHeader } from "./InquiryQuestionClassWorkspaceHeader";
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
+  return <CurriculumDraftGate>{(props) => <CurriculumWorkspace {...props} />}</CurriculumDraftGate>;
+}
+function CurriculumWorkspace({ initialDraft, onDraftChange, onDraftComplete }: {
+  initialDraft?: CurriculumDraft; onDraftChange: (value: CurriculumDraft) => void; onDraftComplete: () => void;
+}) {
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
   const stepLabel = (n: CurriculumStep) => t(`step${n}`);
-  const [step, setStep] = useState<CurriculumStep>(1);
+  const [step, setStep] = useState<CurriculumStep>(() => initialDraft?.step ?? 1);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const [saveTitle, setSaveTitle] = useState("");
-  const [saveGrade, setSaveGrade] = useState("");
-  const [saveDate, setSaveDate] = useState(todayStr);
+  const [saveTitle, setSaveTitle] = useState(() => initialDraft?.saveTitle ?? "");
+  const [saveGrade, setSaveGrade] = useState(() => initialDraft?.saveGrade ?? "");
+  const [saveDate, setSaveDate] = useState(() => initialDraft?.saveDate ?? todayStr());
   const [lastDesignAction, setLastDesignAction] = useState<LastDesignAction | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pendingQuestionClassDesign = useRef<PendingQuestionClassDesign<SavedInquiryDesign> | null>(null);
+  const [pendingDraftDesign, setPendingDraftDesign] = useState(initialDraft?.pendingDesign);
   // 저장 목록(조회·정렬·인라인 편집)은 SavedDesignsTab이 자체 상태로 처리한다
   const [mainTab, setMainTab] = useState<CurriculumMainTab>("create");
-  const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
-  const [sessionIsActive, setSessionIsActive] = useState(true);
-  const [sessionLikesVisible, setSessionLikesVisible] = useState(true);
-  const [sessionCommentsVisible, setSessionCommentsVisible] = useState(true);
+  const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(() => initialDraft?.defaultQuestionPublic ?? true);
+  const [sessionIsActive, setSessionIsActive] = useState(() => initialDraft?.sessionIsActive ?? true);
+  const [sessionLikesVisible, setSessionLikesVisible] = useState(() => initialDraft?.sessionLikesVisible ?? true);
+  const [sessionCommentsVisible, setSessionCommentsVisible] = useState(() => initialDraft?.sessionCommentsVisible ?? true);
 
   // Step 1 — 학년군·교과·영역 선택 (학년군 → 교과 → 영역 순)
   const [areas, setAreas] = useState<{ id: string; area: string }[]>([]);
-  const [selGrade, setSelGrade] = useState("");
-  const [selSubject, setSelSubject] = useState("");
-  const [selAreaId, setSelAreaId] = useState("");
+  const [selGrade, setSelGrade] = useState(() => initialDraft?.selGrade ?? "");
+  const [selSubject, setSelSubject] = useState(() => initialDraft?.selSubject ?? "");
+  const [selAreaId, setSelAreaId] = useState(() => initialDraft?.selAreaId ?? "");
   const [curriculumData, setCurriculumData] = useState<CurriculumArea | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
-  const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
-  const [selectedAchievementCodes, setSelectedAchievementCodes] = useState<string[]>([]);
-  const [unitNameInput, setUnitNameInput] = useState("");
+  const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>(() => initialDraft?.selectedUnitCodes ?? []);
+  const [selectedAchievementCodes, setSelectedAchievementCodes] = useState<string[]>(() => initialDraft?.selectedAchievementCodes ?? []);
+  const [unitNameInput, setUnitNameInput] = useState(() => initialDraft?.unitNameInput ?? "");
   const [isRecommending, setIsRecommending] = useState(false);
   const [recommendMessage, setRecommendMessage] = useState("");
   // 마지막 단계에서 바로 세션을 만들기 위한 대상 선택 데이터(수업세션 페이지와 동일 UI)
   const { data: targetData } = useTeacherStudents<SessionTargetStudent, SessionTargetClass>();
   const students = useMemo(() => targetData?.students ?? [], [targetData]);
   const teacherClasses = useMemo(() => targetData?.teacherClasses ?? [], [targetData]);
-  const [targetClassValue, setTargetClassValue] = useState("all");
-  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
-  const [targetDefaulted, setTargetDefaulted] = useState(false);
+  const [targetClassValue, setTargetClassValue] = useState(() => initialDraft?.targetClassValue ?? "all");
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>(() => initialDraft?.selectedStudentIds ?? []);
+  const [targetDefaulted, setTargetDefaulted] = useState(Boolean(initialDraft?.targetClassValue));
 
   // 내용요소 선택 (새 기능: 핵심아이디어·지식이해·과정기능·가치태도 체크박스)
-  const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>([]);
-  const [selectedKnowledge, setSelectedKnowledge] = useState<string[]>([]);
-  const [selectedProcess, setSelectedProcess] = useState<string[]>([]);
-  const [selectedValue, setSelectedValue] = useState<string[]>([]);
+  const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>(() => initialDraft?.selectedCoreIdeaLines ?? []);
+  const [selectedKnowledge, setSelectedKnowledge] = useState<string[]>(() => initialDraft?.selectedKnowledge ?? []);
+  const [selectedProcess, setSelectedProcess] = useState<string[]>(() => initialDraft?.selectedProcess ?? []);
+  const [selectedValue, setSelectedValue] = useState<string[]>(() => initialDraft?.selectedValue ?? []);
   // Step 2 — 핵심어
-  const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>([]);
-  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
-  const [customKeyword, setCustomKeyword] = useState("");
+  const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>(() => initialDraft?.recommendedKeywords ?? []);
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>(() => initialDraft?.selectedKeywords ?? []);
+  const [customKeyword, setCustomKeyword] = useState(() => initialDraft?.customKeyword ?? "");
   const [loadingKeywords, setLoadingKeywords] = useState(false);
 
   // Step 3 — 핵심 문장
-  const [coreSentences, setCoreSentences] = useState<string[]>([]);
-  const [selectedCoreSentenceIndices, setSelectedCoreSentenceIndices] = useState<number[]>([]);
+  const [coreSentences, setCoreSentences] = useState<string[]>(() => initialDraft?.coreSentences ?? []);
+  const [selectedCoreSentenceIndices, setSelectedCoreSentenceIndices] = useState<number[]>(() => initialDraft?.selectedCoreSentenceIndices ?? []);
   const [loadingSentences, setLoadingSentences] = useState(false);
 
   // Step 4 — 핵심 질문
-  const [essentialQuestions, setEssentialQuestions] = useState<string[]>([]);
-  const [selectedEssentialQuestionIndices, setSelectedEssentialQuestionIndices] = useState<number[]>([]);
+  const [essentialQuestions, setEssentialQuestions] = useState<string[]>(() => initialDraft?.essentialQuestions ?? []);
+  const [selectedEssentialQuestionIndices, setSelectedEssentialQuestionIndices] = useState<number[]>(() => initialDraft?.selectedEssentialQuestionIndices ?? []);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   // Step 5 — 탐구 질문
-  const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
+  const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>(() => initialDraft?.inquiryQuestions ?? []);
   const [dragInquiryIndex, setDragInquiryIndex] = useState<number | null>(null);
   const [inquiryAddType, setInquiryAddType] = useState<InquiryQuestion["type"]>("factual");
   const [loadingInquiry, setLoadingInquiry] = useState(false);
@@ -159,7 +167,10 @@ export default function CurriculumPage() {
   }, [students, teacherClasses]);
 
   // 학년군 변경 → 교과·영역·커리큘럼 초기화
+  const previousGrade = useRef(selGrade);
   useEffect(() => {
+    if (previousGrade.current === selGrade) return;
+    previousGrade.current = selGrade;
     setSelSubject("");
     setSelAreaId("");
     setAreas([]);
@@ -168,6 +179,7 @@ export default function CurriculumPage() {
     setSelectedAchievementCodes([]);
   }, [selGrade]);
 
+  const initialSelection = useRef(initialDraft ? `${initialDraft.selGrade}|${initialDraft.selSubject}` : null);
   // 교과 변경 → 영역 목록 로드 (2022 교육과정 순서로 정렬)
   useEffect(() => {
     if (!selSubject || !selGrade) {
@@ -178,27 +190,42 @@ export default function CurriculumPage() {
       setSelectedAchievementCodes([]);
       return;
     }
-    setSelAreaId("");
-    setCurriculumData(null);
-    setSelectedUnitCodes([]);
-    setSelectedAchievementCodes([]);
+    const restoring = initialSelection.current === `${selGrade}|${selSubject}`;
+    if (!restoring) {
+      initialSelection.current = null;
+      setSelAreaId("");
+      setCurriculumData(null);
+      setSelectedUnitCodes([]);
+      setSelectedAchievementCodes([]);
+    }
+    let active = true;
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
-      .then((d) => setAreas(sortCurriculumAreas(d.areas ?? [], selSubject)))
+      .then((d) => { if (active) setAreas(sortCurriculumAreas(d.areas ?? [], selSubject)); })
       .catch(() => {});
+    return () => { active = false; };
   }, [selSubject, selGrade]);
 
   // 영역 상세 데이터 로드
+  const restoredArea = useRef(initialDraft?.selAreaId ?? null);
+  const areaRequest = useRef(0);
   const loadAreaData = useCallback(async () => {
-    if (!selAreaId) return;
+    const requestId = ++areaRequest.current;
+    if (!selAreaId) { setLoadingCurriculum(false); return; }
+    const restoring = restoredArea.current === selAreaId;
+    if (!restoring) restoredArea.current = null;
     setLoadingCurriculum(true);
+    setCurriculumData(null);
     // 내용요소 선택 및 추천 상태 초기화
-    setSelectedCoreIdeaLines([]);
-    setSelectedKnowledge([]);
-    setSelectedProcess([]);
-    setSelectedValue([]);
+    if (!restoring) {
+      setSelectedCoreIdeaLines([]);
+      setSelectedKnowledge([]);
+      setSelectedProcess([]);
+      setSelectedValue([]);
+    }
     try {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
+      if (!r.ok) throw new Error("교육과정 조회 실패");
       const d: CurriculumArea = await r.json();
       const enrichedRes = await fetch(`/api/curriculum/enriched?areaId=${selAreaId}`);
       const enriched = enrichedRes.ok ? await enrichedRes.json() : {};
@@ -211,7 +238,9 @@ export default function CurriculumPage() {
         achievementConsiderations: enriched.achievementConsiderations ?? [],
         achievementGroups: enriched.achievementGroups ?? [],
       };
+      if (requestId !== areaRequest.current) return;
       setCurriculumData(merged);
+      if (!restoring) {
       setSelectedAchievementCodes(selectAllAchievementCodes(merged.achievements));
       setSelectedCoreIdeaLines(splitCoreIdeaLines(d.coreIdea));
       setSelectedKnowledge(selectAllContentItems(d.knowledgeItems, KNOWLEDGE_ITEM_LIMIT));
@@ -223,10 +252,13 @@ export default function CurriculumPage() {
       } else {
         setSelectedUnitCodes([]);
       }
+      }
+    } catch {
+      if (requestId === areaRequest.current) toast({ variant: "destructive", description: t("curriculumLoadFailed") });
     } finally {
-      setLoadingCurriculum(false);
+      if (requestId === areaRequest.current) setLoadingCurriculum(false);
     }
-  }, [selAreaId]);
+  }, [selAreaId, t, toast]);
 
   useEffect(() => { loadAreaData(); }, [loadAreaData]);
 
@@ -351,11 +383,20 @@ export default function CurriculumPage() {
     hasStaleStudentGuides, canRestoreStudentGuides, restorePreviousStudentGuides,
     clearStudentGuides } = useStudentInquiryGuides({
     questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), achievements: getSelectedAchievements(), selectedKeywords, coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
+    initialLearningGuides: initialDraft?.learningGuides, sourceReady: Boolean(curriculumData),
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
     onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
     onSourceChanged: () => toast({ description: t("studentGuideSourceChangedDuringGeneration") }),
   });
+  const draftValue = useMemo<CurriculumDraft>(() => ({
+    pendingDesign: pendingDraftDesign,
+    step, selGrade, selSubject, selAreaId, saveTitle, saveGrade, saveDate, unitNameInput, selectedUnitCodes, selectedAchievementCodes, selectedCoreIdeaLines, selectedKnowledge, selectedProcess, selectedValue, recommendedKeywords, selectedKeywords, customKeyword, coreSentences, selectedCoreSentenceIndices, essentialQuestions, selectedEssentialQuestionIndices, inquiryQuestions, targetClassValue, selectedStudentIds, defaultQuestionPublic, sessionIsActive, sessionLikesVisible, sessionCommentsVisible,
+    learningGuides: hasFreshStudentGuides ? learningGuides : undefined,
+  }), [pendingDraftDesign, step, selGrade, selSubject, selAreaId, saveTitle, saveGrade, saveDate, unitNameInput, selectedUnitCodes, selectedAchievementCodes, selectedCoreIdeaLines, selectedKnowledge, selectedProcess, selectedValue, recommendedKeywords, selectedKeywords, customKeyword, coreSentences, selectedCoreSentenceIndices, essentialQuestions, selectedEssentialQuestionIndices, inquiryQuestions, targetClassValue, selectedStudentIds, defaultQuestionPublic, sessionIsActive, sessionLikesVisible, sessionCommentsVisible, learningGuides, hasFreshStudentGuides]);
+  useEffect(() => {
+    if (mainTab === "create" && !loadingCurriculum && (!selAreaId || curriculumData)) onDraftChange(draftValue);
+  }, [draftValue, mainTab, loadingCurriculum, selAreaId, curriculumData, onDraftChange]);
   // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)
   const selectedInquiryQuestions = inquiryQuestions
     .map((question) => {
@@ -465,7 +506,9 @@ export default function CurriculumPage() {
       const d = await saveDesign();
       if (d?.id) {
         pendingQuestionClassDesign.current = null;
+        setPendingDraftDesign(undefined);
         setLastDesignAction({ type: "saved", at: d.updatedAt ?? d.createdAt ?? new Date().toISOString() });
+        onDraftComplete();
         resetSaveForm();
         // 저장 탭은 SavedDesignsTab이 새로 마운트되며 접힌 상태로 시작한다
         setMainTab("saved");
@@ -482,6 +525,14 @@ export default function CurriculumPage() {
     try {
       const designPayload = buildDesignPayload();
       const inputSignature = JSON.stringify(designPayload);
+      if (!pendingQuestionClassDesign.current && pendingDraftDesign?.inputSignature === inputSignature) {
+        const savedDesign = savedList.find(design => design.id === pendingDraftDesign.id);
+        if (!savedDesign) {
+          toast({ variant: "destructive", description: t("pendingDesignUnavailable") });
+          return;
+        }
+        pendingQuestionClassDesign.current = { inputSignature, design: savedDesign };
+      }
       const target = buildClassStudentTargetPayload({ targetClassValue, selectedStudentIds, students });
       const result = await runInquiryQuestionClassCreation({
         inputSignature,
@@ -514,6 +565,7 @@ export default function CurriculumPage() {
               subject: curriculumData.subject,
             }),
           });
+          onDraftComplete();
           resetSaveForm();
           setMainTab("saved");
           router.push(`/teacher-sessions?session=${encodeURIComponent(createdSession.id)}`);
@@ -521,6 +573,7 @@ export default function CurriculumPage() {
       });
 
       pendingQuestionClassDesign.current = result.pendingDesign;
+      setPendingDraftDesign(result.pendingDesign ? { id: result.pendingDesign.design.id, inputSignature: result.pendingDesign.inputSignature } : undefined);
       if (result.status === "session-failed") {
         const description =
           result.error instanceof Error && result.error.message

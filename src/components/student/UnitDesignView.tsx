@@ -75,32 +75,40 @@ function LikeButton({
   id, likeCount, myLike, onChange,
 }: { id: string; likeCount: number; myLike: boolean; onChange: (count: number, my: boolean) => void }) {
   const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const tc = useTranslations("common");
   const click = async () => {
     if (pending) return;
     setPending(true);
+    setFailed(false);
     try {
       const res = await fetch(`/api/questions/${id}/likes`, { method: myLike ? "DELETE" : "POST" });
+      if (!res.ok) throw new Error("좋아요 변경 실패");
       if (res.ok) {
         const d = await res.json();
         onChange(typeof d.likeCount === "number" ? d.likeCount : likeCount, !myLike);
       }
     } catch {
-      // 무시
+      setFailed(true);
     } finally {
       setPending(false);
     }
   };
   return (
+    <span className="inline-flex flex-wrap items-center gap-2">
     <button
+      aria-label={tc(myLike ? "unlike" : "like")}
       onClick={click}
       disabled={pending}
-      className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
-        myLike ? "bg-rose-100 text-rose-600 hover:bg-rose-200" : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-500"
+      className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 py-1 text-sm font-medium transition-colors ${
+        myLike ? "bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900" : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-500"
       } ${pending ? "opacity-50" : ""}`}
     >
       <span>{myLike ? "❤️" : "🤍"}</span>
       <span>{likeCount}</span>
     </button>
+    {failed && <span role="alert" className="text-sm text-destructive">{tc("actionFailed")}</span>}
+    </span>
   );
 }
 
