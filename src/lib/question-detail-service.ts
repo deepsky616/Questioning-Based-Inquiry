@@ -9,6 +9,7 @@ import {
 } from "@/lib/pending-activity-bonus-cleanup";
 import { lockCurrentSessionAccessScope } from "@/lib/session-access";
 import { studentCanAccessSession } from "@/lib/session-access-policy";
+import { appendClassificationReview } from "./question-classification-review";
 
 const STUDENT_EDIT_REACTION_BLOCK_MESSAGE =
   "좋아요나 댓글이 달린 질문은 수정할 수 없어요. 선생님께 요청해 주세요.";
@@ -302,6 +303,7 @@ export async function updateQuestionWithGuard(params: {
   actorId: string;
   userRole: string | null | undefined;
   contentChanged: boolean;
+  reviewReason?: string;
   data: Prisma.QuestionUncheckedUpdateInput;
 }) {
   return prisma.$transaction(async (tx) => {
@@ -365,6 +367,8 @@ export async function updateQuestionWithGuard(params: {
       if (blockReason) return { state: "BLOCKED" as const, error: blockReason };
     }
 
+    const reviewRequested = params.userRole === "TEACHER" && (params.data.closure !== undefined || params.data.cognitive !== undefined);
+    const beforeReview = reviewRequested ? await tx.question.findUnique({ where: { id: params.questionId }, select: { closure: true, cognitive: true } }) : null;
     const question = await tx.question.update({
       where: { id: params.questionId },
       data: params.data,
@@ -374,6 +378,7 @@ export async function updateQuestionWithGuard(params: {
         },
       },
     });
+    if (beforeReview) await appendClassificationReview(tx, params.questionId, params.actorId, beforeReview, question, params.reviewReason?.trim() ?? "");
     return { state: "UPDATED" as const, question };
   });
 }

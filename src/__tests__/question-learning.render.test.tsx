@@ -175,7 +175,16 @@ describe("질문학습 슬라이드", () => {
     expect(screen.getAllByRole("heading", { name: "활용 예시 2 · 수학 · 평균으로 자료 비교하기" })).toHaveLength(6);
     expect(screen.getByRole("link", { name: "닫힌 질문 진단 보기" })).toHaveAttribute("href", "/teacher-practice?view=stats&tab=quiz&quizMode=closure&focus=closed");
     expect(screen.getByRole("link", { name: "열린 질문 진단 보기" })).toHaveAttribute("href", "/teacher-practice?view=stats&tab=quiz&quizMode=closure&focus=open");
+    const more = screen.getAllByText(/다른 예시 보기/)[0].closest("details")!;
+    expect(more).not.toHaveAttribute("open");
+    fireEvent.click(more.querySelector("summary")!);
+    expect(more).toHaveAttribute("open");
+    fireEvent.change(screen.getByRole("combobox", { name: "예시 교과" }), { target: { value: "수학" } });
+    expect(screen.getAllByRole("heading", { name: "활용 예시 1 · 수학 · 평균으로 자료 비교하기" })).toHaveLength(6);
+    expect(screen.queryByRole("heading", { name: "활용 예시 1 · 과학 · 용해와 용액" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/다른 예시 보기/)).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "담당 학년" }), { target: { value: "6" } });
+    expect(screen.getByRole("combobox", { name: "예시 교과" })).toHaveValue("all");
     expect(screen.getAllByRole("heading", { name: "활용 예시 1 · 수학 · 비율과 백분율" })).toHaveLength(6);
     expect(screen.queryByRole("heading", { name: "활용 예시 1 · 과학 · 용해와 용액" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "활용 예시 2 · 사회 · 민주주의와 시민 참여" })).toHaveLength(6);
@@ -186,7 +195,7 @@ describe("질문학습 슬라이드", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Teaching guide" }));
     expect(screen.getAllByRole("heading", { name: "Classroom example 1 · Science · Dissolving and solutions" })).toHaveLength(6);
     expect(screen.getAllByText(/Curriculum standards \(Korean original\)/)).toHaveLength(12);
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Teaching grade" })).not.toBeInTheDocument();
   });
 
   it("담당 학년 조회 실패에도 기존 여섯 안내와 재시도를 제공한다", () => {

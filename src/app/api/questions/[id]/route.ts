@@ -14,15 +14,7 @@ import {
 import { canViewQuestion, isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { z } from "zod";
 
-const patchQuestionSchema = z.object({
-  content: z.string().min(1).max(200).optional(),
-  closure: z.enum(["closed", "open"]).optional(),
-  cognitive: z.enum(["factual", "conceptual", "controversial"]).optional(),
-  closureScore: z.number().min(0).max(1).optional(),
-  cognitiveScore: z.number().min(0).max(1).optional(),
-  isPublic: z.boolean().optional(),
-  flagged: z.boolean().optional(),
-});
+import { patchQuestionSchema } from "@/lib/question-update-schema";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -114,6 +106,9 @@ export async function PATCH(req: Request, { params }: Params) {
       return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
     }
     const userRole = viewer?.role;
+    if (data.reviewReason !== undefined && (userRole !== "TEACHER" || (closure === undefined && cognitive === undefined))) {
+      return NextResponse.json({ error: "분류 확인 이유는 교사의 분류 수정과 함께 저장할 수 있습니다" }, { status: 400 });
+    }
     if (!(await canEditQuestionForUser({
       role: userRole, userId, questionId: id, authorId: existing.authorId, fields: patchedFields,
     }))) {
@@ -142,6 +137,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const updateResult = await updateQuestionWithGuard({
       questionId: id, actorId: userId, userRole,
       contentChanged: data.content !== undefined,
+      reviewReason: data.reviewReason,
       data: {
         ...(nextContent && normalizedContent !== null && {
           content: nextContent,

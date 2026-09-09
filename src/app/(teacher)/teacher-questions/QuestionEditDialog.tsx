@@ -29,12 +29,14 @@ interface QuestionEditDialogProps {
 export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditDialogProps) {
   const t = useTranslations("teacherQ");
   const tCls = useTranslations("classification");
+  const tr = useTranslations("classificationReview");
   const tc = useTranslations("common");
   const sessionText = useSessionMetaTranslation(question?.session ? [question.session] : []);
 
   const [closure, setClosure] = useState("");
   const [cognitive, setCognitive] = useState("");
   const [comment, setComment] = useState("");
+  const [reviewReason, setReviewReason] = useState("");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -45,6 +47,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
     setClosure(question.closure);
     setCognitive(normalizeCognitiveType(question.cognitive));
     setComment("");
+    setReviewReason("");
     setMsg(null);
   }, [question]);
 
@@ -72,7 +75,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
       const patchRes = await fetch(`/api/questions/${question.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ closure, cognitive }),
+        body: JSON.stringify({ closure, cognitive, reviewReason }),
       });
       if (!patchRes.ok) throw new Error(t("classifyUpdateFailed"));
 
@@ -96,7 +99,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
 
   return (
     <Dialog open={!!question} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t("editDialogTitle")}</DialogTitle>
         </DialogHeader>
@@ -117,16 +120,16 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
                 <span className="font-medium text-foreground">{question.author.name}</span>
               </p>
               {question.session && (
-                <p className="text-xs text-indigo-600 mt-1">
+                <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
                   {t("sessionPrefix")}{sessionText.label(question.session)}
                 </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{tCls("closure")}</Label>
+                <Label htmlFor="question-review-closure">{tCls("closure")}</Label>
                 <Select value={closure} onValueChange={setClosure}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="question-review-closure"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="closed">{t("closedOption")}</SelectItem>
                     <SelectItem value="open">{t("openOption")}</SelectItem>
@@ -134,9 +137,9 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{t("cognitiveLevel")}</Label>
+                <Label htmlFor="question-review-cognitive">{t("cognitiveLevel")}</Label>
                 <Select value={cognitive} onValueChange={setCognitive}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="question-review-cognitive"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="factual">{t("factualOption")}</SelectItem>
                     <SelectItem value="conceptual">{t("conceptualOption")}</SelectItem>
@@ -146,19 +149,25 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
               </div>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="classification-review-reason">{tr("reasonOptional")}</Label>
+              <Textarea id="classification-review-reason" value={reviewReason} onChange={event => setReviewReason(event.target.value)} maxLength={400} disabled={isSaving} placeholder={tr("reasonHint")} className="min-h-24 text-base" />
+              <p className="text-xs leading-relaxed text-muted-foreground">{tr("reasonHelp")}</p>
+            </div>
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>{t("commentOptional")}</Label>
+                <Label htmlFor="question-review-comment">{t("commentOptional")}</Label>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={isGeneratingAi}
                   onClick={handleGenerateAi}
-                  className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs h-7"
+                  className="text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-xs h-7"
                 >
                   {isGeneratingAi ? t("aiGenerating") : t("aiGenerate")}
                 </Button>
               </div>
               <Textarea
+                id="question-review-comment"
                 placeholder={t("commentPlaceholder")}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}

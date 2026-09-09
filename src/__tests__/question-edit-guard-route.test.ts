@@ -10,6 +10,7 @@ vi.mock("@/lib/translation-cleanup", () => ({ cleanupQuestionTranslations: vi.fn
 vi.mock("@/lib/db", () => ({
   prisma: {
     question: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    questionClassificationReview: { findFirst: vi.fn(), create: vi.fn() },
     pointLog: { count: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
     comment: { count: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn() },
     questionLike: { count: vi.fn(), deleteMany: vi.fn() },
@@ -66,6 +67,8 @@ const cleanQuestion = (overrides = {}) => ({
   id: "q1",
   authorId: "s1",
   content: "원래 질문",
+  closure: "open",
+  cognitive: "factual",
   isPublic: false,
   author: {
     role: "STUDENT",
@@ -149,6 +152,21 @@ beforeEach(() => {
 });
 
 describe("학생 질문 내용 수정 가드 (반응 전까지만)", () => {
+  it("학생은 교사의 분류 확인 이유를 기록할 수 없다", async () => {
+    const response = await PATCH(patchReq({ closure: "open", reviewReason: "학생이 교사 이유를 대신 제출" }), ctx);
+    expect(response.status).toBe(400);
+    expect(mUpdate).not.toHaveBeenCalled();
+    expect(prisma.questionClassificationReview.create).not.toHaveBeenCalled();
+  });
+
+  it("분류 확인 이유는 최대 길이를 지키고 교사의 분류 확인과 함께 제출해야 한다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
+    mUserFind.mockResolvedValue({ id: "t1", role: "TEACHER" });
+    expect((await PATCH(patchReq({ closure: "open", reviewReason: "가".repeat(401) }), ctx)).status).toBe(400);
+    expect((await PATCH(patchReq({ reviewReason: "분류 없는 이유" }), ctx)).status).toBe(400);
+    expect(mUpdate).not.toHaveBeenCalled();
+  });
+
   it("반응이 없으면 내용+재분류 수정이 허용되고 정규화 키가 갱신된다", async () => {
     const res = await PATCH(
       patchReq({ content: "다듬은 질문", closure: "open", cognitive: "conceptual", closureScore: 0.4, cognitiveScore: 0.6 }),

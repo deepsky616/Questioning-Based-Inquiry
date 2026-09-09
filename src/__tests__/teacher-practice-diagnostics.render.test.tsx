@@ -138,6 +138,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("교사 학급 연습 진단", () => {
+  it("풀이 기록이 있는 유형도 문제를 미리 보고 정확한 학생 연습 주소를 복사한다", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "열린 질문" }));
+    expect(screen.getByText("열린 질문 연습을 준비하고 학생에게 안내하세요.")).toBeVisible();
+    expect(screen.getByRole("link", { name: "내장 연습 미리보기" })).toHaveAttribute("href", "/teacher-practice?view=try&tab=quiz&quizMode=closure&focus=open");
+    fireEvent.click(screen.getByRole("button", { name: "전체 학생용 주소 복사" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/student-practice?tab=quiz&quizMode=closure&focus=open")));
+    fireEvent.click(screen.getByRole("button", { name: "논쟁적 질문" }));
+    expect(screen.getByRole("link", { name: "내장 연습 미리보기" })).toHaveAttribute("href", "/teacher-practice?view=try&tab=quiz&quizMode=cognitive&focus=controversial");
+  });
   it("학급 요약에서 다섯 유형의 시도 수와 정답률을 한눈에 비교한다", () => {
     renderPage();
 

@@ -42,6 +42,7 @@ export interface Question {
   cognitive: string;
   closureScore: number;
   cognitiveScore: number;
+  hasClassificationReview?: boolean;
   sessionId: string | null;
   session: {
     id: string;

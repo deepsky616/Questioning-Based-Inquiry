@@ -1,9 +1,10 @@
 "use client";
 
+import { QuestionClassificationReview } from "@/components/shared/QuestionClassificationReview";
+
 import { useRouter, useSearchParams } from "next/navigation";
-import { QuestionGrowthEditor } from "@/components/reports/QuestionGrowthEditor";
+import { QuestionGrowthDialog } from "@/components/reports/QuestionGrowthDialog";
 import { QuestionGrowthLink } from "@/components/reports/QuestionGrowthLink";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -63,6 +64,7 @@ interface Question {
   cognitive: string;
   closureScore: number;
   cognitiveScore: number;
+  hasClassificationReview?: boolean;
   isPublic: boolean;
   createdAt: string;
   likeCount?: number;
@@ -87,7 +89,6 @@ interface Comment {
 
 export function MyQuestionsView() {
   const t = useTranslations("myQuestions");
-  const tg = useTranslations("growth");
   const router = useRouter();
   const searchParams = useSearchParams();
   const growthId = searchParams.get("growth");
@@ -319,6 +320,7 @@ export function MyQuestionsView() {
                   ) : (
                     <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                   )}
+                  <QuestionClassificationReview questionId={q.id} reviewed={Boolean(q.hasClassificationReview)} />
                   <QuestionGrowthLink questionId={q.id} complete={q.growthComplete} className="mt-2" />
                   {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
                 </div>
@@ -451,6 +453,7 @@ export function MyQuestionsView() {
                     ) : (
                       <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                     )}
+                    <QuestionClassificationReview questionId={q.id} reviewed={Boolean(q.hasClassificationReview)} />
                     <QuestionGrowthLink questionId={q.id} complete={q.growthComplete} className="mt-2" />
                     {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                     {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
@@ -548,17 +551,11 @@ export function MyQuestionsView() {
 
   return (
     <div className="space-y-6">
-      <Dialog open={Boolean(growthId)} onOpenChange={(open) => {
-        if (open) return;
+      <QuestionGrowthDialog key={growthId ?? "closed"} questionId={growthId} onClose={() => {
         const params = new URLSearchParams(searchParams.toString());
         params.delete("growth");
         router.replace(`/student-questions?${params.toString()}`, { scroll: false });
-      }}>
-        <DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-xl sm:max-w-3xl">
-          <DialogHeader><DialogTitle>{tg("title")}</DialogTitle><DialogDescription>{tg("editorDescription")}</DialogDescription></DialogHeader>
-          {growthId && <QuestionGrowthEditor key={growthId} questionId={growthId} />}
-        </DialogContent>
-      </Dialog>
+      }} />
       <p className="text-sm text-muted-foreground">
         {t("intro", { count: questions.length })}
       </p>

@@ -7,7 +7,7 @@ import { renderWithIntl } from "./test-utils/render-with-intl";
 import { QuestionGrowthEditor } from "@/components/reports/QuestionGrowthEditor";
 
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "student-1", role: "STUDENT" } } }) }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); });
 it("백그라운드 재조회 후에도 작성 시작 당시 버전으로 저장하고 충돌하면 입력을 보존한다", async () => {
   let revision = 1;
   const record = () => ({ questionId: "q1", originalContent: "소금이 얼마나 녹을까?", revisedContent: "온도에 따라 녹는 양이 어떻게 달라질까?", reflection: "한 가지 조건만 바꾸어 비교해야 해요.", revision, updatedAt: "2026-09-08T00:00:00Z" });

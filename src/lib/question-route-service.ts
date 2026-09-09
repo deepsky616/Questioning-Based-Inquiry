@@ -181,7 +181,7 @@ const teacherQuestionPageSelect = {
   flagged: true,
   flagReason: true,
   createdAt: true,
-  _count: { select: { likes: true, comments: true } },
+  _count: { select: { likes: true, comments: true, classificationReviews: true } },
   comments: { where: { flagged: true }, select: { id: true }, take: 1 },
   likes: {
     select: {
@@ -553,6 +553,7 @@ export async function listTeacherQuestionPage(
         ...question,
         session: questionSession,
         likeCount: _count.likes,
+        hasClassificationReview: (_count.classificationReviews ?? 0) > 0,
         commentCount: _count.comments,
         hasFlaggedComment: comments.length > 0,
         myLike: likes.some((like) => like.userId === requireUserId(sessionUser)),
@@ -612,6 +613,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
   const questions = await prisma.question.findMany({
     where,
     include: {
+      _count: { select: { classificationReviews: true } },
       growth: includeGrowth ? { select: { changeNote: true, reflection: true } } : false,
       author: {
         select: { id: true, name: true, className: true, grade: true, studentNumber: true },
@@ -643,7 +645,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
     take: QUESTION_LIST_MAX,
   });
 
-  const enriched = questions.map(({ growth, ...q }) => {
+  const enriched = questions.map(({ growth, _count, ...q }) => {
     const commentsVisible = q.session?.commentsVisibleToPeers ?? true;
     const visibleComments = q.comments.filter((c) =>
       isCommentVisibleToViewer({
@@ -657,6 +659,7 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
     );
     return {
       ...q,
+      hasClassificationReview: (_count?.classificationReviews ?? 0) > 0,
       ...(includeGrowth && q.authorId === userId ? { growthComplete: isQuestionGrowthComplete(growth) } : {}),
       session: q.session
         ? {

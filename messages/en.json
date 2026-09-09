@@ -2525,7 +2525,8 @@
     "statsCriteriaPeriod": "We use each student’s latest 100 attempts within the last 30 days. Class recommendations combine records from your students.",
     "statsCriteriaRepeat": "Repeated attempts at the same question in the same mode on the same day count only once, using the most recent result. This is why total attempts and attempts used for recommendations can differ.",
     "statsCriteriaSample": "Types with fewer than 3 attempts are suggested for more practice. The threshold counts attempts, not correct answers, and does not indicate a weakness.",
-    "statsCriteriaFocus": "Once every type has at least 3 attempts, lower-accuracy types are prioritized. If every type reaches at least 80% accuracy, question transformation is recommended."
+    "statsCriteriaFocus": "Once every type has at least 3 attempts, lower-accuracy types are prioritized. If every type reaches at least 80% accuracy, question transformation is recommended.",
+    "statsPracticeActionsTitle": "Prepare {type} practice and share it with your students."
   },
   "questionLearning": {
     "title": "Question Learning",
@@ -2576,7 +2577,10 @@
     "exampleActivity_factual": "Choose a source, observation, or calculation that can verify the answer. Check whether another group can use the same evidence to confirm it.",
     "exampleActivity_conceptual": "Connect at least two supporting facts to explain a relationship or principle. Students may use a diagram or comparison table.",
     "exampleActivity_controversial": "Compare the values and evidence behind each choice. After hearing another view, ask what conditions might change the student's judgment.",
-    "exampleActivity_comparison": "Compare the thinking and evidence required, rather than the first question word. In pairs, explain the differences between verifying facts, explaining relationships, and weighing values."
+    "exampleActivity_comparison": "Compare the thinking and evidence required, rather than the first question word. In pairs, explain the differences between verifying facts, explaining relationships, and weighing values.",
+    "exampleSubject": "Example subject",
+    "exampleAllSubjects": "All subjects",
+    "otherExamples": "Show another example"
   },
   "curriculumDraft": {
     "loading": "Checking your lesson draft…",
@@ -2651,12 +2655,51 @@
     "nextPage": "Next records",
     "pageCount": "Page {page} of {pages}",
     "jumpToLibrary": "Browse growth records",
-    "sessionEmpty": "The student has not written any reflections or learning notes for this class yet."
+    "sessionEmpty": "The student has not written any reflections or learning notes for this class yet.",
+    "draft_saved": "Draft kept in this browser for 8 hours. Select Save growth record to share it with your teacher.",
+    "draft_restored": "Your draft has been restored. Check it, then select Save growth record.",
+    "draft_error": "Your draft could not be kept in this browser. Save or copy your writing before leaving.",
+    "draftLeave": "Your draft could not be kept. Leave without saving?"
   },
   "demoPeriod": {
     "title": "Demo period",
     "current": "Current date",
     "latest": "Period with recent records",
     "description": "This changes only the demo viewing period. Recorded dates and points stay the same."
+  },
+  "classificationReview": {
+    "reviewed": "Teacher review history",
+    "open": "Classification history",
+    "title": "Question classification reviews",
+    "description": "Teacher-confirmed classifications and explanations, newest first.",
+    "empty": "No teacher reviews have been saved yet. Reviews are recorded from this feature onward.",
+    "error": "Could not load classification reviews.",
+    "teacher": "Teacher",
+    "before": "Before review",
+    "after": "Teacher-confirmed classification",
+    "reason": "Teacher explanation",
+    "reasonOptional": "Reason for confirming or changing (optional)",
+    "reasonHint": "For example: Several examples are possible, but the answer is verified using evidence, so I classified this as an open factual question.",
+    "reasonHelp": "The student who wrote this question and their teachers can read this explanation.",
+    "pages": "Classification history pages",
+    "previous": "Previous reviews",
+    "next": "Next reviews",
+    "page": "Page {page}"
+  },
+  "classroomPresentation": {
+    "open": "Show in classroom view",
+    "title": "Classroom view",
+    "description": "Read the question and discuss it first. Reveal the classification and explanation when ready.",
+    "count": "Question {current} / {total}",
+    "names": "Show student names",
+    "question": "Question for discussion",
+    "previous": "Previous question",
+    "next": "Next question",
+    "reveal": "Reveal classification",
+    "hide": "Hide classification",
+    "close": "Close classroom view",
+    "studentQuestions": "Student questions",
+    "selected": "Present selected questions",
+    "currentPage": "Present questions on this page"
   }
 }

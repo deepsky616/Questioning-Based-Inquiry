@@ -1,5 +1,8 @@
 "use client";
 
+import { QuestionClassificationReview } from "@/components/shared/QuestionClassificationReview";
+import { ClassroomPresentation } from "@/components/teacher/ClassroomPresentation";
+
 import { Fragment, useMemo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -67,6 +70,7 @@ export function TeacherQuestionTable({
 }: TeacherQuestionTableProps) {
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
+  const tp = useTranslations("classroomPresentation");
   const tCls = useTranslations("classification");
   const tTarget = useTranslations("targetSelector");
   const allChecked = list.length > 0 && list.every((question) => selectedIds.has(question.id));
@@ -91,11 +95,18 @@ export function TeacherQuestionTable({
 
   return (
     <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <ClassroomPresentation title={tp("studentQuestions")} label={tp(list.some(question => selectedIds.has(question.id)) ? "selected" : "currentPage")} items={(list.some(question => selectedIds.has(question.id)) ? list.filter(question => selectedIds.has(question.id)) : list).map(question => ({
+          id: question.id, content: contentTranslation.text({ type: "QUESTION", id: question.id }, question.content),
+          classification: `${closureLabel(question.closure)} · ${cognitiveLabel(question.cognitive)}`, authorName: question.author.name,
+        }))} />
+      </div>
       <div className="space-y-3 lg:hidden">
         <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium">
           <input
             type="checkbox"
             checked={allChecked}
+            aria-label={tTarget("selectAll")}
             onChange={() => (allChecked ? onClearSelection() : onSelectAll(list))}
             className="h-4 w-4 rounded border-input accent-indigo-600"
           />
@@ -112,6 +123,7 @@ export function TeacherQuestionTable({
                 <input
                   type="checkbox"
                   checked={selectedIds.has(question.id)}
+                  aria-label={`${question.author.name}: ${question.content}`}
                   onChange={() => onToggleSelect(question.id)}
                   className="mt-1 h-4 w-4 shrink-0 rounded border-input accent-indigo-600"
                 />
@@ -159,6 +171,7 @@ export function TeacherQuestionTable({
                       {cognitiveLabel(question.cognitive)}
                     </span>
                   </div>
+                  <QuestionClassificationReview questionId={question.id} reviewed={Boolean(question.hasClassificationReview)} teacher />
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     {selectedSessionId === "all" && question.session && (
                       <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
@@ -247,6 +260,7 @@ export function TeacherQuestionTable({
                 <input
                   type="checkbox"
                   checked={allChecked}
+                  aria-label={tTarget("selectAll")}
                   onChange={() => (allChecked ? onClearSelection() : onSelectAll(list))}
                   className="h-4 w-4 rounded border-input accent-indigo-600"
                 />
@@ -267,6 +281,7 @@ export function TeacherQuestionTable({
                     <input
                       type="checkbox"
                       checked={selectedIds.has(question.id)}
+                      aria-label={`${question.author.name}: ${question.content}`}
                       onChange={() => onToggleSelect(question.id)}
                       className="h-4 w-4 rounded border-input accent-indigo-600"
                     />
@@ -312,7 +327,8 @@ export function TeacherQuestionTable({
                         {cognitiveLabel(question.cognitive)}
                       </span>
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <QuestionClassificationReview questionId={question.id} reviewed={Boolean(question.hasClassificationReview)} teacher />
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       {selectedSessionId === "all" && question.session && (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                           <span>📚</span>
