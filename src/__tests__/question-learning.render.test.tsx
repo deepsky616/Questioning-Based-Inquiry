@@ -170,7 +170,7 @@ describe("질문학습 슬라이드", () => {
 
   it("담당 학년을 바꾸면 여섯 패널의 두 교과 예시를 함께 바꾸고 진단을 유형별로 연결한다", () => {
     renderWithIntl(<QuestionLearningExperience audience="teacher" teachingExamples={questionTeachingExamplesForGrades(["5", "6"])} />);
-    fireEvent.click(screen.getByRole("tab", { name: "수업 활용", exact: true }));
+    fireEvent.click(screen.getByRole("tab", { name: "수업 활용" }));
     expect(screen.getAllByRole("heading", { name: "활용 예시 1 · 과학 · 용해와 용액" })).toHaveLength(6);
     expect(screen.getAllByRole("heading", { name: "활용 예시 2 · 수학 · 평균으로 자료 비교하기" })).toHaveLength(6);
     expect(screen.getByRole("link", { name: "닫힌 질문 진단 보기" })).toHaveAttribute("href", "/teacher-practice?view=stats&tab=quiz&quizMode=closure&focus=closed");
@@ -191,7 +191,7 @@ describe("질문학습 슬라이드", () => {
 
   it("담당 학년 조회 실패에도 기존 여섯 안내와 재시도를 제공한다", () => {
     renderWithIntl(<QuestionLearningExperience audience="teacher" teachingExamples={{ status: "unavailable", grades: [], topics: [] }} />);
-    fireEvent.click(screen.getByRole("tab", { name: "수업 활용", exact: true }));
+    fireEvent.click(screen.getByRole("tab", { name: "수업 활용" }));
     expect(screen.getByRole("alert")).toHaveTextContent("담당 학년의 예시를 불러오지 못했습니다.");
     expect(screen.getByRole("button", { name: "예시 다시 불러오기" })).toBeVisible();
     expect(screen.getAllByText("자주 생기는 혼동")).toHaveLength(6);
