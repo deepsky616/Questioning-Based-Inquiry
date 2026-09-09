@@ -19,7 +19,7 @@ it("수업 안에서는 검색 없이 학생이 직접 쓴 내용을 바로 보�
   expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("group", { name: "성장 기록 작성 상태" })).not.toBeInTheDocument();
   expect(screen.queryByText("탐구 후 배운 점을 이어 쓸 수 있어요.")).not.toBeInTheDocument();
-  expect(screen.queryByText("새롭게 알게 된 점")).not.toBeInTheDocument();
+  expect(screen.queryByText("탐구하며 알게 된 점")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "성장 기록 이어쓰기" })).toHaveAttribute("href", "/student-questions?tab=mine&growth=q1");
 });
 it("수업을 바꾸면 해당 수업의 기록만 조회하고 학생이 쓴 내용이 없을 때 전체 검색을 제공하지 않는다", async () => {
@@ -55,7 +55,7 @@ it("질문을 고치지 않은 기록은 나의 질문 하나와 학생이 직�
   expect(screen.getAllByText(unchanged.originalContent, { exact: true })).toHaveLength(1);
   expect(screen.queryByText("처음 질문", { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByText("고친 질문", { exact: true })).not.toBeInTheDocument();
-  expect(screen.queryByText("한 줄 돌아보기", { exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByText("질문을 만들거나 고친 점", { exact: true })).not.toBeInTheDocument();
   expect(screen.getByText(unchanged.reflection)).toBeVisible();
 });
 it("처음 질문과 고친 질문에 작성한 돌아보기와 배운 점을 모두 연결하며 실제 저장된 문장을 유지한다", async () => {

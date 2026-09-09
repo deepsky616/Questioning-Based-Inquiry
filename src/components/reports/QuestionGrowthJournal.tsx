@@ -1,7 +1,6 @@
 "use client";
 
 import { useId, useState } from "react";
-import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -11,7 +10,8 @@ import { isQuestionGrowthComplete } from "@/lib/question-growth-status";
 import { Button } from "@/components/ui/button";
 import { formatDateOnly } from "@/lib/datetime";
 import { QuestionGrowthContent } from "./QuestionGrowthContent";
-import { growthQuestionHref, type GrowthJournalResponse } from "./question-growth-types";
+import type { GrowthJournalResponse } from "./question-growth-types";
+import { QuestionGrowthLink } from "./QuestionGrowthLink";
 
 export function QuestionGrowthJournal({ studentId, sessionId }: { studentId?: string; sessionId: string }) {
   const { data: session } = useSession();
@@ -55,7 +55,7 @@ function SessionGrowthRecords({ userId, studentId, sessionId }: { userId: string
           {record.changeNote?.trim() && <div><dt className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("changeNote")}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed">{record.changeNote}</dd></div>}
           {record.reflection.trim() && <div><dt className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("reflection")}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed">{record.reflection}</dd></div>}
         </dl>
-        {query.data?.canEdit && <Link href={growthQuestionHref(record.questionId)} className="no-print mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{t(isQuestionGrowthComplete(record) ? "viewEdit" : "continue")}</Link>}
+        {query.data?.canEdit && <QuestionGrowthLink questionId={record.questionId} complete={isQuestionGrowthComplete(record)} className="no-print mt-3" />}
       </article>)}
     </div>
     {pageInfo && pageInfo.totalPages > 1 && <nav aria-label={t("pagesLabel")} className="no-print mt-4 flex flex-wrap items-center justify-between gap-3">
