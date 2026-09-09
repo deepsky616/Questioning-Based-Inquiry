@@ -3,7 +3,7 @@ import { preparePage } from "./helpers/session-filter-page";
 import { expectNoHorizontalPageOverflow } from "./helpers/question-game-room";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`${theme === "light" ? "밝은" : "어두운"} 화면에서 분석·다듬기·질문 저장·한 줄 돌아보기를 이어 간다`, async ({ page, baseURL }, testInfo) => {
+  test(`${theme === "light" ? "밝은" : "어두운"} 화면에서 분석·다듬기·질문 저장·작성 과정 기록을 이어 간다`, async ({ page, baseURL }, testInfo) => {
     const { errors } = await preparePage(page, "STUDENT", baseURL!);
     await page.setViewportSize({ width: theme === "light" ? 375 : 1440, height: 900 });
     await page.addInitScript(value => { localStorage.setItem("question-lab-theme", value); }, theme);
@@ -42,8 +42,8 @@ for (const theme of ["light", "dark"] as const) {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ content: revised, growth: { originalContent: original } });
     await page.getByRole("button", { name: "한 줄 남기기", exact: true }).click();
-    await page.getByRole("textbox", { name: /한 줄 돌아보기/ }).fill(note);
-    await expect(page.getByRole("textbox", { name: /새롭게 알게 된 점/ })).toHaveCount(0);
+    await page.getByRole("textbox", { name: /질문을 만들거나 고친 점/ }).fill(note);
+    await expect(page.getByRole("textbox", { name: /탐구하며 알게 된 점/ })).toHaveCount(0);
     await page.getByRole("button", { name: "성장 기록 저장", exact: true }).click();
     await expect(page.getByText("성장 기록을 저장했어요.", { exact: true })).toBeVisible();
     await expectNoHorizontalPageOverflow(page);
@@ -52,10 +52,12 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
+for (const theme of ["light", "dark"] as const) {
 for (const width of [375, 768, 1440]) {
-test(`${width} 화면의 나의 질문에서 배운 점을 이어 쓰고 기존 돌아보기를 보존한다`, async ({ page, baseURL }, testInfo) => {
+test(`${theme === "light" ? "밝은" : "어두운"} ${width} 화면의 성장 기록 양식에서 배운 점을 이어 쓰고 기존 메모를 보존한다`, async ({ page, baseURL }, testInfo) => {
   const { errors } = await preparePage(page, "STUDENT", baseURL!);
   await page.setViewportSize({ width, height: 1024 });
+  await page.addInitScript(value => { localStorage.setItem("question-lab-theme", value); }, theme);
   let writes = 0;
   let record = { questionId: "growth-old", originalContent: "소금이 녹을까?", revisedContent: "온도에 따라 녹는 양은 어떻게 달라질까?", changeNote: "온도를 비교하기로 했어요.", reflection: "", revision: 1, updatedAt: new Date().toISOString() };
   await page.route("**/api/questions?**", route => route.fulfill({ json: [{ id: record.questionId, content: record.revisedContent, closure: "open", cognitive: "conceptual", isPublic: true, createdAt: record.updatedAt, likeCount: 2, commentCount: 1, session: null, growthComplete: Boolean(record.changeNote && record.reflection) }] }));
@@ -75,11 +77,29 @@ test(`${width} 화면의 나의 질문에서 배운 점을 이어 쓰고 기존 
   await growthLink.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("textbox", { name: /한 줄 돌아보기/ })).toHaveValue(record.changeNote);
-  await dialog.getByRole("textbox", { name: /새롭게 알게 된 점/ }).fill("물의 양을 같게 해야 공정하게 비교할 수 있어요.");
+  await expect(dialog.getByRole("textbox", { name: /질문을 만들거나 고친 점/ })).toHaveValue(record.changeNote);
+  const boxes = await Promise.all([
+    dialog.getByText("처음 질문", { exact: true }),
+    dialog.getByText("고친 질문", { exact: true }),
+    dialog.getByRole("textbox", { name: "질문을 만들거나 고친 점", exact: true }),
+    dialog.getByRole("textbox", { name: "탐구하며 알게 된 점", exact: true }),
+  ].map(locator => locator.boundingBox()));
+  for (const box of boxes) expect(box).not.toBeNull();
+  const [originalBox, revisedBox, noteBox, learningBox] = boxes.map(box => box!);
+  if (width >= 640) {
+    expect(Math.abs(originalBox.y - revisedBox.y)).toBeLessThan(2);
+    expect(revisedBox.x).toBeGreaterThan(originalBox.x + originalBox.width);
+    expect(Math.abs(noteBox.y - learningBox.y)).toBeLessThan(2);
+    expect(learningBox.x).toBeGreaterThan(noteBox.x + noteBox.width);
+  } else {
+    expect(revisedBox.y).toBeGreaterThan(originalBox.y);
+    expect(learningBox.y).toBeGreaterThan(noteBox.y + noteBox.height);
+  }
+  expect(noteBox.y).toBeGreaterThan(revisedBox.y);
+  await dialog.getByRole("textbox", { name: /탐구하며 알게 된 점/ }).fill("물의 양을 같게 해야 공정하게 비교할 수 있어요.");
   await dialog.getByRole("button", { name: "성장 기록 저장", exact: true }).click();
   await expect(dialog.getByText("성장 기록을 저장했어요.", { exact: true })).toBeVisible();
-  await expect(dialog.getByRole("textbox", { name: /한 줄 돌아보기/ })).toHaveValue(record.changeNote);
+  await expect(dialog.getByRole("textbox", { name: /질문을 만들거나 고친 점/ })).toHaveValue(record.changeNote);
   await expectNoHorizontalPageOverflow(page);
   await testInfo.attach(`growth-editor-${width}`, { body: await page.screenshot({ path: testInfo.outputPath(`growth-editor-${width}.png`) }), contentType: "image/png" });
   await page.keyboard.press("Escape");
@@ -87,8 +107,8 @@ test(`${width} 화면의 나의 질문에서 배운 점을 이어 쓰고 기존 
   await expect(completedLink).toHaveCount(1);
   await expect(growthLink).toHaveCount(0);
   await completedLink.click();
-  await expect(dialog.getByRole("textbox", { name: /새롭게 알게 된 점/ })).toHaveValue(record.reflection);
-  await dialog.getByRole("textbox", { name: /새롭게 알게 된 점/ }).fill("");
+  await expect(dialog.getByRole("textbox", { name: /탐구하며 알게 된 점/ })).toHaveValue(record.reflection);
+  await dialog.getByRole("textbox", { name: /탐구하며 알게 된 점/ }).fill("");
   await dialog.getByRole("button", { name: "성장 기록 저장", exact: true }).click();
   await expect(dialog.getByText("성장 기록을 저장했어요.", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -96,4 +116,5 @@ test(`${width} 화면의 나의 질문에서 배운 점을 이어 쓰고 기존 
   await expect(completedLink).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+}
 }

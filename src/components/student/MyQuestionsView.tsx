@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { QuestionGrowthEditor } from "@/components/reports/QuestionGrowthEditor";
-import { growthQuestionHref } from "@/components/reports/question-growth-types";
+import { QuestionGrowthLink } from "@/components/reports/QuestionGrowthLink";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -320,7 +319,7 @@ export function MyQuestionsView() {
                   ) : (
                     <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                   )}
-                  <Link href={growthQuestionHref(q.id)} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{tg(q.growthComplete ? "viewEdit" : "continue")}</Link>
+                  <QuestionGrowthLink questionId={q.id} complete={q.growthComplete} className="mt-2" />
                   {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
                 </div>
               </div>
@@ -452,7 +451,7 @@ export function MyQuestionsView() {
                     ) : (
                       <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                     )}
-                    <Link href={growthQuestionHref(q.id)} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-700 underline underline-offset-4 dark:text-emerald-300">{tg(q.growthComplete ? "viewEdit" : "continue")}</Link>
+                    <QuestionGrowthLink questionId={q.id} complete={q.growthComplete} className="mt-2" />
                     {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                     {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -555,7 +554,7 @@ export function MyQuestionsView() {
         params.delete("growth");
         router.replace(`/student-questions?${params.toString()}`, { scroll: false });
       }}>
-        <DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-xl sm:max-w-2xl">
+        <DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-xl sm:max-w-3xl">
           <DialogHeader><DialogTitle>{tg("title")}</DialogTitle><DialogDescription>{tg("editorDescription")}</DialogDescription></DialogHeader>
           {growthId && <QuestionGrowthEditor key={growthId} questionId={growthId} />}
         </DialogContent>

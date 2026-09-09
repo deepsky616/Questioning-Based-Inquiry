@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -24,6 +24,7 @@ function AccountGrowthEditor({ userId, questionId, quick }: { userId: string; qu
   const t = useTranslations("growth");
   const tc = useTranslations("common");
   const client = useQueryClient();
+  const inputId = useId();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -84,17 +85,22 @@ function AccountGrowthEditor({ userId, questionId, quick }: { userId: string; qu
     {query.isLoading && <p role="status" className="text-sm">{t("loading")}</p>}
     {query.isError && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{t("loadFailed")}</p><Button variant="outline" onClick={() => query.refetch()}>{tc("retry")}</Button></div>}
     {question && <>
-      {!quick && <div className="rounded-xl bg-muted/40 p-4"><QuestionGrowthContent record={content} questionOnly /></div>}
       {query.data?.canEdit ? <>
-        <label className="block text-sm font-semibold">{t("changeNote")}
-          <Textarea className="mt-2 min-h-24 text-base leading-relaxed" disabled={saving || message === "savedRefreshFailed"} value={value("changeNote")} maxLength={300} onChange={event => change("changeNote", event.target.value)} placeholder={t("changeNoteHint")} />
-          <span className="mt-1 block text-right text-xs font-normal text-muted-foreground">{value("changeNote").length}/300</span>
-        </label>
-        {!quick && <label className="block text-sm font-semibold">{t("reflection")}
-          <span className="mt-1 block text-sm font-normal leading-relaxed text-muted-foreground">{t("reflectionLater")}</span>
-          <Textarea className="mt-2 min-h-28 text-base leading-relaxed" disabled={saving || message === "savedRefreshFailed"} value={value("reflection")} maxLength={600} onChange={event => change("reflection", event.target.value)} placeholder={t("reflectionHint")} />
-          <span className="mt-1 block text-right text-xs font-normal text-muted-foreground">{value("reflection").length}/600</span>
-        </label>}
+        {!quick && <QuestionGrowthContent record={content} questionOnly formLayout />}
+        <div className={`grid gap-4 ${quick ? "" : "sm:grid-cols-2"}`}>
+          <div className="flex min-w-0 flex-col rounded-xl border bg-background p-4">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><label htmlFor={`${inputId}-changeNote`} className="text-base font-semibold">{t("changeNote")}</label><span className="text-xs text-muted-foreground">{t("optional")}</span></div>
+            <p id={`${inputId}-changeNote-help`} className="mt-2 text-sm leading-relaxed text-muted-foreground">{t("changeNoteHelp")}</p>
+            <Textarea id={`${inputId}-changeNote`} aria-describedby={`${inputId}-changeNote-help ${inputId}-changeNote-count`} className="mt-3 min-h-32 flex-1 text-base leading-relaxed" disabled={saving || message === "savedRefreshFailed"} value={value("changeNote")} maxLength={300} onChange={event => change("changeNote", event.target.value)} placeholder={t("changeNoteHint")} />
+            <span id={`${inputId}-changeNote-count`} className="mt-1 block text-right text-xs text-muted-foreground">{value("changeNote").length}/300</span>
+          </div>
+          {!quick && <div className="flex min-w-0 flex-col rounded-xl border bg-background p-4">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><label htmlFor={`${inputId}-reflection`} className="text-base font-semibold">{t("reflection")}</label><span className="text-xs text-muted-foreground">{t("optional")}</span></div>
+            <p id={`${inputId}-reflection-help`} className="mt-2 text-sm leading-relaxed text-muted-foreground">{t("reflectionLater")}</p>
+            <Textarea id={`${inputId}-reflection`} aria-describedby={`${inputId}-reflection-help ${inputId}-reflection-count`} className="mt-3 min-h-32 flex-1 text-base leading-relaxed" disabled={saving || message === "savedRefreshFailed"} value={value("reflection")} maxLength={600} onChange={event => change("reflection", event.target.value)} placeholder={t("reflectionHint")} />
+            <span id={`${inputId}-reflection-count`} className="mt-1 block text-right text-xs text-muted-foreground">{value("reflection").length}/600</span>
+          </div>}
+        </div>
         <Button type="button" disabled={saving || blocked || !draft || (!record && !value("changeNote").trim() && !value("reflection").trim())} onClick={save}>{saving ? t("saving") : t("save")}</Button>
       </> : <QuestionGrowthContent record={content} />}
     </>}

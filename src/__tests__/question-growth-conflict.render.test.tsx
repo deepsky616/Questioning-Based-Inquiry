@@ -18,15 +18,15 @@ it("백그라운드 재조회 후에도 작성 시작 당시 버전으로 저장
   vi.stubGlobal("fetch", fetcher);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   renderWithIntl(<QuestionGrowthEditor questionId="q1" />, { queryClient: client });
-  await screen.findByRole("textbox", { name: /한 줄 돌아보기/ });
-  fireEvent.change(screen.getByRole("textbox", { name: /한 줄 돌아보기/ }), { target: { value: "새롭게 고쳐 쓴 나의 질문입니다." } });
+  await screen.findByRole("textbox", { name: /질문을 만들거나 고친 점/ });
+  fireEvent.change(screen.getByRole("textbox", { name: /질문을 만들거나 고친 점/ }), { target: { value: "새롭게 고쳐 쓴 나의 질문입니다." } });
   revision = 2;
   await client.invalidateQueries({ queryKey: ["question-growth"] });
   fireEvent.click(screen.getByRole("button", { name: "성장 기록 저장" }));
   await screen.findByRole("alert");
   const saved = fetcher.mock.calls.find(([, init]) => init?.method === "PUT");
   expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({ revision: 1 });
-  expect(screen.getByRole("textbox", { name: /한 줄 돌아보기/ })).toHaveValue("새롭게 고쳐 쓴 나의 질문입니다.");
+  expect(screen.getByRole("textbox", { name: /질문을 만들거나 고친 점/ })).toHaveValue("새롭게 고쳐 쓴 나의 질문입니다.");
   expect(screen.getByRole("button", { name: "성장 기록 저장" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "성장 기록 저장" })).toBeEnabled());
@@ -47,7 +47,7 @@ it("빠른 돌아보기의 저장 실패 후 입력을 보존하고 배운 점�
   });
   vi.stubGlobal("fetch", fetcher);
   renderWithIntl(<QuestionGrowthEditor questionId="q1" quick />);
-  const input = await screen.findByRole("textbox", { name: /한 줄 돌아보기/ });
+  const input = await screen.findByRole("textbox", { name: /질문을 만들거나 고친 점/ });
   fireEvent.change(input, { target: { value: "비교할 조건을 넣었어요." } });
   fireEvent.click(screen.getByRole("button", { name: "성장 기록 저장" }));
   await screen.findByRole("alert");
@@ -58,5 +58,5 @@ it("빠른 돌아보기의 저장 실패 후 입력을 보존하고 배운 점�
   const saved = fetcher.mock.calls.filter(([, init]) => init?.method === "PUT");
   expect(saved).toHaveLength(2);
   expect(JSON.parse(String(saved[1][1]?.body))).toEqual({ questionId: "q1", revision: 0, changeNote: "비교할 조건을 넣었어요." });
-  expect(screen.queryByRole("textbox", { name: /새롭게 알게 된 점/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: /탐구하며 알게 된 점/ })).not.toBeInTheDocument();
 });

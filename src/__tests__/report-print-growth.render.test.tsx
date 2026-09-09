@@ -19,6 +19,6 @@ it("분석이 없는 수업도 직접 쓴 성장 기록을 모두 출력하며 �
   expect(screen.getAllByRole("article")).toHaveLength(105);
   for (const text of ["처음 질문 0", "고친 질문 0", "돌아보기 0", "조건을 같게 맞추어야 해요.", "돌아보기 104"]) expect(screen.getByText(text, { exact: true })).toBeVisible();
   expect(screen.queryByText("자동 보관만 한 질문")).not.toBeInTheDocument();
-  expect(screen.getAllByText("새롭게 알게 된 점", { exact: true })).toHaveLength(1);
+  expect(screen.getAllByText("탐구하며 알게 된 점", { exact: true })).toHaveLength(1);
   expect(screen.queryByRole("link", { name: /성장 기록/ })).not.toBeInTheDocument();
 });
