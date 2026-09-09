@@ -7,9 +7,12 @@ import { NextIntlClientProvider } from "next-intl";
 import * as QuestionLearning from "@/components/shared/QuestionDetectiveSlides";
 import { QuestionLearningExperience } from "@/components/shared/QuestionLearningExperience";
 import en from "../../messages/en.json";
+import ko from "../../messages/ko.json";
+import { questionTeachingExamplesForGrades } from "@/lib/question-teaching-examples";
 
 const messages = {
   questionLearning: {
+    ...ko.questionLearning,
     title: "질문학습",
     subtitle: "질문을 살펴보고 탐구의 힘을 길러요.",
     previous: "이전",
@@ -163,6 +166,35 @@ describe("질문학습 슬라이드", () => {
     expect(
       screen.queryByText("답의 범위와 답에 필요한 사고를 서로 다른 기준으로 분류한다."),
     ).not.toBeInTheDocument();
+  });
+
+  it("담당 학년을 바꾸면 여섯 패널의 두 교과 예시를 함께 바꾸고 진단을 유형별로 연결한다", () => {
+    renderWithIntl(<QuestionLearningExperience audience="teacher" teachingExamples={questionTeachingExamplesForGrades(["5", "6"])} />);
+    fireEvent.click(screen.getByRole("tab", { name: "수업 활용" }));
+    expect(screen.getAllByRole("heading", { name: "활용 예시 1 · 과학 · 용해와 용액" })).toHaveLength(6);
+    expect(screen.getAllByRole("heading", { name: "활용 예시 2 · 수학 · 평균으로 자료 비교하기" })).toHaveLength(6);
+    expect(screen.getByRole("link", { name: "닫힌 질문 진단 보기" })).toHaveAttribute("href", "/teacher-practice?view=stats&tab=quiz&quizMode=closure&focus=closed");
+    expect(screen.getByRole("link", { name: "열린 질문 진단 보기" })).toHaveAttribute("href", "/teacher-practice?view=stats&tab=quiz&quizMode=closure&focus=open");
+    fireEvent.change(screen.getByRole("combobox", { name: "담당 학년" }), { target: { value: "6" } });
+    expect(screen.getAllByRole("heading", { name: "활용 예시 1 · 수학 · 비율과 백분율" })).toHaveLength(6);
+    expect(screen.queryByRole("heading", { name: "활용 예시 1 · 과학 · 용해와 용액" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "활용 예시 2 · 사회 · 민주주의와 시민 참여" })).toHaveLength(6);
+  });
+
+  it("영어 예시를 보여 주면서 성취기준은 한국어 원문임을 명시한다", () => {
+    renderWithEnglishIntl(<QuestionLearningExperience audience="teacher" teachingExamples={questionTeachingExamplesForGrades(["5"])} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Teaching guide" }));
+    expect(screen.getAllByRole("heading", { name: "Classroom example 1 · Science · Dissolving and solutions" })).toHaveLength(6);
+    expect(screen.getAllByText(/Curriculum standards \(Korean original\)/)).toHaveLength(12);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("담당 학년 조회 실패에도 기존 여섯 안내와 재시도를 제공한다", () => {
+    renderWithIntl(<QuestionLearningExperience audience="teacher" teachingExamples={{ status: "unavailable", grades: [], topics: [] }} />);
+    fireEvent.click(screen.getByRole("tab", { name: "수업 활용" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("담당 학년의 예시를 불러오지 못했습니다.");
+    expect(screen.getByRole("button", { name: "예시 다시 불러오기" })).toBeVisible();
+    expect(screen.getAllByText("자주 생기는 혼동")).toHaveLength(6);
   });
 
   it("활성 패널과 진행 탭을 연결하고 단추와 키로 경계 안에서 이동한다", () => {

@@ -9,6 +9,7 @@ import { printTextOf } from "@/lib/report-print-safe";
 import { formatDateOnly } from "@/lib/datetime";
 import { buildSessionLabel } from "@/lib/sessions";
 import type { GrowthRecord } from "./question-growth-types";
+import { QuestionGrowthReportContent } from "./QuestionGrowthReportContent";
 
 // 인쇄 추세 꺾은선 시리즈(화면 리포트와 동일 색)
 const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
@@ -421,13 +422,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                     <h4 className="rdoc-growth-heading">{tg("sessionTitle")}</h4>
                     {authoredGrowth(s).map(record => <article key={record.questionId} className="rdoc-growth-record">
                       <p className="rdoc-section-note">{tg("updatedOn", { date: formatDateOnly(record.updatedAt) })}</p>
-                      <dl>
-                        {(record.originalContent.trim() !== record.revisedContent.trim()
-                          ? [[tg("original"), record.originalContent], [tg("revised"), record.revisedContent]]
-                          : [[tg("myQuestion"), record.revisedContent]])
-                          .concat([[tg("changeNote"), record.changeNote ?? ""], [tg("reflection"), record.reflection]])
-                          .filter(([, value]) => value.trim()).map(([label, value]) => <div className="rdoc-fb-block" key={label}><dt className="rdoc-fb-h">{label}</dt><dd className="rdoc-fb-b">{value}</dd></div>)}
-                      </dl>
+                      <QuestionGrowthReportContent record={record} print />
                     </article>)}
                   </div>}
                 </div>

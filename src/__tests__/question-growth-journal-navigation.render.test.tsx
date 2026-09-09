@@ -4,8 +4,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, expect, it, vi } from "vitest";
 import { renderWithIntl } from "./test-utils/render-with-intl";
 import { QuestionGrowthJournal } from "@/components/reports/QuestionGrowthJournal";
-vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "s1", role: "STUDENT" } } }) }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+const viewer = vi.hoisted(() => ({ role: "STUDENT" }));
+vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: viewer.role === "TEACHER" ? "t1" : "s1", role: viewer.role } } }) }));
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); viewer.role = "STUDENT"; });
 const record = { questionId: "q1", originalContent: "소금이 녹을까?", revisedContent: "물의 온도에 따라 소금이 녹는 양은 어떻게 달라질까?", changeNote: "온도를 비교하는 질문으로 고쳤어요.", reflection: "", revision: 1, updatedAt: "2026-09-08T00:00:00Z", question: { session: { id: "science-1", date: "2026-09-01", subject: "과학", topic: "용해와 용액" } } };
 const response = (records = [record]) => ({ canEdit: true, records, pageInfo: { page: 1, pageSize: 8, total: records.length, totalPages: 1 }, summary: { total: records.length, complete: 0, pending: records.length } });
 it("수업 안에서는 검색 없이 학생이 직접 쓴 내용을 바로 보여 주고 비어 있는 항목은 표시하지 않는다", async () => {
@@ -67,4 +68,20 @@ it("처음 질문과 고친 질문에 작성한 돌아보기와 배운 점을 �
   expect(screen.getByRole("link", { name: "성장 기록 보기·수정" })).toHaveAttribute("href", "/student-questions?tab=mine&growth=q1");
   expect(screen.queryByRole("link", { name: "성장 기록 이어쓰기" })).not.toBeInTheDocument();
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+});
+
+it("교사는 작성된 기록의 네 항목과 미작성 상태를 읽고 빈 기록은 보지 않는다", async () => {
+  viewer.role = "TEACHER";
+  const unchanged = { ...record, revisedContent: record.originalContent, changeNote: " \n ", reflection: "  비교할 조건을 같게 맞추어요.\n결과를 다시 확인했어요.  " };
+  const empty = { ...record, questionId: "auto", originalContent: "자동으로 보관된 질문", changeNote: "", reflection: "" };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...response([unchanged, empty]), canEdit: false }))));
+  renderWithIntl(<QuestionGrowthJournal studentId="s1" sessionId="science-1" />);
+  expect(await screen.findByText("질문을 수정하지 않음", { exact: true })).toBeVisible();
+  expect(screen.getByText("미작성", { exact: true })).toBeVisible();
+  expect(screen.getAllByText(unchanged.originalContent, { exact: true })).toHaveLength(1);
+  expect(screen.getByText("비교할 조건을 같게 맞추어요. 결과를 다시 확인했어요.").textContent).toBe(unchanged.reflection);
+  for (const label of ["처음 질문", "고친 질문", "질문을 만들거나 고친 점", "탐구하며 알게 된 점"]) expect(screen.getByText(label, { exact: true })).toBeVisible();
+  expect(screen.queryByText(empty.originalContent)).not.toBeInTheDocument();
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /성장 기록/ })).not.toBeInTheDocument();
 });

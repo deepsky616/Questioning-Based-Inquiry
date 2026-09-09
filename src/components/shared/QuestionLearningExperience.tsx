@@ -8,12 +8,13 @@ import { QuestionDetectiveSlides } from "@/components/shared/QuestionDetectiveSl
 import { TeacherQuestionLearningGuide } from "@/components/teacher/TeacherQuestionLearningGuide";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { TeachingExamplesData } from "@/lib/question-teaching-examples-types";
 
 export type QuestionLearningAudience = "student" | "teacher";
 type TeacherView = "learning" | "teaching";
 type PendingFocus = "teachingTitle" | "teachingGuideTrigger" | null;
 
-export function QuestionLearningExperience({ audience }: { audience: QuestionLearningAudience }) {
+export function QuestionLearningExperience({ audience, teachingExamples }: { audience: QuestionLearningAudience; teachingExamples?: TeachingExamplesData }) {
   const t = useTranslations("questionLearning");
   const [teacherView, setTeacherView] = useState<TeacherView>("learning");
   const learningTabRef = useRef<HTMLButtonElement>(null);
@@ -137,7 +138,7 @@ export function QuestionLearningExperience({ audience }: { audience: QuestionLea
             aria-labelledby="question-learning-view-teaching"
             hidden={teacherView !== "teaching"}
           >
-            <TeacherQuestionLearningGuide titleRef={teachingTitleRef} onBack={returnToLearning} />
+            <TeacherQuestionLearningGuide titleRef={teachingTitleRef} onBack={returnToLearning} examplesData={teachingExamples} />
           </section>
         </>
       )}

@@ -1,25 +1,34 @@
 "use client";
 
-import type { RefObject } from "react";
+import { useId, useState, type RefObject } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, BarChart3, MessageCircleQuestion, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { questionTeachingGuideForLocale } from "@/lib/question-teaching-guide-data";
 import { practiceSelectionSearch } from "@/lib/practice-selection";
+import type { TeachingExamplesData } from "@/lib/question-teaching-examples-types";
+import { TeacherQuestionExamples } from "./TeacherQuestionExamples";
 
 interface TeacherQuestionLearningGuideProps {
   titleRef: RefObject<HTMLHeadingElement | null>;
   onBack: () => void;
+  examplesData?: TeachingExamplesData;
 }
 
 export function TeacherQuestionLearningGuide({
   titleRef,
   onBack,
+  examplesData,
 }: TeacherQuestionLearningGuideProps) {
   const t = useTranslations("questionLearning");
   const locale = useLocale();
   const teachingGuide = questionTeachingGuideForLocale(locale);
+  const gradeId = useId();
+  const [requestedGrade, setRequestedGrade] = useState("");
+  const grades = examplesData?.grades ?? [];
+  const grade = grades.includes(requestedGrade) ? requestedGrade : grades[0] ?? "";
+  const topics = examplesData?.topics.filter(topic => topic.grade === grade) ?? [];
 
   return (
     <div className="space-y-5">
@@ -40,16 +49,19 @@ export function TeacherQuestionLearningGuide({
         </Button>
       </div>
 
+      {examplesData?.status === "ready" && <section className="rounded-xl border bg-muted/30 p-4" aria-label={t("gradeExamplesTitle")}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 className="text-lg font-bold">{t("examplesForGrade", { grade })}</h4>
+          {grades.length > 1 && <div className="flex items-center gap-2"><label htmlFor={gradeId} className="text-sm font-medium">{t("exampleGrade")}</label><select id={gradeId} value={grade} onChange={event => setRequestedGrade(event.target.value)} className="min-h-11 rounded-md border bg-background px-3 text-base text-foreground">{grades.map(value => <option key={value} value={value}>{t("exampleGradeOption", { grade: value })}</option>)}</select></div>}
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t("exampleBandHint", { band: Number(grade) <= 2 ? "1–2" : Number(grade) <= 4 ? "3–4" : "5–6" })}</p>
+      </section>}
+      {examplesData?.status === "unassigned" && <p className="rounded-xl border bg-muted/30 p-4 text-sm leading-relaxed">{t("examplesUnassigned")} <Link href="/teacher-settings" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">{t("examplesSettings")}</Link></p>}
+      {examplesData?.status === "unavailable" && <div role="alert" className="rounded-xl border p-4 text-sm"><p>{t("examplesUnavailable")}</p><Button variant="outline" className="mt-2" onClick={() => window.location.reload()}>{t("examplesRetry")}</Button></div>}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {teachingGuide.map((item, index) => {
-          const statsHref = item.focus
-            ? `/teacher-practice?view=stats&${practiceSelectionSearch({
-                tab: "quiz",
-                quizMode:
-                  item.focus === "closed" || item.focus === "open" ? "closure" : "cognitive",
-                focus: item.focus,
-              })}`
-            : null;
+          const diagnosticFocuses = item.id === "openClosed" ? ["closed", "open"] as const : item.focus ? [item.focus] : [];
 
           return (
             <article key={item.id} className="rounded-lg border bg-background p-5">
@@ -90,14 +102,15 @@ export function TeacherQuestionLearningGuide({
                   <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.followUp}</dd>
                 </div>
               </dl>
-              {statsHref && (
-                <Button asChild variant="outline" size="sm" className="mt-5 gap-2">
-                  <Link href={statsHref}>
-                    <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                    {t("viewClassDiagnostic")}
+              <TeacherQuestionExamples guideId={item.id} topics={topics} />
+              {diagnosticFocuses.length > 0 && <div className="mt-5 flex flex-wrap gap-2">
+                {diagnosticFocuses.map(focus => <Button key={focus} asChild variant="outline" size="sm" className="h-auto min-h-11 max-w-full gap-2 whitespace-normal py-2 text-left">
+                  <Link href={`/teacher-practice?view=stats&${practiceSelectionSearch({ tab: "quiz", quizMode: focus === "closed" || focus === "open" ? "closure" : "cognitive", focus })}`}>
+                    <BarChart3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {t(item.id === "openClosed" ? focus === "closed" ? "viewClosedDiagnostic" : "viewOpenDiagnostic" : "viewClassDiagnostic")}
                   </Link>
-                </Button>
-              )}
+                </Button>)}
+              </div>}
             </article>
           );
         })}

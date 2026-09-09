@@ -77,9 +77,13 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     await expect(revisedCard.getByText("고친 질문", { exact: true })).toBeVisible();
     await expect(revisedCard.getByText("다듬은 나의 질문 1", { exact: true })).toBeVisible();
     const unchangedCard = lessonGrowth.locator("article").nth(1);
-    await expect(unchangedCard.getByText("나의 질문", { exact: true })).toBeVisible();
+    await expect(unchangedCard.getByText(role === "TEACHER" ? "처음 질문" : "나의 질문", { exact: true })).toBeVisible();
     await expect(unchangedCard.getByText("처음 작성한 질문 3", { exact: true })).toHaveCount(1);
-    await expect(unchangedCard.getByText("고친 질문", { exact: true })).toHaveCount(0);
+    await expect(unchangedCard.getByText("고친 질문", { exact: true })).toHaveCount(role === "TEACHER" ? 1 : 0);
+    if (role === "TEACHER") {
+      await expect(unchangedCard.getByText("질문을 수정하지 않음", { exact: true })).toBeVisible();
+      await expect(unchangedCard.getByText("미작성", { exact: true })).toBeVisible();
+    }
     await expect(lessonGrowth).not.toContainText("약수와 배수");
     await expect(lessonGrowth).not.toContainText("자동으로 저장된 질문만 있는 기록");
     await expect(lessonGrowth.getByRole("searchbox")).toHaveCount(0);
@@ -102,6 +106,30 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     await testInfo.attach("session-growth", { body: await lessonGrowth.screenshot({ path: testInfo.outputPath("session-growth.png") }), contentType: "image/png" });
     await testInfo.attach("complete-growth", { body: await completeCard.screenshot({ path: testInfo.outputPath("complete-growth.png") }), contentType: "image/png" });
     if (role === "TEACHER") {
+      for (const theme of ["light", "dark"]) for (const width of [375, 768, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        if (await page.locator("html").evaluate(el => el.classList.contains("dark")) !== (theme === "dark")) {
+          await page.getByRole("button", { name: theme === "dark" ? "어두운 테마로 변경" : "밝은 테마로 변경", exact: true }).click();
+        }
+        await completeCard.scrollIntoViewIfNeeded();
+        const cells = completeCard.locator(":scope > dl > div");
+        await expect(cells).toHaveCount(4);
+        const boxes = await cells.evaluateAll(elements => elements.map(element => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        }));
+        if (width >= 640) {
+          expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThan(2);
+          expect(Math.abs(boxes[2].y - boxes[3].y)).toBeLessThan(2);
+          expect(boxes[1].x).toBeGreaterThan(boxes[0].x + boxes[0].width);
+          expect(boxes[3].x).toBeGreaterThan(boxes[2].x + boxes[2].width);
+          expect(boxes[2].y).toBeGreaterThan(boxes[0].y + boxes[0].height);
+        } else {
+          for (let i = 1; i < boxes.length; i++) expect(boxes[i].y).toBeGreaterThan(boxes[i - 1].y + boxes[i - 1].height);
+        }
+        await expectNoHorizontalPageOverflow(page);
+        await completeCard.screenshot({ path: testInfo.outputPath(`teacher-growth-${theme}-${width}.png`) });
+      }
       await page.getByRole("button", { name: /학생 개별 출력/ }).click();
       const preview = page.getByRole("dialog", { name: "출력 미리보기", exact: true });
       await expect(preview.locator("article")).toHaveCount(17);
@@ -110,6 +138,8 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
       await expect(preview.getByRole("heading", { name: /약수와 배수/ })).toBeVisible();
       await expect(preview).not.toContainText("자동으로 저장된 질문만 있는 기록");
       await expect(preview).not.toContainText("stored-analysis-model");
+      await expect(preview.getByText("미작성", { exact: true })).toHaveCount(0);
+      await expect(preview.getByText("질문을 수정하지 않음", { exact: true })).toHaveCount(0);
       await page.evaluate(() => { window.print = () => { document.body.dataset.printedGrowth = String(document.querySelectorAll(".print-root article").length); }; });
       await preview.getByRole("button", { name: "인쇄하기", exact: true }).click();
       await expect(page.locator("body")).toHaveAttribute("data-printed-growth", "17");
