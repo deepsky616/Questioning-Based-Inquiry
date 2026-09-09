@@ -9,6 +9,7 @@ import { AppNav } from "@/components/shared/AppNav";
 import { StudentNotificationBell } from "@/components/student/StudentNotificationBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { clearQuestionDrafts } from "@/lib/question-draft";
+import { clearGrowthDrafts } from "@/lib/question-growth-draft";
 
 // 학습 흐름 순서: 홈(대시보드+상세 리포트 탭) → 질문학습 → 질문연습 → 질문하기 → 질문탐구 → 질문놀이
 // 활동 리포트는 대시보드의 '상세 리포트' 탭으로 통합되어 별도 메뉴에서 제외.
@@ -32,7 +33,8 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      try { clearQuestionDrafts(window.sessionStorage); } catch { /* 저장소를 사용할 수 없어도 로그아웃한다. */ }
+      try { clearQuestionDrafts(window.sessionStorage); } catch { /* 다른 저장소 정리까지 계속 진행한다. */ }
+      try { clearGrowthDrafts(window.localStorage); } catch { /* 저장소를 사용할 수 없어도 로그아웃한다. */ }
       router.push("/login");
     } else if (status === "authenticated" && user.role !== "STUDENT") {
       router.push("/teacher-dashboard");

@@ -13,9 +13,11 @@ import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { LearningSectionIcon } from "./LearningSectionIcon";
 import { cn } from "@/lib/utils";
 import { clearQuestionDrafts } from "@/lib/question-draft";
+import { clearGrowthDrafts } from "@/lib/question-growth-draft";
 
 function handleSignOut() {
-  try { clearQuestionDrafts(window.sessionStorage); } catch { /* 저장소 오류가 로그아웃을 막지 않게 한다. */ }
+  try { clearQuestionDrafts(window.sessionStorage); } catch { /* 한 저장소의 오류가 다른 저장소 정리를 막지 않게 한다. */ }
+  try { clearGrowthDrafts(window.localStorage); } catch { /* 저장소 오류가 로그아웃을 막지 않게 한다. */ }
   void signOut({ callbackUrl: "/login" });
 }
 

@@ -514,10 +514,10 @@ function TeacherPracticeContent() {
                   ))}
                 </div>
 
-                {selectedFocus && statsQuery.data.summary.types[selectedFocus].attempts === 0 && (
+                {selectedFocus && (
                   <section className="border-y border-amber-200 bg-amber-50/70 px-4 py-4 dark:border-amber-900 dark:bg-amber-950/25">
                     <p className="text-sm font-semibold text-foreground">
-                      {t("statsNoSampleTitle", { type: tCls(`${selectedFocus}.label`) })}
+                      {t(statsQuery.data.summary.types[selectedFocus].attempts === 0 ? "statsNoSampleTitle" : "statsPracticeActionsTitle", { type: tCls(`${selectedFocus}.label`) })}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button asChild size="sm">

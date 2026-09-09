@@ -25,10 +25,15 @@ export function TeacherQuestionLearningGuide({
   const locale = useLocale();
   const teachingGuide = questionTeachingGuideForLocale(locale);
   const gradeId = useId();
+  const subjectId = useId();
   const [requestedGrade, setRequestedGrade] = useState("");
+  const [subjectSelection, setSubjectSelection] = useState({ grade: "", subject: "all" });
   const grades = examplesData?.grades ?? [];
   const grade = grades.includes(requestedGrade) ? requestedGrade : grades[0] ?? "";
   const topics = examplesData?.topics.filter(topic => topic.grade === grade) ?? [];
+  const subject = subjectSelection.grade === grade ? subjectSelection.subject : "all";
+  const visibleTopics = subject === "all" ? topics : topics.filter(topic => topic.subject.ko === subject);
+  const english = locale.toLowerCase().startsWith("en");
 
   return (
     <div className="space-y-5">
@@ -53,6 +58,13 @@ export function TeacherQuestionLearningGuide({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h4 className="text-lg font-bold">{t("examplesForGrade", { grade })}</h4>
           {grades.length > 1 && <div className="flex items-center gap-2"><label htmlFor={gradeId} className="text-sm font-medium">{t("exampleGrade")}</label><select id={gradeId} value={grade} onChange={event => setRequestedGrade(event.target.value)} className="min-h-11 rounded-md border bg-background px-3 text-base text-foreground">{grades.map(value => <option key={value} value={value}>{t("exampleGradeOption", { grade: value })}</option>)}</select></div>}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label htmlFor={subjectId} className="text-sm font-medium">{t("exampleSubject")}</label>
+          <select id={subjectId} value={subject} onChange={event => setSubjectSelection({ grade, subject: event.target.value })} className="min-h-11 max-w-full rounded-md border bg-background px-3 text-base text-foreground">
+            <option value="all">{t("exampleAllSubjects")}</option>
+            {topics.map(topic => <option key={topic.id} value={topic.subject.ko}>{english ? topic.subject.en : topic.subject.ko}</option>)}
+          </select>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t("exampleBandHint", { band: Number(grade) <= 2 ? "1–2" : Number(grade) <= 4 ? "3–4" : "5–6" })}</p>
       </section>}
@@ -102,7 +114,7 @@ export function TeacherQuestionLearningGuide({
                   <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.followUp}</dd>
                 </div>
               </dl>
-              <TeacherQuestionExamples guideId={item.id} topics={topics} />
+              <TeacherQuestionExamples guideId={item.id} topics={visibleTopics} />
               {diagnosticFocuses.length > 0 && <div className="mt-5 flex flex-wrap gap-2">
                 {diagnosticFocuses.map(focus => <Button key={focus} asChild variant="outline" size="sm" className="h-auto min-h-11 max-w-full gap-2 whitespace-normal py-2 text-left">
                   <Link href={`/teacher-practice?view=stats&${practiceSelectionSearch({ tab: "quiz", quizMode: focus === "closed" || focus === "open" ? "closure" : "cognitive", focus })}`}>

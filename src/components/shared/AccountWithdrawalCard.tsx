@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { clearGrowthDrafts } from "@/lib/question-growth-draft";
 import { useTranslations } from "next-intl";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export function AccountWithdrawalCard({ role }: { role: "TEACHER" | "STUDENT" })
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || t("deleteFailed"));
       }
+      try { clearGrowthDrafts(window.localStorage); } catch { /* 탈퇴 완료 후 저장소 오류로 로그아웃을 막지 않는다. */ }
       await signOut({ callbackUrl: "/login" });
     } catch (error) {
       toast({

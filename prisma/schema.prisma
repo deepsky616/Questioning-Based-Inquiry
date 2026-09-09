@@ -45,6 +45,7 @@ model User {
   gameActivities      GameActivity[]       @relation("GameActivityActor")
   mysteryAnswerUses   MysteryAnswerUse[]    @relation("MysteryAnswerUses")
   demoAiDailyUsages   DemoAiDailyUsage[]    @relation("DemoAiDailyUsages")
+  classificationReviews QuestionClassificationReview[] @relation("ClassificationReviewer")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -211,6 +212,7 @@ model Question {
   comments Comment[] @relation("QuestionComments")
   likes    QuestionLike[] @relation("QuestionLikes")
   growth   QuestionGrowth?
+  classificationReviews QuestionClassificationReview[]
 
   isPublic  Boolean  @default(false) @map("is_public")
   flagged    Boolean @default(false) @map("flagged")
@@ -223,6 +225,23 @@ model Question {
   @@index([sessionId, source])
   @@index([sessionId, createdAt])
   @@map("questions")
+}
+
+model QuestionClassificationReview {
+  id String @id @default(cuid())
+  questionId String @map("question_id")
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reviewerId String? @map("reviewer_id")
+  reviewer User? @relation("ClassificationReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  previousClosure String @map("previous_closure")
+  previousCognitive String @map("previous_cognitive")
+  closure String
+  cognitive String
+  reason String @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([questionId, createdAt, id])
+  @@map("question_classification_reviews")
 }
 
 model QuestionGrowth {

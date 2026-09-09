@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { preparePage } from "./helpers/session-filter-page";
 import { expectNoHorizontalPageOverflow } from "./helpers/question-game-room";
+import ko from "../messages/ko.json";
+import en from "../messages/en.json";
 
 const types = {
   closed: { attempts: 3, correct: 3, accuracy: 100 }, open: { attempts: 5, correct: 2, accuracy: 40 },
@@ -18,6 +20,7 @@ for (const width of [375, 768, 1440]) {
     const { errors } = await preparePage(page, "TEACHER", baseURL!);
     await page.setViewportSize({ width, height: 1024 });
     const english = width === 768;
+    const messages = english ? en : ko;
     if (english) await page.context().addCookies([{ name: "NEXT_LOCALE", value: "en", url: baseURL! }]);
     await page.addInitScript(theme => localStorage.setItem("question-lab-theme", theme), width === 375 ? "dark" : "light");
     await page.route("**/api/teacher/practice-stats", route => route.fulfill({ json: { summary: diagnostic, students } }));
@@ -40,6 +43,10 @@ for (const width of [375, 768, 1440]) {
       expect(recommendationBox!.width).toBeGreaterThan(rowBox!.width * 0.75);
     }
     await testInfo.attach("practice-wording", { body: await page.screenshot({ path: testInfo.outputPath("practice-wording.png"), fullPage: true }), contentType: "image/png" });
+    await page.getByRole("group", { name: messages.practice.statsFocusFilter }).getByRole("button", { name: messages.classification.open.label, exact: true }).click();
+    await expect(page.getByRole("link", { name: messages.practice.statsPreviewBuiltIn, exact: true })).toHaveAttribute("href", "/teacher-practice?view=try&tab=quiz&quizMode=closure&focus=open");
+    await expect(page.getByRole("button", { name: messages.practice.statsCopyStudentLink, exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: messages.practice.statsManageBank, exact: true })).toHaveAttribute("href", "/teacher-practice?view=bank");
     expect(errors).toEqual([]);
   });
 }
