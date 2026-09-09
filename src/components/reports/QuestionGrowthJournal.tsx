@@ -10,16 +10,17 @@ import { isQuestionGrowthComplete } from "@/lib/question-growth-status";
 import { Button } from "@/components/ui/button";
 import { formatDateOnly } from "@/lib/datetime";
 import { QuestionGrowthContent } from "./QuestionGrowthContent";
+import { QuestionGrowthReportContent } from "./QuestionGrowthReportContent";
 import type { GrowthJournalResponse } from "./question-growth-types";
 import { QuestionGrowthLink } from "./QuestionGrowthLink";
 
 export function QuestionGrowthJournal({ studentId, sessionId }: { studentId?: string; sessionId: string }) {
   const { data: session } = useSession();
   const user = getSessionUser(session);
-  return <SessionGrowthRecords key={`${user.id}:${studentId ?? user.id}:${sessionId}`} userId={user.id} studentId={studentId} sessionId={sessionId} />;
+  return <SessionGrowthRecords key={`${user.id}:${studentId ?? user.id}:${sessionId}`} userId={user.id} studentId={studentId} sessionId={sessionId} teacherView={user.role === "TEACHER"} />;
 }
 
-function SessionGrowthRecords({ userId, studentId, sessionId }: { userId: string; studentId?: string; sessionId: string }) {
+function SessionGrowthRecords({ userId, studentId, sessionId, teacherView }: { userId: string; studentId?: string; sessionId: string; teacherView: boolean }) {
   const t = useTranslations("growth");
   const tc = useTranslations("common");
   const titleId = useId();
@@ -50,11 +51,13 @@ function SessionGrowthRecords({ userId, studentId, sessionId }: { userId: string
     <div className="mt-4 space-y-4">
       {records.map(record => <article key={record.questionId} className="rounded-xl border p-4">
         <p className="mb-3 text-xs text-muted-foreground">{t("updatedOn", { date: formatDateOnly(record.updatedAt) })}</p>
+        {teacherView ? <QuestionGrowthReportContent record={record} /> : <>
         <div className="rounded-lg bg-muted/30 p-3 sm:p-4"><QuestionGrowthContent record={record} questionOnly /></div>
         <dl className="mt-4 space-y-4">
           {record.changeNote?.trim() && <div><dt className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("changeNote")}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed">{record.changeNote}</dd></div>}
           {record.reflection.trim() && <div><dt className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("reflection")}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed">{record.reflection}</dd></div>}
         </dl>
+        </>}
         {query.data?.canEdit && <QuestionGrowthLink questionId={record.questionId} complete={isQuestionGrowthComplete(record)} className="no-print mt-3" />}
       </article>)}
     </div>
