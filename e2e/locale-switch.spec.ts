@@ -30,13 +30,37 @@ for (const role of ["TEACHER", "STUDENT"] as const) {
     await page.goto(role === "TEACHER" ? "/teacher-question-learning" : "/student-question-learning");
     await expect(page.getByRole("heading", {name: "Question Learning", exact:true})).toBeVisible();
     await expect(page.locator(".learning-page-header .lucide-book-open")).toBeVisible();
+    const verifiedExampleLogs = new Set<string>();
+    const checkTeachingFallback = async (english: boolean) => {
+      if (role !== "TEACHER") return;
+      const tabName = english ? "Teaching guide" : "수업 활용";
+      await page.getByRole("tab", { name: tabName, exact: true }).click();
+      const panel = page.getByRole("tabpanel", { name: tabName, exact: true });
+      await expect(panel.locator("article")).toHaveCount(6);
+      if (await panel.getByRole("alert").count()) {
+        // CI는 실제 DB 없이 실행한다. 조회 실패가 화면에 안전하게 처리된 경우에만
+        // 개발 서버가 브라우저에 전달한 해당 서버 로그를 예상된 것으로 기록한다.
+        await expect(panel.getByRole("alert")).toContainText(english
+          ? "Examples for your teaching grades could not be loaded. The general teaching guide below is still available."
+          : "담당 학년의 예시를 불러오지 못했습니다. 아래의 일반 수업 안내는 계속 이용할 수 있습니다.");
+        await expect(panel.getByRole("button", { name: english ? "Reload examples" : "예시 다시 불러오기", exact: true })).toBeVisible();
+        for (const error of errors) {
+          if (error.includes("담당 학년의 질문 수업 예시를 불러오지 못했습니다.")) verifiedExampleLogs.add(error);
+        }
+      } else {
+        // DB를 사용할 수 있어도 시험 교사는 실제 담당 학급을 가지지 않는다.
+        await expect(panel.getByRole("link", { name: english ? "Set up teaching classes" : "담당 학급 설정", exact: true })).toBeVisible();
+      }
+    };
+    await checkTeachingFallback(true);
     await page.locator("#lang-select").selectOption("ko");
     await expect(page.locator("html")).toHaveAttribute("lang", "ko");
     await expect(page.getByRole("heading", {name: "질문학습", exact:true})).toBeVisible();
+    await checkTeachingFallback(false);
     // 사파리는 문서 새로고침으로 취소된 같은 출처 요청도 접근 검사 오류로 기록한다.
     // 실제 요청 실패가 모두 취소인 경우에만 이 로그를 제외한다. 화면 오류는 그대로 검사한다.
     const cancelledOnly = failures.length > 0 && failures.every(failure => failure.error === "cancelled");
-    const unexpected = errors.filter(error => !(browserName === "webkit" && cancelledOnly &&
+    const unexpected = errors.filter(error => !verifiedExampleLogs.has(error) && !(browserName === "webkit" && cancelledOnly &&
       error.includes(new URL(baseURL!).host) && error.endsWith("due to access control checks.")));
     expect(unexpected).toEqual([]);
     const keys = requests.flat().map(item => `${item.type}:${item.id}`);
