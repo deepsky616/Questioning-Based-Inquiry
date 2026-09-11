@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { buildPracticeDiagnostic } from "@/lib/practice-diagnostics";
+import { buildPracticeDiagnostic, collectCustomPracticeItemIds, type PracticeCustomItemType } from "@/lib/practice-diagnostics";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -22,7 +22,17 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     take: 101,
   });
-  const diagnostic = buildPracticeDiagnostic(attempts.slice(0, 100));
+  const recentAttempts = attempts.slice(0, 100);
+  const customItemIds = collectCustomPracticeItemIds(recentAttempts);
+  const customItemTypes = new Map<string, PracticeCustomItemType>(
+    customItemIds.length > 0
+      ? (await prisma.practiceCustomItem.findMany({
+          where: { id: { in: customItemIds } },
+          select: { id: true, closure: true, cognitive: true, target: true },
+        })).map((item) => [item.id, item])
+      : [],
+  );
+  const diagnostic = buildPracticeDiagnostic(recentAttempts, customItemTypes);
 
   return NextResponse.json({
     ...diagnostic,

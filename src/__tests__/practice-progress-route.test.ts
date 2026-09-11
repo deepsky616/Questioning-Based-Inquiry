@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
-  prisma: { practiceAttempt: { findMany: vi.fn() } },
+  prisma: { practiceAttempt: { findMany: vi.fn() }, practiceCustomItem: { findMany: vi.fn() } },
 }));
 
 import { GET } from "@/app/api/practice/progress/route";
@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mFindMany = prisma.practiceAttempt.findMany as unknown as ReturnType<typeof vi.fn>;
+const mCustom = vi.mocked(prisma.practiceCustomItem.findMany);
 
 function makeAttempts(count: number) {
   return Array.from({ length: count }, (_, index) => ({
@@ -30,6 +31,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
   mAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
   mFindMany.mockResolvedValue([]);
+  mCustom.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -84,5 +86,34 @@ describe("학생 개인 연습 진단 API", () => {
 
     expect(data.capped).toBe(false);
     expect(data.activityAttempts).toBe(100);
+  });
+
+  it("교사 문항의 분류와 바꾸기 목표를 학생 진단에도 반영한다", async () => {
+    mFindMany.mockResolvedValue([
+      { ...makeAttempts(1)[0], itemId: 'custom-quiz', quizType: 'closure', correct: true },
+      { ...makeAttempts(1)[0], id: 'second', itemId: 'custom-transform', mode: 'transform', quizType: null, correct: false },
+    ]);
+    mCustom.mockResolvedValue([
+      { id: 'custom-quiz', closure: 'closed', cognitive: 'factual', target: null },
+      { id: 'custom-transform', closure: null, cognitive: null, target: 'conceptual' },
+    ] as never);
+    const result = await (await GET()).json();
+    expect(result.types.closed).toEqual({ attempts: 1, correct: 1, accuracy: 100 });
+    expect(result.types.conceptual).toEqual({ attempts: 1, correct: 0, accuracy: 0 });
+    expect(result.unknownTypeAttempts).toBe(0);
+    expect(mCustom).toHaveBeenCalledWith({ where: { id: { in: ['custom-quiz', 'custom-transform'] } }, select: { id: true, closure: true, cognitive: true, target: true } });
+  });
+
+  it("진단에서 제외한 101번째 문항과 내장 문항은 추가 조회하지 않는다", async () => {
+    mFindMany.mockResolvedValue(makeAttempts(101).map((row, index) => ({ ...row, itemId: index === 100 ? 'excluded-custom' : 'q01' })));
+    await GET();
+    expect(mCustom).not.toHaveBeenCalled();
+  });
+
+  it("삭제된 교사 문항은 추정한 유형을 넣지 않고 집계한다", async () => {
+    mFindMany.mockResolvedValue(makeAttempts(1));
+    const result = await (await GET()).json();
+    expect(result.activityAttempts).toBe(1);
+    expect(result.unknownTypeAttempts).toBe(1);
   });
 });
