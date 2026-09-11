@@ -279,7 +279,7 @@ function TeacherPracticeContent() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="min-w-[32rem]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t("bankColQuestion")}</TableHead>
@@ -302,9 +302,10 @@ function TeacherPracticeContent() {
                           <Button
                             variant="outline"
                             size="sm"
+                            className="shrink-0"
                             onClick={() => copyToEdit({ mode: "quiz", content: q.content, closure: q.closure, cognitive: q.cognitive, explanation: q.explanation })}
                           >
-                            {t("addToMineBtn")}
+                            <span className="whitespace-nowrap">{t("addToMineBtn")}</span>
                           </Button>
                         </TableCell>
                       </TableRow>
