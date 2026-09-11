@@ -125,6 +125,11 @@ describe("POST /api/sessions/[id]/analysis", () => {
     expect(body.engagementInsights).toContain("좋아요");
     expect(body.analysisModel).toBe("gemini-2.5-flash");
     expect(typeof body.analyzedAt).toBe("string");
+    const output = mockGenerateContent.mock.calls[0][0].config;
+    expect(output.thinkingConfig).toEqual({ thinkingBudget: 512 });
+    expect(output.responseMimeType).toBe('application/json');
+    expect(output.responseJsonSchema.required).toEqual(expect.arrayContaining(['summary', 'commentInsights', 'bestQuestion', 'nextQuestions', 'themes']));
+    expect(prompt).toContain('각 설명은 80자 이내');
   });
 
   it("다른 교사의 세션이면 403을 반환한다", async () => {
