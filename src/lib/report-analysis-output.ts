@@ -7,7 +7,7 @@ const classFields = ['summary', 'insights', 'commentInsights', 'engagementInsigh
 export function reportAnalysisOutput(scope: 'student' | 'class') {
   const fields = scope === 'student' ? studentFields : classFields;
   return {
-    thinkingBudget: 256,
+    thinkingBudget: 512,
     responseMimeType: 'application/json',
     responseJsonSchema: {
       type: 'object',

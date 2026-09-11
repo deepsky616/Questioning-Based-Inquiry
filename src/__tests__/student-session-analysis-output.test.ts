@@ -29,7 +29,7 @@ describe('시연 학생의 완성된 분석 응답', () => {
     const result = await runStudentSessionAnalysis({ studentId: 'demo-output-student', sessionId: 'lesson', req: new Request('http://localhost', { headers: { cookie: 'NEXT_LOCALE=ko' } }) });
     const request = generateContent.mock.calls[0][0];
     expect(request.config.maxOutputTokens).toBe(2048);
-    expect(request.config.thinkingConfig).toEqual({ thinkingBudget: 256 });
+    expect(request.config.thinkingConfig).toEqual({ thinkingBudget: 512 });
     expect(request.config.responseMimeType).toBe('application/json');
     expect(request.config.responseJsonSchema.required).toEqual(Object.keys(data));
     expect(request.contents).toContain('각 설명은 80자 이내');
