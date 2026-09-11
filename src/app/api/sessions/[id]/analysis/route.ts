@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
 import { generateJsonWithMetadata, AiKeyMissingError, AiBusyError, AiQuotaError } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
+import { conciseReportPrompt, reportAnalysisOutput } from "@/lib/report-analysis-output";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -116,7 +117,7 @@ export async function POST(req: Request, { params }: Params) {
       balanceInsights?: string;
       bestQuestion?: string;
       nextQuestions?: string;
-    }>({ userId: teacherId, prompt, req, localize: true, quality: true });
+    }>({ userId: teacherId, prompt: conciseReportPrompt(prompt), req, localize: true, quality: true, ...reportAnalysisOutput('class') });
     const parsed = generated.data;
     const analyzedAt = new Date().toISOString();
 

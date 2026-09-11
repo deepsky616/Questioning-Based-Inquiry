@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
 import { generateJsonWithMetadata } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
+import { conciseReportPrompt, reportAnalysisOutput } from "@/lib/report-analysis-output";
 
 export interface StudentSessionAnalysisResult {
   summary: string;
@@ -79,7 +80,7 @@ export async function runStudentSessionAnalysis(opts: {
   });
   const generated = await generateJsonWithMetadata<{
     summary?: string; insights?: string; relevanceInsights?: string; growthInsights?: string; rewriteExample?: string;
-  }>({ userId: studentId, prompt, req, localize: true, quality: true });
+  }>({ userId: studentId, prompt: conciseReportPrompt(prompt), req, localize: true, quality: true, ...reportAnalysisOutput('student') });
   const parsed = generated.data;
   const analyzedAt = new Date().toISOString();
 
