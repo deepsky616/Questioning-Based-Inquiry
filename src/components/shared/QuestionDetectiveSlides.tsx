@@ -143,8 +143,9 @@ export function QuestionDetectiveSlides({ completionActions, allowPresentation =
           className={cn("w-full transition-opacity duration-200 motion-reduce:transition-none motion-reduce:duration-0", presentationOpen ? "question-learning-presentation-panel grid min-h-full [&>div]:h-auto [&>div]:min-h-full [&>div]:min-w-0" : "min-h-[34rem] lg:h-full lg:min-h-0")}
         >
           <QuestionLearningSlideContent
-            completionActions={presentationOpen && completionActions ? <div className="contents" onClickCapture={(event) => {
+            completionActions={presentationOpen && completionActions ? <div className="contents" onClick={(event) => {
               if (!(event.target as HTMLElement).closest("button,a")) return;
+              // 대상 버튼의 이동 동작이 먼저 실행된 뒤 수업 화면을 닫는다.
               leavingForCompletion.current = true;
               setPresentationOpen(false);
             }}>{completionActions}</div> : completionActions}
