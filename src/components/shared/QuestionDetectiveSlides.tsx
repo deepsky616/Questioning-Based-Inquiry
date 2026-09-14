@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { PresentationHeader } from "@/components/shared/PresentationHeader";
 import { QuestionLearningSlideContent } from "@/components/shared/QuestionLearningSlideContent";
 import { cn } from "@/lib/utils";
 import { getQuestionDetectiveContent } from "@/lib/question-detective-content";
@@ -265,22 +266,15 @@ export function QuestionDetectiveSlides({ completionActions, allowPresentation =
       {!presentationOpen && stage}
       {presentationOpen && (
         <DialogContent
-          className="learning-shell inset-0 left-0 top-0 flex h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-none p-3 sm:rounded-none sm:p-5"
+          showCloseButton={false}
+          className="learning-shell inset-0 left-0 top-0 flex h-[100dvh] w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-none p-3 sm:rounded-none sm:p-5"
           onOpenAutoFocus={(event) => { event.preventDefault(); stageRef.current?.focus(); }}
           onCloseAutoFocus={(event) => {
             if (leavingForCompletion.current) event.preventDefault();
             leavingForCompletion.current = false;
           }}
         >
-          <DialogHeader className="shrink-0 pr-8 text-left">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle className="text-lg sm:text-xl">{t("presentationTitle")}</DialogTitle>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" className="min-h-11">{t("presentationClose")}</Button>
-              </DialogClose>
-            </div>
-            <DialogDescription>{t("presentationDescription")}</DialogDescription>
-          </DialogHeader>
+          <PresentationHeader title={t("presentationTitle")} description={t("presentationDescription")} closeLabel={t("presentationClose")} />
           {stage}
         </DialogContent>
       )}
