@@ -439,6 +439,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
         backDisabled={requestBlocked}
       />
 
+      <p className="text-sm leading-relaxed text-muted-foreground">{t("mysteryAnswerGuide")}</p>
+
       {error && (
         <div className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-950 dark:border-red-700 dark:bg-red-950 dark:text-red-100">
           <p role="alert">{error}</p>

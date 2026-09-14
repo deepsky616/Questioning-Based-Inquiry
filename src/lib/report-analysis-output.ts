@@ -1,5 +1,19 @@
+import { z } from 'zod';
+import { AiInvalidResponseError } from './ai-errors';
+
 const studentFields = ['summary', 'insights', 'relevanceInsights', 'growthInsights', 'rewriteExample'];
 const classFields = ['summary', 'insights', 'commentInsights', 'engagementInsights', 'relevanceInsights', 'balanceInsights', 'bestQuestion', 'nextQuestions'];
+
+/** 모델이 반환한 형식도 저장 전에 검사해 기존 리포트를 잘못된 값으로 덮어쓰지 않는다. */
+export function validateReportAnalysis(data: unknown, scope: 'student' | 'class'): void {
+  const fields = scope === 'student' ? studentFields : classFields;
+  const schema = z.object({
+    ...Object.fromEntries(fields.map(field => [field, z.string().optional()])),
+    summary: z.string().trim().min(1),
+    ...(scope === 'class' ? { themes: z.array(z.string()).optional() } : {}),
+  });
+  if (!schema.safeParse(data).success) throw new AiInvalidResponseError();
+}
 
 // 시연의 2,048 토큰 제한 안에서도 생각 과정 뒤에 완성된 분석 객체를 받을 수 있게 한다.
 // 참고: https://ai.google.dev/gemini-api/docs/generate-content/thinking

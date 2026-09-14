@@ -192,13 +192,19 @@ function parseHistoryItem(
       knowledgeVersion,
     );
     if (value.answerSource === "RULE") {
-      if (
-      !isAttribute(value.attribute, knowledgeVersion) ||
-      typeof value.negated !== "boolean" ||
-      analysis.answer === "unknown" ||
-      analysis.answer !== value.answer ||
-      analysis.attribute !== value.attribute ||
-      analysis.negated !== value.negated
+      if (isMysteryAnswerEvidence(value.answerEvidence, knowledgeVersion) &&
+        "kind" in value.answerEvidence && value.answerEvidence.kind === "known") {
+        if (value.attribute !== undefined || value.negated !== undefined ||
+          value.answerEvidence.locale !== locale ||
+          resolveMysteryAnswerEvidence(item, value.answerEvidence, value.text, knowledgeVersion) !== value.answer) damaged();
+      } else if (
+        value.answerEvidence !== undefined ||
+        !isAttribute(value.attribute, knowledgeVersion) ||
+        typeof value.negated !== "boolean" ||
+        analysis.answer === "unknown" ||
+        analysis.answer !== value.answer ||
+        analysis.attribute !== value.attribute ||
+        analysis.negated !== value.negated
       ) damaged();
     } else if (
       value.attribute !== undefined ||
@@ -225,7 +231,7 @@ function parseHistoryItem(
       textHash: value.textHash,
       answer: value.answer,
       answerSource: value.answerSource,
-      ...(value.answerSource === "RULE"
+      ...(value.answerSource === "RULE" && value.answerEvidence === undefined
         ? {
             attribute: value.attribute as MysteryFact,
             negated: value.negated as boolean,

@@ -108,7 +108,8 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
       userId: "player-1",
       modelOverride: "gemini-2.5-flash-lite",
       temperature: 0,
-      maxOutputTokens: 64,
+      maxOutputTokens: 128,
+      retryTruncatedOutput: true,
       thinkingBudget: 0,
       timeoutMs: 12_000,
       responseMimeType: "application/json",
@@ -200,6 +201,9 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
       });
 
     expect(mocks.generateJson).toHaveBeenCalledTimes(2);
+    for (const [options] of mocks.generateJson.mock.calls) {
+      expect(options).toMatchObject({ maxOutputTokens: 2048, retryTruncatedOutput: true });
+    }
     const firstPrompt = JSON.parse(mocks.generateJson.mock.calls[0][0].prompt);
     expect(firstPrompt).toMatchObject({
       locale: "ko",

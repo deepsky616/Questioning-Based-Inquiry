@@ -8,6 +8,7 @@ import { AiBusyError, AiKeyMissingError, AiQuotaError, generateJsonWithMetadata 
 import { getRequestLocale } from "@/lib/locale";
 import { issuePracticeGenerationProof } from "@/lib/practice-generation-proof";
 import { JsonExtractionError } from "@/lib/json-extract";
+import { AiInvalidResponseError } from "@/lib/ai-errors";
 
 // 질문 연습용 AI 실시간 출제 (바꾸기·만들기 모드 전용).
 // 분류 퀴즈는 정답·해설의 신뢰성이 필요해 검수된 문항 은행만 사용하고,
@@ -171,7 +172,7 @@ export async function POST(req: Request) {
       generationProofExpiresAt: proof.expiresAt.toISOString(),
     });
   } catch (error) {
-    if (error instanceof z.ZodError || error instanceof JsonExtractionError) {
+    if (error instanceof z.ZodError || error instanceof JsonExtractionError || error instanceof AiInvalidResponseError) {
       // 요청 형식 오류와 AI 응답 형식 오류 모두 — 클라이언트는 은행 문항으로 폴백
       return NextResponse.json({ error: "AI 출제 형식이 올바르지 않습니다" }, { status: 502 });
     }

@@ -3,7 +3,7 @@ import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
-import { AiBusyError, AiKeyMissingError, AiQuotaError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
+import { AiBusyError, AiInvalidResponseError, AiKeyMissingError, AiOutputTruncatedError, AiQuotaError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
 import type { GeminiModel } from "@/lib/api-config";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -13,6 +13,8 @@ export { AiBusyError, AiKeyMissingError, AiQuotaError, DemoAiQuotaError, isDaily
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface GenerateOptions {
+  /** 기본 true. 출력 길이 제한에 걸리면 한 번만 예산을 늘려 처음부터 다시 생성한다. */
+  retryTruncatedOutput?: boolean;
   /** AI 설정(키·모델)을 결정할 사용자 id (교사 본인 또는 학생의 담당 교사 키) */
   userId: string;
   prompt: string;
@@ -60,6 +62,7 @@ export const CONSISTENT_TEMPERATURE = 0.1;
  * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
 async function callGeminiWithMetadata({
+  retryTruncatedOutput = true,
   userId,
   prompt,
   req,
@@ -100,22 +103,30 @@ async function callGeminiWithMetadata({
   );
   const primary = quality ? chooseQualityModel(configuredModel) : chooseModelAuto(configuredModel, fullPrompt.length);
   const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
-  const effectiveMaxOutputTokens = cfg.isDemo
+  let effectiveMaxOutputTokens = cfg.isDemo
     ? Math.min(maxOutputTokens ?? 2_048, 2_048)
     : maxOutputTokens;
+  let retriedTruncatedOutput = false;
 
   const genAI = new GoogleGenAI({ apiKey: cfg.apiKey });
   const runWith = async (modelName: GeminiModel, attempts: number): Promise<GenerateTextResult> => {
     for (let attempt = 1; ; attempt++) {
       try {
+        // Pro는 사고를 끌 수 없다. 대체 모델에는 원래 요청한 값을 사용한다.
+        // https://ai.google.dev/gemini-api/docs/generate-content/thinking
+        const requiresThinking = modelName === "gemini-2.5-pro" && thinkingBudget === 0;
+        const modelThinkingBudget = requiresThinking ? 128 : thinkingBudget;
+        const modelOutputLimit = requiresThinking && effectiveMaxOutputTokens !== undefined
+          ? Math.max(effectiveMaxOutputTokens, 256)
+          : effectiveMaxOutputTokens;
         const config = {
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(temp != null ? { temperature: temp } : {}),
-          ...(effectiveMaxOutputTokens !== undefined
-            ? { maxOutputTokens: effectiveMaxOutputTokens }
+          ...(modelOutputLimit !== undefined
+            ? { maxOutputTokens: modelOutputLimit }
             : {}),
-          ...(thinkingBudget !== undefined
-            ? { thinkingConfig: { thinkingBudget } }
+          ...(modelThinkingBudget !== undefined
+            ? { thinkingConfig: { thinkingBudget: modelThinkingBudget } }
             : {}),
           ...(timeoutMs !== undefined
             ? { httpOptions: { timeout: timeoutMs } }
@@ -128,7 +139,19 @@ async function callGeminiWithMetadata({
           contents: fullPrompt,
           ...(Object.keys(config).length > 0 ? { config } : {}),
         });
-        return { text: (response.text ?? "").trim(), model: modelName };
+        if (response.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+          const expandedLimit = modelOutputLimit === undefined ? undefined
+            : Math.min(modelOutputLimit * 2, cfg.isDemo ? 2_048 : 8_192);
+          if (retryTruncatedOutput && !retriedTruncatedOutput && modelOutputLimit !== undefined && expandedLimit !== undefined && expandedLimit > modelOutputLimit) {
+            retriedTruncatedOutput = true;
+            effectiveMaxOutputTokens = expandedLimit;
+            continue;
+          }
+          throw new AiOutputTruncatedError();
+        }
+        const text = (response.text ?? "").trim();
+        if (!text) throw new AiInvalidResponseError();
+        return { text, model: modelName };
       } catch (err) {
         // 일일 한도 초과는 같은 모델 재시도가 무의미(잔여 한도만 소모) — 즉시 중단
         if (isDailyQuotaError(err)) throw new AiQuotaError();

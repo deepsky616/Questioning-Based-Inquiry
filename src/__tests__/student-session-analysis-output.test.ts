@@ -23,6 +23,11 @@ beforeEach(() => {
 });
 
 describe('시연 학생의 완성된 분석 응답', () => {
+  it.each([{}, { summary: '' }, { summary: { text: '잘못된 요약' } }, { summary: '요약', insights: ['잘못된 문장'] }])('파싱 가능한 JSON이라도 잘못된 항목은 기존 리포트를 덮어쓰지 않는다: %j', async (data) => {
+    generateContent.mockResolvedValue({ text: JSON.stringify(data) });
+    await expect(runStudentSessionAnalysis({ studentId: 'demo-invalid-report', sessionId: 'lesson', req: new Request('http://localhost') })).rejects.toThrow('AI_INVALID_RESPONSE');
+    expect(prisma.sessionAnalysis.upsert).not.toHaveBeenCalled();
+  });
   it('시연 토큰 상한을 유지하면서 JSON 형식과 생각 예산을 전달하고 실제 모델을 저장한다', async () => {
     const data = { summary: '평균과 개별 자료를 연결했어요.', insights: '평균이 같은 다른 예를 찾아봐요.', relevanceInsights: '자료 비교라는 주제에 맞는 질문이에요.', growthInsights: '다음에는 조건도 비교해 봐요.', rewriteExample: '평균이 같아도 자료가 다를 수 있는 까닭은 무엇일까요?' };
     generateContent.mockResolvedValue({ text: JSON.stringify(data) });

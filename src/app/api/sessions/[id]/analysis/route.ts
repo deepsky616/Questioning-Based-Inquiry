@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
 import { generateJsonWithMetadata, AiKeyMissingError, AiBusyError, AiQuotaError } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
-import { conciseReportPrompt, reportAnalysisOutput } from "@/lib/report-analysis-output";
+import { conciseReportPrompt, reportAnalysisOutput, validateReportAnalysis } from "@/lib/report-analysis-output";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -119,6 +119,7 @@ export async function POST(req: Request, { params }: Params) {
       nextQuestions?: string;
     }>({ userId: teacherId, prompt: conciseReportPrompt(prompt), req, localize: true, quality: true, ...reportAnalysisOutput('class') });
     const parsed = generated.data;
+    validateReportAnalysis(parsed, 'class');
     const analyzedAt = new Date().toISOString();
 
     // 저장·반환 결과(테마·집계까지 포함해 질문조회/대시보드 어디서든 그대로 복원 가능)

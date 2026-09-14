@@ -1,3 +1,5 @@
+import { resolveKnownMysteryQuestion } from "./mystery-known-questions";
+
 export const MYSTERY_ATTRIBUTES = [
   "living",
   "animal",
@@ -121,7 +123,16 @@ export interface MysteryDynamicAnswerEvidence {
 
 export type MysteryAnswerEvidence =
   | MysteryCatalogAnswerEvidence
-  | MysteryDynamicAnswerEvidence;
+  | MysteryDynamicAnswerEvidence
+  | MysteryKnownAnswerEvidence;
+
+export interface MysteryKnownAnswerEvidence {
+  kind: "known";
+  question: string;
+  locale: MysteryLocale;
+  answer: "yes" | "no";
+  version: 1;
+}
 
 export interface MysteryItem {
   id: string;
@@ -1779,6 +1790,13 @@ export function isMysteryAnswerEvidence(
     return false;
   }
   const evidence = value as Record<string, unknown>;
+  if (evidence.kind === "known") {
+    return knowledgeVersion >= 4 && Object.keys(evidence).length === 5 &&
+      typeof evidence.question === "string" && evidence.question.length > 0 &&
+      [...evidence.question].length <= 200 && evidence.question === evidence.question.trim() &&
+      (evidence.locale === "ko" || evidence.locale === "en") &&
+      (evidence.answer === "yes" || evidence.answer === "no") && evidence.version === 1;
+  }
   if (evidence.kind === "dynamic") {
     return knowledgeVersion >= 4 &&
       Object.keys(evidence).length === 6 &&
@@ -1806,6 +1824,11 @@ export function resolveMysteryAnswerEvidence(
   question: string,
   knowledgeVersion: MysteryKnowledgeVersion,
 ): MysteryAnswer {
+  if ("kind" in evidence && evidence.kind === "known") {
+    return evidence.question === question &&
+      resolveKnownMysteryQuestion(item, question, evidence.locale) === evidence.answer
+      ? evidence.answer : "unknown";
+  }
   if ("kind" in evidence) {
     return evidence.question === question ? evidence.answer : "unknown";
   }
@@ -1815,6 +1838,23 @@ export function resolveMysteryAnswerEvidence(
     evidence.negated,
     knowledgeVersion,
   );
+}
+
+export function resolveKnownMysteryAnswer(
+  request: Omit<MysteryAnswerResolution, "answer" | "source">,
+): MysteryAnswerResolution | null {
+  if (request.knowledgeVersion < 4) return null;
+  const item = getMysteryItem(request.itemId);
+  if (!item) return null;
+  const answer = resolveKnownMysteryQuestion(item, request.question, request.locale);
+  if (answer === null) return null;
+  return {
+    ...request,
+    answer,
+    ...(answer === "unknown" ? {} : {
+      evidence: { kind: "known", question: request.question, locale: request.locale, answer, version: 1 },
+    }),
+  };
 }
 
 export function resolveMysteryAttribute(

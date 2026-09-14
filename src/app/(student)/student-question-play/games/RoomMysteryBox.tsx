@@ -447,9 +447,10 @@ export default function RoomMysteryBox({
               {t("askOneSimpleQuestionEnding")}
             </p>
           </div>
+          <p id="room-mystery-question-guide" className="text-sm leading-relaxed text-muted-foreground">{t("mysteryAnswerGuide")}</p>
           <textarea
             id="room-mystery-question"
-            aria-describedby={questionError ? "room-mystery-question-error" : undefined}
+            aria-describedby={`room-mystery-question-guide${questionError ? " room-mystery-question-error" : ""}`}
             aria-invalid={questionError ? true : undefined}
             value={questionInput}
             maxLength={QUESTION_GAME_LIMITS.question}

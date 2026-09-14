@@ -6,6 +6,7 @@ import {
   mysteryAttributesForVersion,
   mysteryItemsForVersion,
   resolveMysteryAttribute,
+  resolveKnownMysteryAnswer,
   type MysteryFact,
   type MysteryAnswerResolution,
 } from "@/lib/mystery-box-rules";
@@ -177,7 +178,8 @@ async function generateDynamicMysteryAnswer(
       }),
       systemInstruction: DYNAMIC_PRIMARY_INSTRUCTION,
       temperature: 0,
-      maxOutputTokens: 768,
+      maxOutputTokens: 2_048,
+      retryTruncatedOutput: true,
       thinkingBudget: 0,
       timeoutMs: 12_000,
       responseMimeType: "application/json",
@@ -207,7 +209,8 @@ async function generateDynamicMysteryAnswer(
       }),
       systemInstruction: DYNAMIC_VERIFIER_INSTRUCTION,
       temperature: 0,
-      maxOutputTokens: 768,
+      maxOutputTokens: 2_048,
+      retryTruncatedOutput: true,
       thinkingBudget: 0,
       timeoutMs: 12_000,
       responseMimeType: "application/json",
@@ -269,6 +272,8 @@ export async function generateMysteryAiAnswer(
   if (!item) {
     throw new Error("미스터리 물건을 찾을 수 없습니다");
   }
+  const known = resolveKnownMysteryAnswer(request);
+  if (known) return known;
   if (request.knowledgeVersion >= 4) {
     return generateDynamicMysteryAnswer(userId, request);
   }
@@ -299,7 +304,8 @@ export async function generateMysteryAiAnswer(
     }),
     systemInstruction: LEGACY_MYSTERY_AI_SYSTEM_INSTRUCTION,
     temperature: 0,
-    maxOutputTokens: 64,
+    maxOutputTokens: 128,
+    retryTruncatedOutput: true,
     thinkingBudget: 0,
     timeoutMs: 12_000,
     responseMimeType: "application/json",

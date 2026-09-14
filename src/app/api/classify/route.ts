@@ -12,11 +12,12 @@ import {
   generateJsonWithMetadata,
 } from "@/lib/ai";
 import { JsonExtractionError } from "@/lib/json-extract";
+import { AiInvalidResponseError } from "@/lib/ai-errors";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
   model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다").optional(),
-  content: z.string().min(1).max(200),
+  content: z.string().trim().min(1).max(200),
 });
 
 const CLASSIFICATION_RESPONSE_JSON_SCHEMA = {
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
     if (error instanceof AiBusyError) {
       return fallbackResponse(fallbackContent, "busy");
     }
-    if (error instanceof JsonExtractionError) {
+    if (error instanceof JsonExtractionError || error instanceof AiInvalidResponseError) {
       return fallbackResponse(fallbackContent, "invalid-response");
     }
 

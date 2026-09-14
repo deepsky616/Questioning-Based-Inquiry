@@ -53,8 +53,27 @@ describe("translateTexts (Gemini 모킹)", () => {
     await expect(translateTexts(["가", "나"], "en", "u1", "key", "m")).rejects.toThrow();
   });
 
+  it("긴 글 묶음은 응답 상한 안에서 나누어 번역하고 순서를 유지한다", async () => {
+    const texts = ["첫째 글 ".repeat(220), "둘째 글 ".repeat(220), "셋째 글 ".repeat(220)];
+    mocks.generateJsonArray.mockResolvedValueOnce(["First text"]).mockResolvedValueOnce(["Second text"]).mockResolvedValueOnce(["Third text"]);
+    expect(await translateTexts(texts, "en", "u1", "key", "m")).toEqual(["First text", "Second text", "Third text"]);
+    expect(mocks.generateJsonArray).toHaveBeenCalledTimes(3);
+    expect(mocks.generateJsonArray.mock.calls[1][0]).toMatchObject({ prompt: expect.stringContaining(texts[1]), thinkingBudget: 0, maxOutputTokens: 2048 });
+  });
+
+  it("나중 번역이 잘못되면 먼저 번역한 일부 결과로 원문을 덮어쓰지 않는다", async () => {
+    mocks.generateJsonArray.mockResolvedValueOnce(["First text"]).mockResolvedValueOnce([null]);
+    await expect(translateTexts(["가".repeat(1500), "나".repeat(1500)], "en", "u1", "key", "m")).rejects.toThrow("AI_INVALID_RESPONSE");
+    expect(mocks.generateJsonArray).toHaveBeenCalledTimes(2);
+  });
+
   it("배열이 아니면 예외", async () => {
     mocks.generateJsonArray.mockResolvedValue({ text: "그냥 텍스트" });
     await expect(translateTexts(["가"], "en", "u1", "key", "m")).rejects.toThrow();
+  });
+
+  it.each([null, 12, {}, [], '', '   '])("번역 문장이 아닌 값은 원문을 덮어쓸 수 없다: %j", async (invalid) => {
+    mocks.generateJsonArray.mockResolvedValue([invalid]);
+    await expect(translateTexts(["색깔이 주황색인가요?"], "en", "u1", "key", "m")).rejects.toThrow('AI_INVALID_RESPONSE');
   });
 });

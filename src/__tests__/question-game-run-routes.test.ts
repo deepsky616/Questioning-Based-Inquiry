@@ -4017,6 +4017,41 @@ describe("카드 짝 찾기 서버 실행 경로", () => {
 });
 
 describe("미스터리 박스 서버 실행 경로", () => {
+  it.each([
+    ["puppy", "세글자인가요?", "yes"],
+    ["carrot", "주황색인가요?", "yes"],
+    ["banana", "색깔이 주황색인가요?", "no"],
+    ["puppy", "발톱이 있나요?", "yes"],
+  ])("%s의 %s는 인공지능 없이 저장하고 다시 열어도 복원된다", async (itemId, question, answer) => {
+    await createMystery();
+    runs.get("run-1")!.state = { ...storedMysteryState(), privateItemId: itemId };
+    mocks.generateJson.mockRejectedValue(new Error("인공지능 연결 끊김"));
+    const response = await submitMysteryQuestion(0, 1, question);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.run).toMatchObject({ version: 2, questionCount: 1, mysteryHistory: [{ answer, text: question }] });
+    expect(storedMysteryState().history[0]).toMatchObject({ answerSource: "RULE", answerEvidence: { kind: "known", question, answer } });
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(JSON.stringify(body)).not.toContain("answerEvidence");
+    const replay = await submitMysteryQuestion(0, 1, question);
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, run: { questionCount: 1 } });
+    const restored = await readResult();
+    expect(restored.status).toBe(200);
+    await expect(restored.json()).resolves.toMatchObject({ run: { questionCount: 1, mysteryHistory: [{ answer }] } });
+    expect(activities).toHaveLength(1);
+  });
+
+  it("색깔을 확정할 수 없으면 인공지능 호출·질문 횟수 소비 없이 다른 특징을 안내한다", async () => {
+    await createMystery();
+    runs.get("run-1")!.state = { ...storedMysteryState(), privateItemId: "puppy" };
+    const response = await submitMysteryQuestion(0, 1, "주황색인가요?");
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ mysteryAnswerUncertain: true });
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(storedMysteryState()).toMatchObject({ questionCount: 0, history: [] });
+    expect(activities).toHaveLength(0);
+  });
   it("고정 비밀 물건을 서버에서 고르고 정산 전에는 어떤 공개 자료에도 내보내지 않는다", async () => {
     const extraTopic = await postCreate({
       gameId: "mystery-box",
@@ -4271,7 +4306,8 @@ describe("미스터리 박스 서버 실행 경로", () => {
         expect(body).toMatchObject({ mysteryRewriteRequired: true });
       } else {
         expect(body).toEqual({
-          error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요",
+          error: "인공지능 답변을 처리하지 못했어요. 다시 시도해 주세요.",
+      code: "AI_UNAVAILABLE",
         });
         expect(JSON.stringify(body)).not.toContain("private-provider-failure");
         expect(JSON.stringify(body)).not.toContain(storedMysteryState().privateItemId);

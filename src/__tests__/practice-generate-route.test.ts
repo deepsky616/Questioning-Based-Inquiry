@@ -19,6 +19,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateJsonWithMetadata, AiBusyError } from "@/lib/ai";
 import { JsonExtractionError } from "@/lib/json-extract";
+import { AiInvalidResponseError, AiOutputTruncatedError } from "@/lib/ai-errors";
 import { __resetRateLimit } from "@/lib/rate-limit";
 import {
   hashPracticeGenerationContent,
@@ -46,6 +47,12 @@ beforeEach(() => {
 });
 
 describe("연습 AI 실시간 출제", () => {
+  it.each([new AiInvalidResponseError(), new AiOutputTruncatedError()])("비었거나 잘린 응답에는 출제 증명을 만들지 않는다: %s", async (error) => {
+    mGen.mockRejectedValueOnce(error);
+    const response = await POST(req({ mode: "transform" }));
+    expect(response.status).toBe(502);
+    expect((await response.json()).generationProof).toBeUndefined();
+  });
   it("바꾸기: 원본 질문·힌트·예시에 서버가 정한 목표 유형을 붙여 돌려준다", async () => {
     mGen.mockResolvedValue({
       data: { source: "우리나라의 수도는 어디인가요?", hint: "까닭을 물어보세요.", example: "수도가 서울이 되면서 어떤 변화가 생겼을까요?" },

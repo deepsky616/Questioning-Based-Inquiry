@@ -480,12 +480,12 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
     expect(input).toHaveValue("어떤 느낌인가요?");
     expect(screen.getByText(
-      "한 가지 특징만 묻고 예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요.",
+      "이 특징은 확실하게 답하기 어려워요. 이름의 글자 수나 다른 특징을 물어보세요. 질문 횟수는 줄어들지 않았어요.",
     )).toBeVisible();
 
     fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
     expect(screen.queryByText(
-      "한 가지 특징만 묻고 예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요.",
+      "이 특징은 확실하게 답하기 어려워요. 이름의 글자 수나 다른 특징을 물어보세요. 질문 횟수는 줄어들지 않았어요.",
     )).not.toBeInTheDocument();
   });
 

@@ -44,6 +44,7 @@ import {
 } from "@/lib/practice-generation-proof";
 import { lockPointUserTransactions } from "@/lib/point-user-transaction-lock";
 import { JsonExtractionError } from "@/lib/json-extract";
+import { AiInvalidResponseError } from "@/lib/ai-errors";
 
 // 질문 연습 판정 + 포인트 지급.
 // 채점을 서버가 다시 수행하므로 클라이언트 값은 신뢰하지 않는다.
@@ -378,6 +379,7 @@ async function classifyContent(
     responseMimeType: "application/json",
     responseJsonSchema: PRACTICE_ASSESSMENT_JSON_SCHEMA,
     maxOutputTokens: 768,
+    thinkingBudget: 0,
   });
   const parsed = practiceAssessmentSchema.safeParse(generated.data);
   if (!parsed.success) throw new PracticeAssessmentResponseError();
@@ -610,7 +612,8 @@ export async function POST(req: Request) {
     }
     if (
       error instanceof PracticeAssessmentResponseError ||
-      error instanceof JsonExtractionError
+      error instanceof JsonExtractionError ||
+      error instanceof AiInvalidResponseError
     ) {
       return NextResponse.json(
         { error: "판정 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." },
