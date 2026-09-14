@@ -130,7 +130,7 @@ export function QuestionLearningExperience({ audience, teachingExamples }: { aud
             aria-labelledby="question-learning-view-learning"
             hidden={teacherView !== "learning"}
           >
-            <QuestionDetectiveSlides completionActions={completionActions} />
+            <QuestionDetectiveSlides allowPresentation completionActions={completionActions} />
           </section>
           <section
             id="question-learning-panel-teaching"
