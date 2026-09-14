@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Monitor, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { PresentationHeader } from "@/components/shared/PresentationHeader";
 
 export interface ClassroomQuestion {
   id: string;
@@ -34,15 +35,12 @@ export function ClassroomPresentation({ items, title, label }: { items: Classroo
       setIndex(0); setRevealed(false); setShowNames(false); setOpen(true);
     }}><Monitor className="h-4 w-4 shrink-0" aria-hidden="true" />{label || t("open")}</Button>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="inset-0 left-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-4 sm:rounded-none sm:p-6" onKeyDown={event => {
+      <DialogContent showCloseButton={false} className="inset-0 left-0 top-0 flex h-[100dvh] w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-3 sm:rounded-none sm:p-5" onKeyDown={event => {
         if ((event.target as HTMLElement).closest("button,input,select,textarea,a") || event.altKey || event.ctrlKey || event.metaKey) return;
         if (event.key === "ArrowRight") { event.preventDefault(); move(index + 1); }
         if (event.key === "ArrowLeft") { event.preventDefault(); move(index - 1); }
       }}>
-        <DialogHeader className="shrink-0 pr-7 text-left">
-          <DialogTitle className="text-lg sm:text-xl">{t("title")} · {title}</DialogTitle>
-          <DialogDescription>{t("description")}</DialogDescription>
-        </DialogHeader>
+        <PresentationHeader title={<>{t("title")} · {title}</>} description={t("description")} closeLabel={t("close")} />
         <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b pb-3">
           <p className="font-semibold tabular-nums" aria-live="polite">{t("count", { current: index + 1, total: snapshot.length })}</p>
           {snapshot.some(item => item.authorName) && <Button variant="outline" aria-pressed={showNames} onClick={() => setShowNames(value => !value)}>{t("names")}</Button>}
@@ -61,7 +59,6 @@ export function ClassroomPresentation({ items, title, label }: { items: Classroo
             <Button variant="outline" disabled={index >= snapshot.length - 1} onClick={() => move(index + 1)} aria-label={t("next")}><span className="hidden sm:inline">{t("next")}</span><ChevronRight aria-hidden="true" /></Button>
           </div>
           <Button className="h-auto min-h-11 whitespace-normal py-2" aria-expanded={revealed} onClick={() => setRevealed(value => !value)}>{t(revealed ? "hide" : "reveal")}</Button>
-          <Button variant="outline" onClick={() => setOpen(false)}>{t("close")}</Button>
         </div>
       </DialogContent>
     </Dialog>
