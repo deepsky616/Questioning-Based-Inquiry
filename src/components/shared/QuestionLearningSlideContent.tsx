@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import questionLearningCover from "../../../public/question-learning-cover.png";
 import { type ReactNode, type RefObject } from "react";
 import {
   ArrowRight,
@@ -119,17 +120,8 @@ function QuestionTypeLabel({ type, label }: { type: Cognitive; label: string }) 
 
 function CoverSlide({ content }: { content: QuestionDetectiveContent }) {
   return (
-    <div className="relative isolate flex min-h-[34rem] w-full items-center overflow-hidden rounded-lg lg:h-full lg:min-h-0">
-      <Image
-        src="/question-learning-cover.png"
-        alt=""
-        fill
-        priority
-        sizes="(min-width: 1280px) 960px, (min-width: 768px) 80vw, 100vw"
-        className="-z-20 object-cover object-[32%_center] sm:object-center"
-      />
-      <div className="absolute inset-0 -z-10 bg-white/45 sm:bg-white/25 dark:bg-slate-950/45" />
-      <div className="w-[82%] max-w-md px-5 py-10 sm:w-[52%] sm:px-10">
+    <div className="relative isolate flex min-h-[34rem] w-full flex-col justify-center overflow-hidden rounded-lg bg-gradient-to-br from-sky-50 via-white to-violet-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 sm:flex-row sm:items-center sm:justify-start lg:h-full lg:min-h-0">
+      <div className="relative z-10 w-full px-5 pb-4 pt-8 sm:w-1/2 sm:max-w-md sm:px-10 sm:py-10">
         <span className="mb-5 block h-1.5 w-16 rounded-full bg-violet-500" aria-hidden="true" />
         <p className="text-base font-bold text-sky-950 dark:text-sky-100">{content.cover.eyebrow}</p>
         <h3 className="mt-2 whitespace-nowrap text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-4xl">{content.cover.title}</h3>
@@ -140,6 +132,16 @@ function CoverSlide({ content }: { content: QuestionDetectiveContent }) {
           <Search className="h-5 w-5 text-sky-700 dark:text-sky-200" aria-hidden="true" />
           <span>{content.cover.badge}</span>
         </div>
+      </div>
+      <div className="relative h-64 w-full shrink-0 sm:absolute sm:inset-0 sm:h-full" aria-hidden="true">
+        <Image
+          src={questionLearningCover}
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1280px) 1216px, (min-width: 768px) calc(100vw - 64px), calc(100vw - 48px)"
+          className="object-cover object-right sm:object-contain sm:object-center"
+        />
       </div>
     </div>
   );
