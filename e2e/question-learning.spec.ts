@@ -231,6 +231,17 @@ async function verifyTeacherViewTabs(page: Page) {
   await expect(learningPanel).toBeVisible();
   await expect(teachingPanel).toBeHidden();
 
+  await page.getByRole("button", { name: "수업 화면으로 보기", exact: true }).click();
+  const presentation = page.getByRole("dialog", { name: "질문학습 수업 화면", exact: true });
+  await expect(presentation).toBeVisible();
+  await presentation.getByTestId("question-learning-stage").press("End");
+  await presentation.getByRole("button", { name: "수업 활용 보기", exact: true }).click();
+  await expect(presentation).toHaveCount(0);
+  await expect(teachingTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "수업 활용", exact: true })).toBeFocused();
+  await learningTab.click();
+  await expect(page.locator("#question-learning-tab-13")).toHaveAttribute("aria-selected", "true");
+
   await teachingTab.click();
   await expect(teachingTab).toHaveAttribute("aria-selected", "true");
   await expect(teachingTab).toHaveAttribute("aria-controls", "question-learning-panel-teaching");
@@ -273,6 +284,7 @@ test.describe("질문학습 화면", () => {
     try {
       for (const viewport of viewports) {
         await verifyLearningRoute(page, "/student-question-learning", viewport);
+        await expect(page.getByRole("button", { name: "수업 화면으로 보기", exact: true })).toHaveCount(0);
       }
       await page.goto("/student-practice");
       await expect(page.getByRole("button", { name: "질문 유형 알아보기", exact: true })).toBeVisible();
