@@ -272,6 +272,14 @@ export function findMysteryAiAnswerRequest(
   return { ...result.resolution };
 }
 
+function combinesMysteryClaims(question: string, locale: "ko" | "en"): boolean {
+  const text = question.normalize("NFKC").trim().toLowerCase().replace(/\s+/gu, " ").replace(/[?？]+$/u, "").trim();
+  if (/[?？]/u.test(text)) return true;
+  if (locale === "en") return /\b(?:and|or)\b/u.test(text);
+  // ‘가지고 있나요’, ‘먹고 있나요’ 같은 한 가지 동작의 표현은 유지한다.
+  return /(?:그리고|또는|혹은)|(?:이고|이며|지만|면서)(?!\s*(?:있|없|싶))\s*|고\s+(?!(?:있|없|싶))/u.test(text);
+}
+
 export async function generateMysteryAiAnswer(
   userId: string,
   request: MysteryAiAnswerRequest,
@@ -282,6 +290,9 @@ export async function generateMysteryAiAnswer(
   const item = getMysteryItem(request.itemId);
   if (!item) {
     throw new Error("미스터리 물건을 찾을 수 없습니다");
+  }
+  if (request.knowledgeVersion >= 4 && combinesMysteryClaims(request.question, request.locale)) {
+    return { ...request, answer: "unknown" };
   }
   const known = resolveKnownMysteryAnswer(request);
   if (known) return known;

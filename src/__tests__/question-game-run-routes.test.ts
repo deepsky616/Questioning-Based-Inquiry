@@ -4085,6 +4085,17 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(mocks.generateJson).not.toHaveBeenCalled();
   });
 
+  it("복합 질문은 인공지능 호출·질문 횟수·점수 소비 없이 나누어 쓰도록 안내한다", async () => {
+    await createMystery();
+    const response = await submitMysteryQuestion(0, 1, "빨갛고 먹을 수 있나요?");
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ mysteryAnswerUncertain: true });
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(storedMysteryState()).toMatchObject({ questionCount: 0, history: [] });
+    expect(activities).toHaveLength(0);
+    expect(pointLogs).toHaveLength(0);
+  });
+
   it("색깔을 확정할 수 없으면 인공지능 호출·질문 횟수 소비 없이 다른 특징을 안내한다", async () => {
     await createMystery();
     runs.get("run-1")!.state = { ...storedMysteryState(), privateItemId: "puppy" };

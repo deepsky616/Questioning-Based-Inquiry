@@ -135,6 +135,25 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     expect(options.systemInstruction).not.toContain(request.question);
   });
 
+  it.each([
+    ["빨갛고 먹을 수 있나요?", "ko"],
+    ["다리가 있고 날개가 있나요?", "ko"],
+    ["동물이고 작은가요?", "ko"],
+    ["작은가요? 먹을 수 있나요?", "ko"],
+    ["Is it red and edible?", "en"],
+    ["Is it small or round?", "en"],
+  ] as const)("명시적으로 여러 특징을 묶은 질문 %s은 인공지능이 억지로 승인하지 못한다", async (question, locale) => {
+    const result = await generateMysteryAiAnswer("player-1", { ...dynamicRequest, question, locale });
+    expect(result.answer).toBe("unknown");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
+  it.each(["날개를 가지고 있나요?", "스스로 움직이고 있나요?", "물에서 살고   있나요?"])("한 가지 동작의 표현 %s은 복합 질문으로 막지 않는다", async (question) => {
+    mocks.generateJson.mockResolvedValue({ decision: "unsupported", predicate: "", confidence: "low", answers: [] });
+    await generateMysteryAiAnswer("player-1", { ...dynamicRequest, question });
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+  });
+
   it("뜻이 불분명하거나 확신이 낮으면 답을 추측하지 않는다", async () => {
     mocks.generateJson.mockResolvedValue({
       attribute: "unknown",
