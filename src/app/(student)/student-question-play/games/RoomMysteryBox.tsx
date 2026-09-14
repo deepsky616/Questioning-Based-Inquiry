@@ -471,7 +471,7 @@ export default function RoomMysteryBox({
             <p
               id="room-mystery-question-error"
               role="alert"
-              className="text-sm font-semibold text-destructive"
+              className="text-sm font-semibold text-red-700 dark:text-red-300"
             >
               {questionError}
             </p>

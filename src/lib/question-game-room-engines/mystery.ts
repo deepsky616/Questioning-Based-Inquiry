@@ -3,6 +3,8 @@ import {
   CURRENT_MYSTERY_KNOWLEDGE_VERSION,
   MYSTERY_ITEMS,
   classifyMysteryQuestion,
+  analyzeNewMysteryQuestion,
+  analyzeRecordedMysteryQuestion,
   getMysteryItem,
   isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
@@ -302,12 +304,13 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
         if (!evidence) return state.knowledgeVersion < 3;
         return isMysteryAnswerEvidence(evidence, state.knowledgeVersion) &&
           (state.knowledgeVersion < 4 || "kind" in evidence) &&
-          classifyMysteryQuestion(
+          analyzeRecordedMysteryQuestion(
             historyItem.question,
             item,
             historyItem.locale,
             state.knowledgeVersion,
-          ) === "unknown" &&
+            evidence,
+          ).answer === "unknown" &&
           resolveMysteryAnswerEvidence(
             item,
             evidence,
@@ -966,7 +969,7 @@ function askMysteryQuestion(
   }
 
   const ruleAnswer = state.knowledgeVersion >= 4 && resolveKnownMysteryQuestion(item, question, locale) !== null
-    ? "unknown" : classifyMysteryQuestion(question, item, locale, state.knowledgeVersion);
+    ? "unknown" : analyzeNewMysteryQuestion(question, item, locale, state.knowledgeVersion).answer;
   const resolution = context.mysteryAnswerResolution;
   let answer = ruleAnswer;
   let answerSource: "ai" | "fallback" | undefined;

@@ -75,6 +75,8 @@ import {
 import {
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
+  analyzeNewMysteryQuestion,
+  analyzeRecordedMysteryQuestion,
   getMysteryItem,
   isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
@@ -2073,11 +2075,12 @@ function mysteryQuestionEntry(
       text: question, textHash, answer, answerSource: "RULE", answerEvidence,
     };
   }
-  const analysis = analyzeMysteryQuestion(
+  const analysis = analyzeRecordedMysteryQuestion(
     question,
     item,
     state.mysteryLocale,
     state.knowledgeVersion,
+    answerEvidence,
   );
   if (source === "RULE") {
     if (analysis.answer === "unknown" || analysis.answer !== answer) {
@@ -2273,12 +2276,15 @@ async function verifyMysteryActivitySequence(
         payload.answer !== history.answer ||
         payload.answerSource !== history.answerSource
       ) mysteryEvidenceError();
-      const analysis = analyzeMysteryQuestion(
-        history.text,
-        item,
-        history.locale,
-        state.knowledgeVersion,
-      );
+      const analysis = history.answerEvidence && "kind" in history.answerEvidence && history.answerEvidence.kind === "known"
+        ? { answer: resolveMysteryAnswerEvidence(item, history.answerEvidence, history.text, state.knowledgeVersion) }
+        : analyzeRecordedMysteryQuestion(
+          history.text,
+          item,
+          history.locale,
+          state.knowledgeVersion,
+          history.answerEvidence,
+        );
       if (
         (history.answerSource === "RULE" &&
           (analysis.answer === "unknown" || analysis.answer !== history.answer)) ||
@@ -2528,7 +2534,7 @@ async function submitMysteryQuestion(
     }
     const analysis = state.knowledgeVersion >= 4 && resolveKnownMysteryQuestion(item, question, locale) !== null
       ? { answer: "unknown" as const }
-      : analyzeMysteryQuestion(question, item, locale, state.knowledgeVersion);
+      : analyzeNewMysteryQuestion(question, item, locale, state.knowledgeVersion);
     let answer: "yes" | "no";
     let source: "RULE" | "AI";
     let answerEvidence: MysteryAnswerEvidence | undefined;

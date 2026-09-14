@@ -745,7 +745,7 @@ for (const theme of ["light", "dark"] as const) {
       sessions.push(friend);
       await host.page.getByRole("button", { name: /게임 시작/ }).click();
       await host.page.getByRole("button", { name: "미스터리 상자 시작" }).click();
-      for (const question of ["세글자인가요?", "주황색인가요?", "색깔이 주황색인가요?", "발톱이 있나요?"]) {
+      for (const question of ["세글자인가요?", "주황색인가요?", "색깔이 주황색인가요?", "발톱이 있나요?", "날개가 있나요?", "다리가 네 개인가요?"]) {
         const state = readMysteryState(transport.getRoom(host.code)!.gameState)!;
         const actor = sessionForPlayer(sessions, state.turnOrder[state.currentTurnIdx]);
         const item = getMysteryItem(state.private!.itemId)!;
@@ -756,7 +756,7 @@ for (const theme of ["light", "dark"] as const) {
         await input.fill(question);
         await actor.page.getByRole("button", { name: "질문 보내기", exact: true }).click();
         if (expected === "unknown") {
-          await expect(actor.page.getByText("이 특징은 확실하게 답하기 어려워요. 이름의 글자 수나 다른 특징을 물어보세요. 질문 횟수는 줄어들지 않았어요.", { exact: true })).toBeVisible();
+          await expect(actor.page.getByText("이 특징은 확실하게 답하기 어려워요. 생김새·사는 곳·쓰임새 등 다른 특징을 한 가지씩 물어보세요. 질문 횟수는 줄어들지 않았어요.", { exact: true })).toBeVisible();
           await expect(input).toHaveValue(question);
           expect(readMysteryState(transport.getRoom(host.code)!.gameState)!.history).toHaveLength(before);
         } else {
@@ -766,6 +766,53 @@ for (const theme of ["light", "dark"] as const) {
       }
       await expectNoHorizontalPageOverflow(host.page);
       await host.page.screenshot({ path: testInfo.outputPath(`미스터리-개선-${theme}.png`), fullPage: true });
+    } finally {
+      await closeQuestionGameSessions(sessions);
+      await transport.dispose();
+    }
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`미스터리 자유 질문의 답변과 재접속·보류 안내가 유지된다 ${theme}`, async ({ browser }, testInfo) => {
+    const fixture = createQuestionGameBrowserFixture(`mystery-flexible-${theme}`);
+    const transport = createSharedQuestionGameTransport({
+      resolveMysteryQuestion: (request) => request.question === "귀여운가요?"
+        ? { ...request, answer: "unknown" }
+        : { ...request, answer: "no", evidence: { kind: "dynamic", question: request.question, predicate: request.question.slice(0, -1), answer: "no", confidence: "high", verification: "independent-item-agreement" } },
+    });
+    const sessions: QuestionGameBrowserSession[] = [];
+    try {
+      const options = { theme, viewport: { width: 390, height: 900 } };
+      const host = await openStudentRoom(browser, fixture.students[0], "mystery-box", transport, options);
+      const friend = await joinStudentRoom(browser, fixture.students[1], "mystery-box", host.code, transport, options);
+      sessions.push(host, friend);
+      await host.page.getByRole("button", { name: /게임 시작/ }).click();
+      await host.page.getByRole("button", { name: "미스터리 상자 시작" }).click();
+      for (const question of ["건전지가 필요한가요?", "바다에 사나요?", "풀을 먹나요?", "귀여운가요?"]) {
+        const before = readMysteryState(transport.getRoom(host.code)!.gameState)!;
+        const actor = sessionForPlayer(sessions, before.turnOrder[before.currentTurnIdx]);
+        const input = actor.page.getByLabel("예 또는 아니오 질문", { exact: true });
+        await expect(input).toBeEnabled();
+        await input.fill(question);
+        await actor.page.getByRole("button", { name: "질문 보내기", exact: true }).click();
+        if (question === "귀여운가요?") {
+          await expect(actor.page.getByText(/이 특징은 확실하게 답하기 어려워요/)).toBeVisible();
+          await expect(input).toHaveValue(question);
+          const after = readMysteryState(transport.getRoom(host.code)!.gameState)!;
+          expect(after.history).toHaveLength(before.history.length);
+          expect(after.currentTurnIdx).toBe(before.currentTurnIdx);
+          expect(after.scores).toEqual(before.scores);
+          await expectNoHorizontalPageOverflow(actor.page);
+          await actor.page.screenshot({ path: testInfo.outputPath(`미스터리-자유질문-${theme}.png`), fullPage: true });
+        } else {
+          await expect.poll(() => readMysteryState(transport.getRoom(host.code)!.gameState)!.history.length).toBe(before.history.length + 1);
+          for (const session of sessions) await expect(session.page.getByText(question, { exact: true })).toBeVisible();
+        }
+      }
+      await host.page.reload();
+      await expect(host.page.getByText("건전지가 필요한가요?", { exact: true })).toBeVisible();
+      await expect(host.page.getByText("풀을 먹나요?", { exact: true })).toBeVisible();
     } finally {
       await closeQuestionGameSessions(sessions);
       await transport.dispose();

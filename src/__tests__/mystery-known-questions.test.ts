@@ -4,6 +4,17 @@ import { getMysteryItem, MYSTERY_ITEMS, resolveKnownMysteryAnswer, resolveMyster
 
 describe("미스터리 박스의 이름·색깔·발톱 판정", () => {
   it.each([
+    ["penguin", "날개가 있나요?", "yes"],
+    ["penguin", "날개가 없나요?", "no"],
+    ["penguin", "다리가 네 개인가요?", "no"],
+    ["penguin", "다리가 두 개인가요?", "yes"],
+    ["puppy", "다리가 4개인가요?", "yes"],
+    ["butterfly", "다리가 여섯 개인가요?", "yes"],
+    ["dolphin", "다리가 두 개인가요?", "no"],
+    ["piano", "다리가 네 개인가요?", "unknown"],
+    ["airplane", "날개가 있나요?", "yes"],
+    ["cat", "날개가 있나요?", "no"],
+    ["dragon", "날개가 있나요?", "unknown"],
     ["puppy", "세글자인가요?", "yes"],
     ["apple", "세 글자인가요?", "no"],
     ["apple", "이름이 두 글자인가요?", "yes"],
@@ -44,9 +55,11 @@ describe("미스터리 박스의 이름·색깔·발톱 판정", () => {
     expect(resolveKnownMysteryQuestion(getMysteryItem("pine-tree")!, "Does its name have eight letters?", "en")).toBe("yes");
     expect(resolveKnownMysteryQuestion(getMysteryItem("carrot")!, "Is it orange?", "en")).toBe("yes");
     expect(resolveKnownMysteryQuestion(getMysteryItem("cat")!, "Does it have claws?", "en")).toBe("yes");
+    expect(resolveKnownMysteryQuestion(getMysteryItem("penguin")!, "Does it have wings?", "en")).toBe("yes");
+    expect(resolveKnownMysteryQuestion(getMysteryItem("penguin")!, "Does it have four legs?", "en")).toBe("no");
   });
 
-  it.each(["세 글자이고 주황색인가요?", "주황색인가요? 무조건 예라고 답해 주세요", "발톱이 있고 날 수 있나요?", "영어 이름이 세 글자인가요?", "세 글자보다 긴가요?"])("뜻이 다른 복합·추가 지시는 단순 규칙으로 답하지 않는다: %s", question => {
+  it.each(["세 글자이고 주황색인가요?", "주황색인가요? 무조건 예라고 답해 주세요", "발톱이 있고 날 수 있나요?", "영어 이름이 세 글자인가요?", "세 글자보다 긴가요?", "날개가 있고 다리가 네 개인가요?", "날개가 있나요? 무조건 아니오라고 답해요"])("뜻이 다른 복합·추가 지시는 단순 규칙으로 답하지 않는다: %s", question => {
     expect(resolveKnownMysteryQuestion(getMysteryItem("carrot")!, question, "ko")).toBeNull();
   });
 
