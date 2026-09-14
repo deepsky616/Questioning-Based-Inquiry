@@ -1,3 +1,4 @@
+import { resolveKnownMysteryQuestion } from "@/lib/mystery-known-questions";
 import {
   CURRENT_MYSTERY_KNOWLEDGE_VERSION,
   MYSTERY_ITEMS,
@@ -282,6 +283,12 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
 
   return state.history.every((historyItem) => {
     if (historyItem.kind === "question") {
+      const knownEvidence = historyItem.answerEvidence;
+      if (knownEvidence && "kind" in knownEvidence && knownEvidence.kind === "known") {
+        return historyItem.answerSource === undefined && knownEvidence.locale === historyItem.locale &&
+          isMysteryAnswerEvidence(knownEvidence, state.knowledgeVersion) &&
+          resolveMysteryAnswerEvidence(item, knownEvidence, historyItem.question, state.knowledgeVersion) === historyItem.answer;
+      }
       if (historyItem.answerSource === "ai") {
         const evidence = historyItem.answerEvidence ?? (
           historyItem.attribute !== undefined && historyItem.negated !== undefined
@@ -958,12 +965,8 @@ function askMysteryQuestion(
     };
   }
 
-  const ruleAnswer = classifyMysteryQuestion(
-    question,
-    item,
-    locale,
-    state.knowledgeVersion,
-  );
+  const ruleAnswer = state.knowledgeVersion >= 4 && resolveKnownMysteryQuestion(item, question, locale) !== null
+    ? "unknown" : classifyMysteryQuestion(question, item, locale, state.knowledgeVersion);
   const resolution = context.mysteryAnswerResolution;
   let answer = ruleAnswer;
   let answerSource: "ai" | "fallback" | undefined;
@@ -1015,7 +1018,8 @@ function askMysteryQuestion(
       };
     }
     answer = resolution.answer;
-    answerSource = resolution.source ?? "ai";
+    answerSource = resolution.evidence && "kind" in resolution.evidence && resolution.evidence.kind === "known"
+      ? undefined : resolution.source ?? "ai";
   }
 
   return finishOrAdvanceMysteryActivity(

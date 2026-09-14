@@ -19,6 +19,8 @@ import {
   type QuestionGameBrowserSession,
 } from "./helpers/question-game-room";
 import { getMysteryItem } from "../src/lib/mystery-box-rules";
+import { resolveKnownMysteryQuestion } from "../src/lib/mystery-known-questions";
+import { readMysteryState } from "../src/lib/question-game-room-engines/mystery";
 import { KABA_SENTENCES } from "../src/lib/question-game-i18n";
 
 test.describe.configure({ mode: "serial" });
@@ -729,6 +731,47 @@ test("미스터리 질문을 공유하고 같은 학생이 재접속해 이어 �
     await transport.dispose();
   }
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`미스터리의 같은 색깔 표현과 글자 수·발톱 질문이 유지된다 ${theme}`, async ({ browser }, testInfo) => {
+    const fixture = createQuestionGameBrowserFixture(`mystery-known-${theme}`);
+    const transport = createSharedQuestionGameTransport();
+    const sessions: QuestionGameBrowserSession[] = [];
+    try {
+      const options = { theme, viewport: theme === "light" ? { width: 375, height: 900 } : { width: 1440, height: 1000 } };
+      const host = await openStudentRoom(browser, fixture.students[0], "mystery-box", transport, options);
+      sessions.push(host);
+      const friend = await joinStudentRoom(browser, fixture.students[1], "mystery-box", host.code, transport, options);
+      sessions.push(friend);
+      await host.page.getByRole("button", { name: /게임 시작/ }).click();
+      await host.page.getByRole("button", { name: "미스터리 상자 시작" }).click();
+      for (const question of ["세글자인가요?", "주황색인가요?", "색깔이 주황색인가요?", "발톱이 있나요?"]) {
+        const state = readMysteryState(transport.getRoom(host.code)!.gameState)!;
+        const actor = sessionForPlayer(sessions, state.turnOrder[state.currentTurnIdx]);
+        const item = getMysteryItem(state.private!.itemId)!;
+        const expected = resolveKnownMysteryQuestion(item, question, "ko");
+        const before = state.history.length;
+        const input = actor.page.getByLabel("예 또는 아니오 질문", { exact: true });
+        await expect(input).toBeEnabled();
+        await input.fill(question);
+        await actor.page.getByRole("button", { name: "질문 보내기", exact: true }).click();
+        if (expected === "unknown") {
+          await expect(actor.page.getByText("이 특징은 확실하게 답하기 어려워요. 이름의 글자 수나 다른 특징을 물어보세요. 질문 횟수는 줄어들지 않았어요.", { exact: true })).toBeVisible();
+          await expect(input).toHaveValue(question);
+          expect(readMysteryState(transport.getRoom(host.code)!.gameState)!.history).toHaveLength(before);
+        } else {
+          await expect.poll(() => readMysteryState(transport.getRoom(host.code)!.gameState)!.history.length).toBe(before + 1);
+          for (const session of sessions) await expect(session.page.getByText(question, { exact: true })).toBeVisible();
+        }
+      }
+      await expectNoHorizontalPageOverflow(host.page);
+      await host.page.screenshot({ path: testInfo.outputPath(`미스터리-개선-${theme}.png`), fullPage: true });
+    } finally {
+      await closeQuestionGameSessions(sessions);
+      await transport.dispose();
+    }
+  });
+}
 
 test("짝 찾기 실패 뒤 다음 참가자가 카드를 뒤집는다", async ({ browser }) => {
   const fixture = createQuestionGameBrowserFixture("memory-turn");

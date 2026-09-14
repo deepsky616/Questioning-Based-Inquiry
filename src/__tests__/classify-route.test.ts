@@ -20,6 +20,7 @@ vi.mock("@/lib/ai", () => ({
 import { POST } from "@/app/api/classify/route";
 import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { AiInvalidResponseError, AiOutputTruncatedError } from "@/lib/ai-errors";
 import {
   AiBusyError,
   AiKeyMissingError,
@@ -44,6 +45,26 @@ beforeEach(() => {
 });
 
 describe("POST /api/classify", () => {
+  it.each(['', '  \n  ', '가'.repeat(201)])("비어 있거나 글자 수 제한을 넘는 입력은 분석을 호출하지 않는다", async (content) => {
+    const response = await POST(request(content));
+    expect(response.status).toBe(400);
+    expect(mGenerate).not.toHaveBeenCalled();
+  });
+
+  it.each(['왜?', '주황색인가요?', '색깔이 주황색인가요?', '평균이 3.5이면\n모든 값도 3.5인가요? 📊', '물의 온도가 "0도"보다 낮으면 <얼음>이 될까요?', '가'.repeat(199) + '?'])("다양한 입력도 응답 실패 시 기본 분석과 입력 흐름을 유지한다: %s", async (content) => {
+    mGenerate.mockRejectedValue(new AiInvalidResponseError());
+    const response = await POST(request(content));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ analysisSource: 'fallback', fallbackReason: 'invalid-response' });
+    expect(mGenerate).toHaveBeenCalledWith(expect.objectContaining({ prompt: expect.stringContaining(content) }));
+  });
+
+  it("잘린 응답은 서버 오류 대신 기본 분석으로 전환한다", async () => {
+    mGenerate.mockRejectedValue(new AiOutputTruncatedError());
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ analysisSource: 'fallback', fallbackReason: 'invalid-response' });
+  });
   it("구조화된 인공지능 분석과 개선 질문 예시 및 실제 모델을 반환한다", async () => {
     mGenerate.mockResolvedValue({
       data: {

@@ -28,6 +28,8 @@ import type {
   RoomPlayer,
 } from "../../src/lib/question-games-data";
 import { createBrowserQuestionGameRunStore } from "./question-game-run";
+import { resolveKnownMysteryAnswer } from "../../src/lib/mystery-box-rules";
+import { mysteryUncertainAnswer } from "../../src/lib/question-game-ai-errors";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const SESSION_COOKIE = "authjs.session-token";
@@ -628,7 +630,7 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
       }
     }
 
-    const result = applyQuestionGameRoomCommand({
+    let result = applyQuestionGameRoomCommand({
       room,
       userId: identity.id,
       userName: identity.name,
@@ -638,6 +640,16 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
       random,
       randomUUID,
     });
+    if (result.kind === "resolution-required" && "itemId" in result.resolution) {
+      const resolution = resolveKnownMysteryAnswer(result.resolution);
+      if (resolution?.answer === "unknown") {
+        return { status: 422, body: mysteryUncertainAnswer(resolution.locale) };
+      }
+      if (resolution) {
+        result = applyQuestionGameRoomCommand({ room, userId: identity.id, userName: identity.name,
+          action, body, now: now(), random, randomUUID, mysteryAnswerResolution: resolution });
+      }
+    }
     if (result.kind === "changed") {
       return resultResponse(save(result.room), result.result);
     }

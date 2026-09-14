@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { generateText, AiKeyMissingError } from "@/lib/ai";
+import { questionGameAiError } from "@/lib/question-game-ai-errors";
 import { extractJsonObject } from "@/lib/json-extract";
 
 function systemPromptFor(locale: string, action?: string) {
@@ -134,6 +135,8 @@ export async function POST(req: NextRequest) {
       req,
       localize: true,
       systemInstruction: systemPromptFor(locale, action),
+      maxOutputTokens: 2_048,
+      retryTruncatedOutput: true,
     });
   } catch (err: unknown) {
     if (err instanceof AiKeyMissingError) {
@@ -142,8 +145,7 @@ export async function POST(req: NextRequest) {
         { status: 503 }
       );
     }
-    const msg = err instanceof Error ? err.message : "AI 응답 오류";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(questionGameAiError(err, locale), { status: 503 });
   }
 
   // JSON 응답 파싱이 필요한 액션들 — 실패 시 텍스트만 반환

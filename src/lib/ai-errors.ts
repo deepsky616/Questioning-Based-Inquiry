@@ -16,6 +16,23 @@ export class AiBusyError extends Error {
   }
 }
 
+/** 비어 있거나 사용할 수 없는 응답을 정상 결과로 저장하지 않는다. */
+export class AiInvalidResponseError extends Error {
+  constructor() {
+    super("AI_INVALID_RESPONSE");
+    this.name = "AiInvalidResponseError";
+  }
+}
+
+/** 끝까지 생성되지 않은 응답은 질문·판정 결과로 저장하지 않는다. */
+export class AiOutputTruncatedError extends AiInvalidResponseError {
+  constructor() {
+    super();
+    this.message = "AI_OUTPUT_TRUNCATED";
+    this.name = "AiOutputTruncatedError";
+  }
+}
+
 /** 무료 티어 일일 한도 초과(재시도 무의미 — 내일 리셋 또는 유료 키 필요). */
 export class AiQuotaError extends Error {
   constructor() {

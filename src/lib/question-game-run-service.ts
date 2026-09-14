@@ -1,3 +1,4 @@
+import { resolveKnownMysteryQuestion } from "@/lib/mystery-known-questions";
 import {
   createCipheriv,
   createDecipheriv,
@@ -2062,6 +2063,16 @@ function mysteryQuestionEntry(
   if (!item) {
     throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
   }
+  if (answerEvidence && "kind" in answerEvidence && answerEvidence.kind === "known") {
+    if (answerEvidence.locale !== state.mysteryLocale ||
+      resolveMysteryAnswerEvidence(item, answerEvidence, question, state.knowledgeVersion) !== answer) {
+      throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
+    }
+    return {
+      sequence: state.activitySequence + 1, actor, kind: "QUESTION", locale: state.mysteryLocale,
+      text: question, textHash, answer, answerSource: "RULE", answerEvidence,
+    };
+  }
   const analysis = analyzeMysteryQuestion(
     question,
     item,
@@ -2515,12 +2526,9 @@ async function submitMysteryQuestion(
     if (!item) {
       throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
     }
-    const analysis = analyzeMysteryQuestion(
-      question,
-      item,
-      locale,
-      state.knowledgeVersion,
-    );
+    const analysis = state.knowledgeVersion >= 4 && resolveKnownMysteryQuestion(item, question, locale) !== null
+      ? { answer: "unknown" as const }
+      : analyzeMysteryQuestion(question, item, locale, state.knowledgeVersion);
     let answer: "yes" | "no";
     let source: "RULE" | "AI";
     let answerEvidence: MysteryAnswerEvidence | undefined;

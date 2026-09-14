@@ -106,7 +106,16 @@ export function validateStudentGuideBundle(
   ) issues.push("탐구 질문마다 뜻, 생각 단서, 서로 다른 핵심 낱말 2~5개가 필요합니다.");
 
   if (issues.length > 0 || !learningGuides || !coreIdea) return { ok: false, issues };
-  return { ok: true, value: { learningGuides: { ...learningGuides, coreIdea }, guides } };
+  const byIndex = (a: { index: number }, b: { index: number }) => a.index - b.index;
+  return { ok: true, value: {
+    learningGuides: {
+      ...learningGuides, coreIdea,
+      ...(learningGuides.achievements ? { achievements: learningGuides.achievements.sort(byIndex) } : {}),
+      coreSentences: learningGuides.coreSentences.sort(byIndex),
+      essentialQuestions: learningGuides.essentialQuestions.sort(byIndex),
+    },
+    guides: guides.sort(byIndex),
+  } };
 }
 
 export function buildStudentGuideRepairPrompt(

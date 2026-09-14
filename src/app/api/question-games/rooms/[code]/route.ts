@@ -63,9 +63,11 @@ import {
 } from "@/lib/question-game-story-answer-review";
 import {
   getMysteryItem,
+  resolveKnownMysteryAnswer,
   type MysteryAnswerResolution,
   type MysterySelectionProfile,
 } from "@/lib/mystery-box-rules";
+import { mysteryUncertainAnswer, questionGameAiError } from "@/lib/question-game-ai-errors";
 import {
   loadMysterySelectionProfile,
   recordMysteryAnswerUses,
@@ -444,26 +446,23 @@ async function handleQuestionGameCommand({
           { status: 500 },
         );
       }
-      const limited = checkRateLimit(`game-room-mystery-ai:${userId}`, 20);
+      const knownResolution = resolveKnownMysteryAnswer(request);
+      const limited = !knownResolution && checkRateLimit(`game-room-mystery-ai:${userId}`, 20);
       if (limited) {
         logger.warn("미스터리 박스 에이아이 요청 제한으로 질문 처리를 보류합니다");
         return limited;
       }
       try {
-        commandResolution = await generateMysteryAiAnswer(userId, request);
-      } catch {
-        logger.warn("미스터리 박스 에이아이 답변 실패로 질문 처리를 보류합니다");
+        commandResolution = knownResolution ?? await generateMysteryAiAnswer(userId, request);
+      } catch (error) {
         return NextResponse.json(
-          { error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요" },
+          questionGameAiError(error, request.locale),
           { status: 503 },
         );
       }
       if (commandResolution.answer === "unknown") {
         return NextResponse.json(
-          {
-            error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
-            mysteryRewriteRequired: true,
-          },
+          mysteryUncertainAnswer(request.locale),
           { status: 422 },
         );
       }

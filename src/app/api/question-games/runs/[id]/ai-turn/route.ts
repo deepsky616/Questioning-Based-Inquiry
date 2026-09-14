@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { generateText } from "@/lib/ai";
-import { AiBusyError, AiKeyMissingError, AiQuotaError } from "@/lib/ai-errors";
+import { AiBusyError, AiKeyMissingError, AiOutputTruncatedError, AiQuotaError } from "@/lib/ai-errors";
+import { questionGameAiError } from "@/lib/question-game-ai-errors";
 import { getQuestionDiceTypes } from "@/lib/question-game-i18n";
 import {
   authenticatedQuestionGameActorId,
@@ -147,7 +148,10 @@ async function issueStoryDiceFallbackTurn(prepared: PreparedQuestionGameAiTurn) 
   );
 }
 
-function aiGenerationFailure(error: unknown) {
+function aiGenerationFailure(error: unknown, locale: string) {
+  if (error instanceof AiOutputTruncatedError) {
+    return NextResponse.json(questionGameAiError(error, locale), { status: 503 });
+  }
   if (error instanceof AiKeyMissingError) {
     return NextResponse.json(
       { error: "인공지능 모델이 준비되지 않았습니다" },
@@ -209,7 +213,9 @@ export async function POST(req: Request, { params }: Params) {
       userId: actorId,
       prompt: prompt.prompt,
       systemInstruction: prompt.systemInstruction,
-      maxOutputTokens: 80,
+      maxOutputTokens: 256,
+      thinkingBudget: 0,
+      retryTruncatedOutput: true,
       timeoutMs: 12_000,
       temperature: 0.7,
     });
@@ -219,11 +225,11 @@ export async function POST(req: Request, { params }: Params) {
         return NextResponse.json(await issueStoryDiceFallbackTurn(prepared));
       } catch {
         await releaseLease(prepared);
-        return aiGenerationFailure(error);
+        return aiGenerationFailure(error, prepared.locale);
       }
     }
     await releaseLease(prepared);
-    return aiGenerationFailure(error);
+    return aiGenerationFailure(error, prepared.locale);
   }
 
   try {
@@ -240,6 +246,6 @@ export async function POST(req: Request, { params }: Params) {
     if (error instanceof QuestionGameRunError && error.status === 503) {
       return questionGameRunFailure(error);
     }
-    return aiGenerationFailure(error);
+    return aiGenerationFailure(error, prepared.locale);
   }
 }

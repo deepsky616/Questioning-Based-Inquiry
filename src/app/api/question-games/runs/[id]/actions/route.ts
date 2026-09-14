@@ -6,6 +6,8 @@ import {
   readQuestionGameRunBody,
 } from "@/lib/question-game-run-route";
 import { generateMysteryAiAnswer } from "@/lib/mystery-box-ai-answer";
+import { resolveKnownMysteryAnswer } from "@/lib/mystery-box-rules";
+import { mysteryUncertainAnswer, questionGameAiError } from "@/lib/question-game-ai-errors";
 import {
   fallbackStoryDiceAnswerReview,
   generateStoryDiceAnswerReview,
@@ -34,23 +36,22 @@ export async function POST(req: Request, { params }: Params) {
       body,
     );
     if (isMysteryQuestionResolutionRequired(result)) {
-      const aiLimited = checkRateLimit(`question-game-mystery-answer:${actorId}`, 20);
-      if (aiLimited) return aiLimited;
-      let providerResolution;
+      let providerResolution = resolveKnownMysteryAnswer(result.resolution);
       try {
-        providerResolution = await generateMysteryAiAnswer(actorId, result.resolution);
-      } catch {
+        if (!providerResolution) {
+          const aiLimited = checkRateLimit(`question-game-mystery-answer:${actorId}`, 20);
+          if (aiLimited) return aiLimited;
+          providerResolution = await generateMysteryAiAnswer(actorId, result.resolution);
+        }
+      } catch (error) {
         return NextResponse.json(
-          { error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요" },
+          questionGameAiError(error, result.resolution.locale),
           { status: 503 },
         );
       }
       if (providerResolution.answer === "unknown") {
         return NextResponse.json(
-          {
-            error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
-            mysteryRewriteRequired: true,
-          },
+          mysteryUncertainAnswer(result.resolution.locale),
           { status: 422 },
         );
       }

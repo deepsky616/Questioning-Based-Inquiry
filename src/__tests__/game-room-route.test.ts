@@ -928,7 +928,8 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(response.status).toBe(503);
     const body = await response.json();
     expect(body).toEqual({
-      error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요",
+      error: "인공지능 답변을 처리하지 못했어요. 다시 시도해 주세요.",
+      code: "AI_UNAVAILABLE",
     });
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
     expect(state.history).toEqual([]);
@@ -961,8 +962,9 @@ describe("미스터리 박스 실제 공개 응답", () => {
 
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toEqual({
-      error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
+      error: "이 특징은 확실하게 답하기 어려워요. 이름의 글자 수나 다른 특징을 물어보세요. 질문 횟수는 줄어들지 않았어요.",
       mysteryRewriteRequired: true,
+      mysteryAnswerUncertain: true,
     });
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
     expect(state).toMatchObject({

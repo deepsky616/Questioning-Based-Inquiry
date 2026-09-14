@@ -25,6 +25,7 @@ import { __resetRateLimit } from "@/lib/rate-limit";
 import { PRACTICE_DAILY_CAP, PRACTICE_POINTS } from "@/lib/practice-points";
 import { issuePracticeGenerationProof } from "@/lib/practice-generation-proof";
 import { JsonExtractionError } from "@/lib/json-extract";
+import { AiInvalidResponseError, AiOutputTruncatedError } from "@/lib/ai-errors";
 import { POST } from "@/app/api/points/practice/route";
 
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
@@ -426,6 +427,15 @@ describe("연습 포인트 — 분류 퀴즈", () => {
 });
 
 describe("연습 포인트 — 질문 바꾸기·만들기 (서버 AI 판정)", () => {
+  it.each([new AiInvalidResponseError(), new AiOutputTruncatedError()])("잘못된 응답은 오답 기록이나 점수 변경으로 이어지지 않는다: %s", async (error) => {
+    mGen.mockRejectedValueOnce(error);
+    const response = await POST(req({ mode: "transform", itemId: "t01", content: "주인공의 선택이 달랐다면 어떤 결과가 생겼을까요?" }));
+    expect(response.status).toBe(502);
+    expect(mAttempt).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+    expect(mCreate).not.toHaveBeenCalled();
+    expect(mUserUpdate).not.toHaveBeenCalled();
+  });
   it("목표 유형 달성 시 지급하고 분류 결과를 돌려준다", async () => {
     const res = await POST(req({ mode: "transform", itemId: "t01", content: "주인공의 행동이 어떤 결과를 가져올까요?" }));
     const data = await res.json();
