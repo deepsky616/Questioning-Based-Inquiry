@@ -948,6 +948,23 @@ describe("질문놀이 실행 정의", () => {
     });
   });
 
+  it("새 자유 질문의 다리 수를 넓은 다리 유무로 바꾸어 인공지능 후보를 줄이지 않는다", () => {
+    const history: MysteryAiHistoryItem[] = [{
+      kind: "QUESTION", text: "다리의 개수가 네 개인가요?", answer: "no",
+      answerEvidence: { kind: "dynamic", question: "다리의 개수가 네 개인가요?", predicate: "다리가 네 개 있다", answer: "no", confidence: "high", verification: "independent-item-agreement" },
+    }];
+    expect(planMysteryAiActivity(history, "ko", 5)).toEqual(planMysteryAiActivity([], "ko", 5));
+  });
+
+  it("새 날개 단서가 있어도 날지 못하는 펭귄을 인공지능의 정답 후보에서 제외하지 않는다", () => {
+    const penguin = MYSTERY_ITEMS.find((item) => item.id === "penguin")!;
+    const history: MysteryAiHistoryItem[] = mysteryAttributesForVersion(5)
+      .filter((fact) => penguin.factsV4[fact] !== "unknown")
+      .map((fact) => ({ kind: "QUESTION", text: mysteryQuestionForAttribute(fact, "ko"), answer: penguin.factsV4[fact] ? "yes" : "no" }));
+    history.unshift({ kind: "QUESTION", text: "날개가 있나요?", answer: "yes", answerEvidence: { kind: "known", question: "날개가 있나요?", locale: "ko", answer: "yes", version: 2 } });
+    expect(planMysteryAiActivity(history, "ko", 5)).toMatchObject({ kind: "GUESS", guessedItemId: "penguin" });
+  });
+
   it("미스터리 박스 인공지능은 모든 등록 정답을 열 차례 안에 해결한다", () => {
     for (const secret of MYSTERY_ITEMS) {
       const history: MysteryAiHistoryItem[] = [];

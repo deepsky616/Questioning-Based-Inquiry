@@ -135,6 +135,25 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     expect(options.systemInstruction).not.toContain(request.question);
   });
 
+  it.each([
+    ["빨갛고 먹을 수 있나요?", "ko"],
+    ["다리가 있고 날개가 있나요?", "ko"],
+    ["동물이고 작은가요?", "ko"],
+    ["작은가요? 먹을 수 있나요?", "ko"],
+    ["Is it red and edible?", "en"],
+    ["Is it small or round?", "en"],
+  ] as const)("명시적으로 여러 특징을 묶은 질문 %s은 인공지능이 억지로 승인하지 못한다", async (question, locale) => {
+    const result = await generateMysteryAiAnswer("player-1", { ...dynamicRequest, question, locale });
+    expect(result.answer).toBe("unknown");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
+  it.each(["날개를 가지고 있나요?", "스스로 움직이고 있나요?", "물에서 살고   있나요?"])("한 가지 동작의 표현 %s은 복합 질문으로 막지 않는다", async (question) => {
+    mocks.generateJson.mockResolvedValue({ decision: "unsupported", predicate: "", confidence: "low", answers: [] });
+    await generateMysteryAiAnswer("player-1", { ...dynamicRequest, question });
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+  });
+
   it("뜻이 불분명하거나 확신이 낮으면 답을 추측하지 않는다", async () => {
     mocks.generateJson.mockResolvedValue({
       attribute: "unknown",
@@ -170,7 +189,7 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     });
   });
 
-  it("등록되지 않은 객관적 분류는 전체 물건 판정이 두 번 일치할 때만 답한다", async () => {
+  it("등록되지 않은 객관적 질문은 해당 물건의 판정이 두 번 일치할 때 답한다", async () => {
     const answers = dynamicAnswers();
     mocks.generateJson
       .mockResolvedValueOnce({
@@ -196,7 +215,7 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
           predicate: "건전지가 필요하다",
           answer: "no",
           confidence: "high",
-          verification: "independent-agreement",
+          verification: "independent-item-agreement",
         },
       });
 
@@ -217,7 +236,7 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     )).toEqual(MYSTERY_ITEMS.map(({ id }) => id));
   });
 
-  it("두 판정에서 물건 하나라도 답이 다르면 안전하게 판정을 보류한다", async () => {
+  it("두 판정에서 실제 정답의 답이 다르면 안전하게 판정을 보류한다", async () => {
     mocks.generateJson
       .mockResolvedValueOnce({
         decision: "classifiable",
@@ -237,6 +256,54 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
         ...dynamicRequest,
         answer: "unknown",
       });
+  });
+
+  it("다른 후보의 판정 차이와 불확실성은 정답에 대한 독립 합의를 무효화하지 않는다", async () => {
+    const first = dynamicAnswers();
+    const second = first.map((entry) => entry.itemId === "clock"
+      ? { ...entry, answer: "unknown" as const } : entry);
+    mocks.generateJson
+      .mockResolvedValueOnce({ decision: "classifiable", predicate: "건전지가 필요하다", confidence: "high", answers: first })
+      .mockResolvedValueOnce({ decision: "classifiable", meaningMatch: "exact", confidence: "high", answers: second });
+    const result = await generateMysteryAiAnswer("player-1", dynamicRequest);
+    expect(result.answer).toBe("no");
+    expect(result.evidence).toMatchObject({ kind: "dynamic", verification: "independent-item-agreement" });
+    const verifierPrompt = JSON.parse(mocks.generateJson.mock.calls[1][0].prompt);
+    expect(verifierPrompt).not.toHaveProperty("answers");
+    expect(verifierPrompt).not.toHaveProperty("itemId");
+    expect(verifierPrompt.candidateItems).toHaveLength(MYSTERY_ITEMS.length);
+  });
+
+  it.each(["broader", "narrower", "different", "ambiguous"])("답이 같아도 원문 뜻을 %s로 바꾸었으면 보류한다", async (meaningMatch) => {
+    const answers = dynamicAnswers();
+    mocks.generateJson
+      .mockResolvedValueOnce({ decision: "classifiable", predicate: "전기를 사용한다", confidence: "high", answers })
+      .mockResolvedValueOnce({ decision: "classifiable", meaningMatch, confidence: "high", answers });
+    expect((await generateMysteryAiAnswer("player-1", dynamicRequest)).answer).toBe("unknown");
+  });
+
+  it.each(["primary", "verifier"])("%s 응답에 누락·중복·낯선 후보가 있으면 답이 같아도 거절한다", async (stage) => {
+    const valid = dynamicAnswers();
+    for (const invalid of [valid.slice(1), valid.map((entry, i) => i === 0 ? valid[1] : entry), valid.map((entry, i) => i === 0 ? { ...entry, itemId: "missing" } : entry)]) {
+      mocks.generateJson.mockReset();
+      mocks.generateJson
+        .mockResolvedValueOnce({ decision: "classifiable", predicate: "건전지가 필요하다", confidence: "high", answers: stage === "primary" ? invalid : valid })
+        .mockResolvedValueOnce({ decision: "classifiable", meaningMatch: "exact", confidence: "high", answers: stage === "verifier" ? invalid : valid });
+      expect((await generateMysteryAiAnswer("player-1", dynamicRequest)).answer).toBe("unknown");
+    }
+  });
+
+  it.each([
+    ["unknown", "no", "high", "classifiable"],
+    ["no", "unknown", "high", "classifiable"],
+    ["unknown", "unknown", "high", "classifiable"],
+    ["no", "no", "low", "classifiable"],
+    ["no", "no", "high", "unsupported"],
+  ] as const)("정답 판정이 불확실하거나 검증이 부족하면 보류한다: %s / %s / %s / %s", async (first, second, confidence, decision) => {
+    mocks.generateJson
+      .mockResolvedValueOnce({ decision: "classifiable", predicate: "건전지가 필요하다", confidence: "high", answers: dynamicAnswers(first) })
+      .mockResolvedValueOnce({ decision, meaningMatch: "exact", confidence, answers: dynamicAnswers(second) });
+    expect((await generateMysteryAiAnswer("player-1", dynamicRequest)).answer).toBe("unknown");
   });
 
   it("주관적이거나 뜻이 불분명한 새 분류는 두 번째 판정 없이 보류한다", async () => {

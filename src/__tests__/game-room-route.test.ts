@@ -962,7 +962,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
 
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toEqual({
-      error: "이 특징은 확실하게 답하기 어려워요. 이름의 글자 수나 다른 특징을 물어보세요. 질문 횟수는 줄어들지 않았어요.",
+      error: "이 특징은 확실하게 답하기 어려워요. 생김새·사는 곳·쓰임새 등 다른 특징을 한 가지씩 물어보세요. 질문 횟수는 줄어들지 않았어요.",
       mysteryRewriteRequired: true,
       mysteryAnswerUncertain: true,
     });

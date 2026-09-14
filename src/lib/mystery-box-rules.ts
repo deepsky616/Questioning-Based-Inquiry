@@ -1,4 +1,4 @@
-import { resolveKnownMysteryQuestion } from "./mystery-known-questions";
+import { resolveKnownMysteryQuestion, resolveMysteryAnatomyQuestion } from "./mystery-known-questions";
 
 export const MYSTERY_ATTRIBUTES = [
   "living",
@@ -118,7 +118,7 @@ export interface MysteryDynamicAnswerEvidence {
   predicate: string;
   answer: Exclude<MysteryAnswer, "unknown">;
   confidence: "high";
-  verification: "independent-agreement";
+  verification: "independent-agreement" | "independent-item-agreement";
 }
 
 export type MysteryAnswerEvidence =
@@ -131,7 +131,7 @@ export interface MysteryKnownAnswerEvidence {
   question: string;
   locale: MysteryLocale;
   answer: "yes" | "no";
-  version: 1;
+  version: 1 | 2;
 }
 
 export interface MysteryItem {
@@ -1795,7 +1795,7 @@ export function isMysteryAnswerEvidence(
       typeof evidence.question === "string" && evidence.question.length > 0 &&
       [...evidence.question].length <= 200 && evidence.question === evidence.question.trim() &&
       (evidence.locale === "ko" || evidence.locale === "en") &&
-      (evidence.answer === "yes" || evidence.answer === "no") && evidence.version === 1;
+      (evidence.answer === "yes" || evidence.answer === "no") && (evidence.version === 1 || evidence.version === 2);
   }
   if (evidence.kind === "dynamic") {
     return knowledgeVersion >= 4 &&
@@ -1810,7 +1810,8 @@ export function isMysteryAnswerEvidence(
       evidence.predicate === evidence.predicate.trim() &&
       (evidence.answer === "yes" || evidence.answer === "no") &&
       evidence.confidence === "high" &&
-      evidence.verification === "independent-agreement";
+      (evidence.verification === "independent-agreement" ||
+        evidence.verification === "independent-item-agreement");
   }
   return Object.keys(evidence).length === 3 &&
     isMysteryAttributeForVersion(evidence.attribute, knowledgeVersion) &&
@@ -1852,7 +1853,7 @@ export function resolveKnownMysteryAnswer(
     ...request,
     answer,
     ...(answer === "unknown" ? {} : {
-      evidence: { kind: "known", question: request.question, locale: request.locale, answer, version: 1 },
+      evidence: { kind: "known", question: request.question, locale: request.locale, answer, version: resolveMysteryAnatomyQuestion(item, request.question, request.locale) === null ? 1 : 2 },
     }),
   };
 }
@@ -2000,6 +2001,71 @@ export function analyzeMysteryQuestion(
     attribute,
     negated,
   };
+}
+
+// 새 질문은 검수한 완전한 문장만 규칙으로 답한다. 수식어·숫자·다른 절이 붙으면
+// 인공지능이 원문 전체를 검증한다. 기존 기록을 읽는 analyzeMysteryQuestion은 유지한다.
+const DIRECT_QUESTION_ALIASES: Record<MysteryLocale, readonly string[]> = {
+  ko: [
+    "짐승인가요?", "생물인가요?", "초본인가요?", "꽃인가요?", "과일인가요?",
+    "글을 쓰는 도구인가요?", "교통수단인가요?", "학용품인가요?", "애완동물인가요?",
+    "자연물인가요?", "천체인가요?", "포유동물인가요?", "전자제품인가요?",
+    "작나요?", "크기가 작나요?", "크키가 작나요?", "큰가요?", "크기가 큰가요?",
+    "동그란가요?", "단단한가요?", "축축한가요?", "스스로 움직이나요?",
+  ],
+  en: [
+    "Is it alive?", "Is it a woody plant?", "Is it a non-woody plant?",
+    "Is it a writing tool?", "Does it move on its own?", "Is it a companion animal?",
+    "Is it big?", "Is it tiny?", "Is it hard?", "Is it circular?",
+  ],
+};
+
+function directQuestionKey(question: string, locale: MysteryLocale): string {
+  const text = normalizeText(question, locale).replace(/[?？]+$/u, "").trim();
+  if (locale === "ko") {
+    return text.replace(/\s+/gu, "")
+      .replace(/^(?:그것|이것|정답)은/u, "")
+      .replace(/(?:입니까|이에요|예요|인가|이야|이죠)$/u, "인가요")
+      .replace(/(?:가|이)아닌가요$/u, "인가요")
+      .replace(/없나요$/u, "있나요")
+      .replace(/있지않나요$/u, "있나요")
+      .replace(/움직이지않나요$/u, "움직이나요");
+  }
+  return text.replace(/^isn't it /u, "is it ")
+    .replace(/^(is|can|does) it not /u, "$1 it ");
+}
+
+const DIRECT_QUESTION_KEYS = Object.fromEntries(
+  (["ko", "en"] as const).map((locale) => [locale, new Set([
+    ...Object.values(MYSTERY_FACT_QUESTIONS[locale]),
+    ...DIRECT_QUESTION_ALIASES[locale],
+  ].map((question) => directQuestionKey(question, locale)))]),
+) as Record<MysteryLocale, Set<string>>;
+
+export function analyzeNewMysteryQuestion(
+  question: string,
+  item: MysteryItem,
+  locale: MysteryLocale,
+  knowledgeVersion: MysteryKnowledgeVersion = CURRENT_MYSTERY_KNOWLEDGE_VERSION,
+): MysteryQuestionAnalysis {
+  if (knowledgeVersion >= 4 && !DIRECT_QUESTION_KEYS[locale].has(directQuestionKey(question, locale))) {
+    return { answer: "unknown" };
+  }
+  return analyzeMysteryQuestion(question, item, locale, knowledgeVersion);
+}
+
+/** 새 판정 근거가 붙은 기록만 문장 전체 기준으로 확인해 과거 기록을 보존한다. */
+export function analyzeRecordedMysteryQuestion(
+  question: string,
+  item: MysteryItem,
+  locale: MysteryLocale,
+  knowledgeVersion: MysteryKnowledgeVersion,
+  evidence?: MysteryAnswerEvidence,
+): MysteryQuestionAnalysis {
+  return evidence && "kind" in evidence && evidence.kind === "dynamic" &&
+    evidence.verification === "independent-item-agreement"
+    ? analyzeNewMysteryQuestion(question, item, locale, knowledgeVersion)
+    : analyzeMysteryQuestion(question, item, locale, knowledgeVersion);
 }
 
 export function classifyMysteryQuestion(

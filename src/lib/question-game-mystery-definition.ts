@@ -1,10 +1,12 @@
 import { randomInt } from "node:crypto";
+import { resolveMysteryAnatomyQuestion } from "./mystery-known-questions";
 import type { Prisma } from "@prisma/client";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import {
   CURRENT_MYSTERY_KNOWLEDGE_VERSION,
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
+  analyzeRecordedMysteryQuestion,
   getMysteryItem,
   isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
@@ -94,7 +96,7 @@ export type MysteryAiPlan =
     };
 
 export type MysteryAiHistoryItem =
-  | { kind: "QUESTION"; text: string; answer: "yes" | "no" }
+  | { kind: "QUESTION"; text: string; answer: "yes" | "no"; answerEvidence?: MysteryAnswerEvidence }
   | { kind: "GUESS"; text: string; correct: boolean };
 
 type RandomIndex = (upperExclusive: number) => number;
@@ -185,11 +187,12 @@ function parseHistoryItem(
       (value.answer !== "yes" && value.answer !== "no") ||
       (value.answerSource !== "RULE" && value.answerSource !== "AI")
     ) damaged();
-    const analysis = analyzeMysteryQuestion(
+    const analysis = analyzeRecordedMysteryQuestion(
       value.text,
       item,
       locale,
       knowledgeVersion,
+      isMysteryAnswerEvidence(value.answerEvidence, knowledgeVersion) ? value.answerEvidence : undefined,
     );
     if (value.answerSource === "RULE") {
       if (isMysteryAnswerEvidence(value.answerEvidence, knowledgeVersion) &&
@@ -353,7 +356,16 @@ function candidateItems(
   let candidates = [...mysteryItemsForVersion(knowledgeVersion)];
   for (const activity of history) {
     if (activity.kind === "QUESTION") {
+      // 새 자유 질문의 답을 예전의 넓은 속성으로 다시 해석해 후보를 지우지 않는다.
+      if (activity.answerEvidence && "kind" in activity.answerEvidence &&
+        activity.answerEvidence.kind === "dynamic" &&
+        activity.answerEvidence.verification === "independent-item-agreement") continue;
       const filtered = candidates.filter((item) => {
+        if (activity.answerEvidence && "kind" in activity.answerEvidence &&
+          activity.answerEvidence.kind === "known" && activity.answerEvidence.version === 2) {
+          const answer = resolveMysteryAnatomyQuestion(item, activity.text, locale);
+          return answer === "unknown" || answer === activity.answer;
+        }
         const analysis = analyzeMysteryQuestion(
           activity.text,
           item,
@@ -388,11 +400,14 @@ export function planMysteryAiActivity(
   }
   const used = new Set(history.flatMap((activity) => {
     if (activity.kind !== "QUESTION") return [];
-    const analysis = analyzeMysteryQuestion(
+    if (activity.answerEvidence && "kind" in activity.answerEvidence &&
+      activity.answerEvidence.kind === "known" && activity.answerEvidence.version === 2) return [];
+    const analysis = analyzeRecordedMysteryQuestion(
       activity.text,
       MYSTERY_ITEMS[0],
       locale,
       knowledgeVersion,
+      activity.answerEvidence,
     );
     return analysis.answer === "unknown" ? [] : [analysis.attribute];
   }));

@@ -28,7 +28,7 @@ import type {
   RoomPlayer,
 } from "../../src/lib/question-games-data";
 import { createBrowserQuestionGameRunStore } from "./question-game-run";
-import { resolveKnownMysteryAnswer } from "../../src/lib/mystery-box-rules";
+import { resolveKnownMysteryAnswer, type MysteryAnswerResolution } from "../../src/lib/mystery-box-rules";
 import { mysteryUncertainAnswer } from "../../src/lib/question-game-ai-errors";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
@@ -298,7 +298,9 @@ async function installAuxiliaryRoutes(
   });
 }
 
-export function createSharedQuestionGameTransport(): SharedQuestionGameTransport {
+export function createSharedQuestionGameTransport(options: {
+  resolveMysteryQuestion?: (request: Omit<MysteryAnswerResolution, "answer">) => MysteryAnswerResolution | null;
+} = {}): SharedQuestionGameTransport {
   const rooms = new Map<string, GameRoom>();
   const runs = createBrowserQuestionGameRunStore();
   const identities = new Map<string, QuestionGameBrowserIdentity>();
@@ -641,7 +643,7 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
       randomUUID,
     });
     if (result.kind === "resolution-required" && "itemId" in result.resolution) {
-      const resolution = resolveKnownMysteryAnswer(result.resolution);
+      const resolution = resolveKnownMysteryAnswer(result.resolution) ?? options.resolveMysteryQuestion?.(result.resolution);
       if (resolution?.answer === "unknown") {
         return { status: 422, body: mysteryUncertainAnswer(resolution.locale) };
       }

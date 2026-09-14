@@ -1,3 +1,4 @@
+import { MYSTERY_REVIEWED_ANATOMY } from "./mystery-item-context";
 import type { MysteryAnswer, MysteryItem, MysteryLocale } from "./mystery-box-rules";
 
 const counts: Record<string, number> = {
@@ -70,6 +71,39 @@ export function resolveKnownMysteryQuestion(
       item.category !== "animal" && item.category !== "imaginary" ? false : undefined
     );
     return hasClaws === undefined ? "unknown" : yesNo(hasClaws, /없/u.test(text));
+  }
+  return resolveMysteryAnatomyQuestion(item, question, locale);
+}
+
+/** 새로 검수한 몸 구조 질문은 별도 근거 버전으로 보관한다. */
+export function resolveMysteryAnatomyQuestion(
+  item: MysteryItem,
+  question: string,
+  locale: MysteryLocale,
+): MysteryAnswer | null {
+  const text = question.normalize("NFC").trim().toLowerCase().replace(/[?？]+$/u, "").trim();
+  const wingMatch = locale === "ko"
+    ? text.match(/^(?:(?:그것|이것)(?:은|에|에는)?\s*)?날개(?:가|는)?\s*(있나요|있습니까|있어요|있는가요|없나요|없습니까|없어요|없는가요)$/u)
+    : text.match(/^(?:does it have|has it got) (?:any )?wings$/u);
+  if (wingMatch) {
+    const wings = MYSTERY_REVIEWED_ANATOMY[item.id]?.wings;
+    if (wings !== undefined) return yesNo(wings, /없/u.test(text));
+    // 비행기는 날개가 있지만 로켓·상상 속 물건은 모습에 따라 달라질 수 있다.
+    if (item.id === "airplane") return yesNo(true, /없/u.test(text));
+    if (item.category === "imaginary" || item.id === "rocket" || item.category === "animal") return "unknown";
+    return yesNo(false, /없/u.test(text));
+  }
+
+  const legMatch = locale === "ko"
+    ? text.match(/^다리(?:가|는)?\s*(\d{1,2}|한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉|열)\s*개(?:인가요|입니까|예요|인가|야|죠|가\s*아닌가요)$/u)
+    : text.match(/^does it have (\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten) legs$/u);
+  if (legMatch) {
+    const legs = MYSTERY_REVIEWED_ANATOMY[item.id]?.legs;
+    const count = counts[legMatch[1]] ?? Number(legMatch[1]);
+    if (legs !== undefined) return yesNo(legs === count, /아닌/u.test(text));
+    // 가구·악기·상상 속 물건의 다리 수를 단정하지 않는다.
+    if (["food", "plant", "nature"].includes(item.category)) return yesNo(count === 0, /아닌/u.test(text));
+    return "unknown";
   }
   return null;
 }

@@ -117,6 +117,7 @@ import { GET as getResult } from "@/app/api/question-games/runs/[id]/result/rout
 import { traceLadderColumns } from "@/lib/question-ladder";
 import {
   MYSTERY_ATTRIBUTES,
+  mysteryAttributesForVersion,
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
   getMysteryItem,
@@ -4022,6 +4023,8 @@ describe("미스터리 박스 서버 실행 경로", () => {
     ["carrot", "주황색인가요?", "yes"],
     ["banana", "색깔이 주황색인가요?", "no"],
     ["puppy", "발톱이 있나요?", "yes"],
+    ["penguin", "날개가 있나요?", "yes"],
+    ["penguin", "다리가 네 개인가요?", "no"],
   ])("%s의 %s는 인공지능 없이 저장하고 다시 열어도 복원된다", async (itemId, question, answer) => {
     await createMystery();
     runs.get("run-1")!.state = { ...storedMysteryState(), privateItemId: itemId };
@@ -4040,6 +4043,57 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(restored.status).toBe(200);
     await expect(restored.json()).resolves.toMatchObject({ run: { questionCount: 1, mysteryHistory: [{ answer }] } });
     expect(activities).toHaveLength(1);
+  });
+
+  it.each([
+    ["penguin", "날개를 가지고 있나요?", "yes"],
+    ["penguin", "다리의 개수가 네 개인가요?", "no"],
+    ["elephant", "풀을 먹나요?", "yes"],
+    ["dolphin", "바다에 사나요?", "yes"],
+    ["pencil", "건전지가 필요한가요?", "no"],
+    ["pencil", "글씨를 쓸 때 쓰나요?", "yes"],
+    ["apple", "껍질이 있나요?", "yes"],
+  ] as const)("%s의 자유 질문 %s은 원문 판정을 저장·복원·정산한다", async (itemId, question, answer) => {
+    await createMystery();
+    storedMysteryState().privateItemId = itemId;
+    const answers = MYSTERY_ITEMS.map((item) => ({ itemId: item.id, answer: item.id === itemId ? answer : "no" }));
+    mocks.generateJson
+      .mockResolvedValueOnce({ decision: "classifiable", predicate: question.slice(0, -1), confidence: "high", answers })
+      .mockResolvedValueOnce({ decision: "classifiable", meaningMatch: "exact", confidence: "high", answers: answers.map((item) => item.itemId === "clock" ? { ...item, answer: "unknown" } : item) });
+    const response = await submitMysteryQuestion(0, 1, question);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ run: { mysteryHistory: [{ text: question, answer }] } });
+    expect(mocks.generateJson).toHaveBeenCalledTimes(2);
+    expect((await readResult()).status).toBe(200);
+    expect((await submitMysteryQuestion(1, 2, "동물인가요?")).status).toBe(200);
+    expect((await submitMysteryQuestion(2, 3, "살아 있나요?")).status).toBe(200);
+    const solved = await submitMysteryGuess(3, 4, mysterySecret().names.ko);
+    expect(solved.status).toBe(200);
+    expect(runs.get("run-1")).toMatchObject({ status: "SETTLED" });
+    expect(pointLogs).toHaveLength(1);
+  });
+
+  it("날개·다리 수의 새 규칙 질문도 게임 종료 때 한 번만 정산한다", async () => {
+    await createMystery();
+    storedMysteryState().privateItemId = "penguin";
+    expect((await submitMysteryQuestion(0, 1, "날개가 있나요?")).status).toBe(200);
+    expect((await submitMysteryQuestion(1, 2, "다리가 네 개인가요?")).status).toBe(200);
+    expect((await submitMysteryQuestion(2, 3, "날 수 있나요?")).status).toBe(200);
+    expect((await submitMysteryGuess(3, 4, "펭귄")).status).toBe(200);
+    expect(runs.get("run-1")).toMatchObject({ status: "SETTLED" });
+    expect(pointLogs).toHaveLength(1);
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
+  it("복합 질문은 인공지능 호출·질문 횟수·점수 소비 없이 나누어 쓰도록 안내한다", async () => {
+    await createMystery();
+    const response = await submitMysteryQuestion(0, 1, "빨갛고 먹을 수 있나요?");
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ mysteryAnswerUncertain: true });
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(storedMysteryState()).toMatchObject({ questionCount: 0, history: [] });
+    expect(activities).toHaveLength(0);
+    expect(pointLogs).toHaveLength(0);
   });
 
   it("색깔을 확정할 수 없으면 인공지능 호출·질문 횟수 소비 없이 다른 특징을 안내한다", async () => {
@@ -4111,6 +4165,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("틀린 추측 뒤에는 새 질문을 써야 다시 추측할 수 있다", async () => {
     await createMystery();
+    storedMysteryState().privateItemId = "apple";
     await submitMysteryQuestion(0, 1, "살아 있나요?");
     await submitMysteryQuestion(1, 2, "동물인가요?");
     await submitMysteryQuestion(2, 3, "먹을 수 있나요?");
@@ -4268,7 +4323,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
         predicate: "학교에서 자주 볼 수 있다",
         answer: secret.factsV3.readingMaterial ? "yes" : "no",
         confidence: "high",
-        verification: "independent-agreement",
+        verification: "independent-item-agreement",
       },
     });
     expect(activities).toHaveLength(1);
@@ -4730,11 +4785,13 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("스무 번째 외부 판정 활동 저장 실패는 실행과 점수를 모두 되돌리고 같은 요청으로 제한 정산한다", async () => {
     await createMystery();
-    for (let index = 0; index < 19; index += 1) {
+    const facts = mysteryAttributesForVersion(5).filter((fact) => mysterySecret().factsV4[fact] !== "unknown").slice(0, 19);
+    expect(facts).toHaveLength(19);
+    for (let index = 0; index < facts.length; index += 1) {
       const response = await submitMysteryQuestion(
         index,
         index + 1,
-        `먹을 수 있나요 ${index + 1}?`,
+        mysteryQuestionForAttribute(facts[index], "ko"),
       );
       expect(response.status).toBe(200);
     }
