@@ -45,6 +45,7 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
 
   useEffect(() => {
     if (classOptions.length > 0 && !classOptions.some((c) => c.key === classKey)) {
+      setChecked(new Set());
       setClassKey(classOptions[0].key);
     }
   }, [classOptions, classKey]);
@@ -56,9 +57,6 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
         .sort((a, b) => (parseInt(a.studentNumber || "0", 10) - parseInt(b.studentNumber || "0", 10))),
     [students, classKey],
   );
-
-  // 학급이 바뀌면 선택 초기화
-  useEffect(() => { setChecked(new Set()); }, [classKey]);
 
   const allChecked = classStudents.length > 0 && classStudents.every((s) => checked.has(s.id));
   const someChecked = checked.size > 0 && !allChecked;
@@ -133,7 +131,10 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
             {classOptions.length > 1 && (
               <div className="space-y-2">
                 <Label htmlFor="resetStudentClass">{t("selectClass")}</Label>
-                <Select value={classKey} onValueChange={setClassKey}>
+                <Select value={classKey} onValueChange={(nextClassKey) => {
+                  if (nextClassKey !== classKey) setChecked(new Set());
+                  setClassKey(nextClassKey);
+                }}>
                   <SelectTrigger id="resetStudentClass" className="bg-background"><SelectValue placeholder={t("selectClass")} /></SelectTrigger>
                   <SelectContent>
                     {classOptions.map((c) => (

@@ -117,9 +117,10 @@ describe("학생 계정 관리 자료 오류", () => {
     renderWithProviders(<StudentPasswordResetCard embedded />);
 
     const firstStudent = await screen.findByRole("checkbox", { name: /김하늘/ });
-    const selectAll = screen.getByRole("checkbox", { name: ko.account.selectAll });
     fireEvent.click(firstStudent);
-    expect(selectAll).toBePartiallyChecked();
+    await waitFor(() => expect(
+      screen.getByRole("checkbox", { name: ko.account.selectAll }),
+    ).toBePartiallyChecked());
 
     const password = screen.getByLabelText(ko.account.newPassword);
     fireEvent.change(password, { target: { value: "short" } });
