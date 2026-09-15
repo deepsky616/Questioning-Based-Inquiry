@@ -36,11 +36,11 @@ const QUESTION_GAME_PREPARATION_CASES = [
 ] as const;
 
 const KABA_ROOM_QUESTIONS = [
-  "고양이가 자나요?", "개미가 걷나요?", "토끼가 뛰나요?", "꽃이 예쁜가요?", "사과가 빨간가요?",
-  "하늘이 파란가요?", "비가 오나요?", "새가 날아가나요?", "강아지가 짖나요?", "물고기가 헤엄치나요?",
+  "고양이가 자요?", "개미가 걸어요?", "토끼가 뛰나요?", "꽃이 예쁜가요?", "사과가 빨간색인가요?",
+  "하늘이 파란색인가요?", "비가 오나요?", "새가 날아가나요?", "강아지가 짖나요?", "물고기가 헤엄치나요?",
   "아이가 웃나요?", "나무가 흔들리나요?", "별이 빛나나요?", "바람이 부나요?", "눈이 내리나요?",
   "나비가 날개를 펴나요?", "달이 밝은가요?", "파도가 치나요?", "벌이 꿀을 모으나요?", "원숭이가 나무에 오르나요?",
-  "햇빛이 따뜻한가요?", "구름이 하얀가요?", "고래가 바다에 사나요?", "개구리가 우나요?", "아기 새가 둥지에 있나요?",
+  "햇빛이 따뜻한가요?", "구름이 흰색인가요?", "고래가 바다에 사나요?", "개구리가 우나요?", "아기 새가 둥지에 있나요?",
 ] as const;
 
 function kabaRoomQuestion(sentence: string) {
@@ -134,7 +134,7 @@ async function completeRelay(
     const input = page.locator("#relay-question-input");
     await expect(input).toBeEnabled();
     questionCount += 1;
-    await input.fill(`별과 우주는 ${questionCount}번째로 어떻게 이어질까요?`);
+    await input.fill(`별과 우주는 ${questionCount}번째로 어떻게 이어질까`);
     await input.press("Enter");
     await expect.poll(
       () => (transport.getRoom(code)?.gameState.questions as unknown[] | undefined)?.length ?? 0,
@@ -168,7 +168,7 @@ async function completeDice(
     const input = page.locator("#dice-question-input");
     await expect(input).toBeEnabled();
     questionCount += 1;
-    await input.fill(`이 주제를 ${questionCount}번째로 어떻게 탐구할까요?`);
+    await input.fill(`이 주제를 ${questionCount}번째로 어떻게 탐구하죠`);
     await input.press("Enter");
     await expect.poll(
       () => (transport.getRoom(code)?.gameState.questions as unknown[] | undefined)?.length ?? 0,
@@ -745,11 +745,23 @@ for (const theme of ["light", "dark"] as const) {
       sessions.push(friend);
       await host.page.getByRole("button", { name: /게임 시작/ }).click();
       await host.page.getByRole("button", { name: "미스터리 상자 시작" }).click();
-      for (const question of ["세글자인가요?", "주황색인가요?", "색깔이 주황색인가요?", "발톱이 있나요?", "날개가 있나요?", "다리가 네 개인가요?"]) {
+      const draft = host.page.getByLabel("예 또는 아니오 질문", { exact: true });
+      await draft.fill("검은색인가요?");
+      const guide = host.page.locator("details").filter({ hasText: "색깔 질문의 기준 보기" });
+      await guide.locator("summary").click();
+      await expect(guide.locator("dt")).toHaveCount(48);
+      await expect(guide.locator("dt", { hasText: "피아노" }).locator("..")).toContainText("검은색 · 흰색");
+      await expect(draft).toHaveValue("검은색인가요?");
+      await expectNoHorizontalPageOverflow(host.page);
+      await host.page.screenshot({ path: testInfo.outputPath(`미스터리-색깔안내-${theme}.png`), fullPage: true });
+      await guide.locator("summary").click();
+      await expect(draft).toHaveValue("검은색인가요?");
+      for (const question of ["검은색인가요?", "색깔이 검정색인가요?", "세글자인가요?", "주황색인가요?", "색깔이 주황색인가요?", "발톱이 있나요?", "날개가 있나요?", "다리가 네 개인가요?"]) {
         const state = readMysteryState(transport.getRoom(host.code)!.gameState)!;
         const actor = sessionForPlayer(sessions, state.turnOrder[state.currentTurnIdx]);
         const item = getMysteryItem(state.private!.itemId)!;
         const expected = resolveKnownMysteryQuestion(item, question, "ko");
+        if (question.includes("색")) expect(["yes", "no"]).toContain(expected);
         const before = state.history.length;
         const input = actor.page.getByLabel("예 또는 아니오 질문", { exact: true });
         await expect(input).toBeEnabled();
@@ -764,6 +776,8 @@ for (const theme of ["light", "dark"] as const) {
           for (const session of sessions) await expect(session.page.getByText(question, { exact: true })).toBeVisible();
         }
       }
+      await host.page.reload();
+      await expect(host.page.getByText("검은색인가요?", { exact: true })).toBeVisible();
       await expectNoHorizontalPageOverflow(host.page);
       await host.page.screenshot({ path: testInfo.outputPath(`미스터리-개선-${theme}.png`), fullPage: true });
     } finally {

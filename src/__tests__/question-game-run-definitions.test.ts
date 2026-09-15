@@ -965,6 +965,18 @@ describe("질문놀이 실행 정의", () => {
     expect(planMysteryAiActivity(history, "ko", 5)).toMatchObject({ kind: "GUESS", guessedItemId: "penguin" });
   });
 
+  it("새 색깔 단서는 인공지능 후보에 반영하고 옛 색깔 기록의 계획은 유지한다", () => {
+    const guesses: MysteryAiHistoryItem[] = MYSTERY_ITEMS
+      .filter(item => !["piano", "umbrella"].includes(item.id))
+      .map(item => ({ kind: "GUESS", text: item.names.ko, correct: false }));
+    const color: MysteryAiHistoryItem = {
+      kind: "QUESTION", text: "검은색인가요?", answer: "yes",
+      answerEvidence: { kind: "known", question: "검은색인가요?", locale: "ko", answer: "yes", version: 3 },
+    };
+    expect(planMysteryAiActivity([...guesses, color], "ko", 5)).toMatchObject({ kind: "GUESS", guessedItemId: "piano" });
+    expect(planMysteryAiActivity([...guesses, { ...color, answerEvidence: { kind: "known", question: color.text, locale: "ko", answer: "yes", version: 1 } }], "ko", 5)).toEqual(planMysteryAiActivity(guesses, "ko", 5));
+  });
+
   it("미스터리 박스 인공지능은 모든 등록 정답을 열 차례 안에 해결한다", () => {
     for (const secret of MYSTERY_ITEMS) {
       const history: MysteryAiHistoryItem[] = [];

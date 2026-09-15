@@ -35,7 +35,39 @@ const NATURAL_GGALKKA_QUESTIONS = [
   "햇빛이 따뜻할까?", "구름이 하얄까?", "고래가 바다에 살까?", "개구리가 울까?", "아기 새가 둥지에 있을까?",
 ] as const;
 
+const POLITE_QUESTIONS = [
+  "고양이가 자요?", "개미가 걸어요?", "토끼가 뛰어요?", "꽃이 예뻐요?", "사과가 빨개요?",
+  "하늘이 파래요?", "비가 와요?", "새가 날아가요?", "강아지가 짖어요?", "물고기가 헤엄쳐요?",
+  "아이가 웃어요?", "나무가 흔들려요?", "별이 빛나요?", "바람이 불어요?", "눈이 내려요?",
+  "나비가 날개를 펴요?", "달이 밝아요?", "파도가 쳐요?", "벌이 꿀을 모아요?", "원숭이가 나무에 올라요?",
+  "햇빛이 따뜻해요?", "구름이 하얘요?", "고래가 바다에 살아요?", "개구리가 울어요?", "아기 새가 둥지에 있어요?",
+];
+
 describe("까바놀이 내용 보존 판정", () => {
+  it.each(KABA_SENTENCES.ko.map((sentence, index) => [sentence, POLITE_QUESTIONS[index]]))("자연스러운 해요체 질문을 인정한다: %s", (sentence, question) => {
+    expect(isKabaQuestionRewrite(sentence, question, "ko")).toBe(true);
+  });
+
+  it.each([
+    ["사과가 빨갛다", "사과가 빨간색인가요?"], ["사과가 빨갛다", "사과는 빨강색이에요?"],
+    ["하늘이 파랗다", "하늘이 파란색인가요?"], ["하늘이 파랗다", "하늘의 색깔이 파랑색인가요?"],
+    ["구름이 하얗다", "구름이 흰색인가요?"], ["구름이 하얗다", "구름은 하얀색인가요?"],
+  ])("색을 같은 뜻의 말로 바꾼 질문을 인정한다: %s", (sentence, question) => {
+    expect(isKabaQuestionRewrite(sentence, question, "ko")).toBe(true);
+    expect(isKabaQuestionRewrite(sentence, question, "ko", 1)).toBe(false);
+  });
+
+  it.each([
+    ["사과가 빨갛다", "사과가 주황색인가요?", "ko"],
+    ["사과가 빨갛다", "사과가 안 빨간색인가요?", "ko"],
+    ["사과가 빨갛다", "사과가 빨간색이 아닌가요?", "ko"],
+    ["고양이가 잔다", "고양이가 안 자요?", "ko"],
+    ["The apple is red", "Is the apple not red?", "en"],
+    ["The cat sleeps", "Doesn't the cat sleep?", "en"],
+  ])("색·행동·긍정의 뜻이 달라지면 인정하지 않는다: %s", (sentence, question, locale) => {
+    expect(isKabaQuestionRewrite(sentence, question, locale)).toBe(false);
+  });
+
   it.each(["ko", "en"] as const)("%s 문장 스물다섯 개의 알맞은 질문을 모두 인정한다", (locale) => {
     KABA_SENTENCES[locale].forEach((sentence, index) => {
       expect(

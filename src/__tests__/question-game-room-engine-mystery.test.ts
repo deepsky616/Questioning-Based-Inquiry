@@ -36,6 +36,28 @@ it("친구 방의 글자 수 판정은 저장 후 검증·공개 상태 복원·
 });
 
 it.each([
+  ["piano", "검은색인가요?", "yes"],
+  ["puppy", "색깔이 주황색인가요?", "no"],
+  ["cat", "그것은 주황색인가요?", "yes"],
+] as const)("친구 방의 %s 색깔 질문 %s은 저장·재접속·다음 차례에서 유지된다", (itemId, question, answer) => {
+  const room = prepareRoom();
+  (room.gameState as unknown as MysteryRoomState).private = { itemId };
+  const pending = applyMystery(room, "mystery-ask", { question, locale: "ko" });
+  if (pending.kind !== "resolution-required" || !("itemId" in pending.resolution)) throw new Error("판정 요청 없음");
+  const resolved = resolveKnownMysteryAnswer(pending.resolution)!;
+  expect(resolved).toMatchObject({ answer });
+  const next = changedRoom(applyMystery(room, "mystery-ask", { question, locale: "ko" }, { mysteryAnswerResolution: resolved }));
+  const state = readMysteryState(next.gameState)!;
+  expect(state.history[0]).toMatchObject({ answer, answerEvidence: { kind: "known", version: 3 } });
+  const publicState = toPublicMysteryState(state);
+  expect(readMysteryPublicState(publicState)).not.toBeNull();
+  expect(publicState).not.toHaveProperty("private");
+  expect(JSON.stringify(publicState)).not.toContain("itemId");
+  const afterGuest = changedRoom(applyMystery(next, "mystery-ask", { question: "동물인가요?", locale: "ko" }, { userId: "guest", commandIndex: 2 }));
+  expect(readMysteryState(afterGuest.gameState)!.history).toHaveLength(2);
+});
+
+it.each([
   ["penguin", "날개를 가지고 있나요?", "yes"],
   ["penguin", "다리의 개수가 네 개인가요?", "no"],
   ["elephant", "풀을 먹나요?", "yes"],

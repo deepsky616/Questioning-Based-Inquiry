@@ -408,6 +408,21 @@ describe("질문 릴레이 판정기", () => {
 });
 
 describe("카바 판정기", () => {
+  it("새 색깔 표현의 정답을 저장하고 이전 오답 기록은 당시 기준으로 복원한다", () => {
+    const matching = changed(run(preparedKabaWithFirstSentence("사과가 빨갛다"), "host", "kaba-submit-question", 88, { locale: "ko", question: "사과가 빨간색인가요?" }));
+    const state = readKabaPublicState(matching.gameState)!;
+    expect(state.attempts[0]).toMatchObject({ correct: true, ruleVersion: 2 });
+    const legacy = JSON.parse(JSON.stringify(state));
+    delete legacy.attempts[0].ruleVersion;
+    legacy.attempts[0].correct = false;
+    legacy.scores.host = 0;
+    expect(readKabaPublicState(legacy)).not.toBeNull();
+    const forged = JSON.parse(JSON.stringify(state));
+    forged.attempts[0].correct = false;
+    forged.scores.host = 0;
+    expect(readKabaPublicState(forged)).toBeNull();
+  });
+
   it("내용이 없는 질문은 틀린 시도로도 기록하지 않는다", () => {
     const room = preparedKaba(2);
     const result = run(room, "host", "kaba-submit-question", 89, {

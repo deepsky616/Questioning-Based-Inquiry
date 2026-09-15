@@ -31,21 +31,21 @@ function questionIntent(
   locale: "ko" | "en",
 ): StoryAnswerQualityEvaluation["intent"] {
   if (locale === "en") {
-    if (/\b(?:feel|feeling|mood)\b/iu.test(question)) return "feeling";
     if (/^\s*why\b/iu.test(question)) return "reason";
     if (/^\s*where\b/iu.test(question)) return "place";
     if (/^\s*when\b/iu.test(question)) return "time";
     if (/^\s*who\b/iu.test(question)) return "person";
+    if (/\b(?:feel|feeling|mood)\b/iu.test(question)) return "feeling";
     if (/^\s*(?:is|are|was|were|do|does|did|can|could|will|would|has|have|had)\b/iu.test(question)) {
       return "yes-no";
     }
     return "other";
   }
-  if (/(?:기분|느낌|어떤\s*마음|마음이\s*어)/u.test(question)) return "feeling";
   if (/(?:왜|이유|까닭)/u.test(question)) return "reason";
   if (/(?:어디|어느\s*곳)/u.test(question)) return "place";
   if (/(?:언제|몇\s*시|어느\s*때)/u.test(question)) return "time";
   if (/(?:누가|누구)/u.test(question)) return "person";
+  if (/(?:기분|느낌|어떤\s*마음|마음이\s*어)/u.test(question)) return "feeling";
   if (/(?:무엇|뭐|어떤|무슨|어떻게)/u.test(question)) return "other";
   if (/(?:나요|인가요|했나요|있나요|없나요|일까요|했을까요)\s*[?？]?$/u.test(question)) {
     return "yes-no";

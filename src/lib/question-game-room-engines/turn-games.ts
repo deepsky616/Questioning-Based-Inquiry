@@ -167,6 +167,7 @@ export interface KabaAttemptRecord extends RoundRecordBase {
   locale: QuestionLocale;
   question: string;
   correct: boolean;
+  ruleVersion?: 1 | 2;
 }
 
 export interface KabaRoomState extends EngineStateBase {
@@ -779,7 +780,7 @@ function isKabaAttempt(value: unknown): value is KabaAttemptRecord {
   if (!isRecord(value) || !hasExactKeys(value, [
     "roundId", "round", "playerId", "playerName", "sentenceKey", "sentence",
     "locale", "question", "correct",
-  ]) || !isUuid(value.roundId) || !isIntegerBetween(value.round, 1, KABA_MAX_ROUNDS) ||
+  ], ["ruleVersion"]) || (value.ruleVersion !== undefined && value.ruleVersion !== 1 && value.ruleVersion !== 2) || !isUuid(value.roundId) || !isIntegerBetween(value.round, 1, KABA_MAX_ROUNDS) ||
     !isPlayerId(value.playerId) || !isPlayerName(value.playerName) ||
     !isStoredText(value.sentenceKey, QUESTION_GAME_LIMITS.story) ||
     !isLocalizedText(value.sentence) || !isLocale(value.locale) ||
@@ -793,6 +794,7 @@ function isKabaAttempt(value: unknown): value is KabaAttemptRecord {
       value.sentence[value.locale],
       value.question,
       value.locale,
+      value.ruleVersion ?? 1,
     );
 }
 
@@ -1704,6 +1706,7 @@ function applyKabaCommand(context: QuestionGameRoomEngineContext): QuestionGameE
     locale: context.body.locale,
     question,
     correct,
+    ruleVersion: 2,
   };
   const roundSubmittedPlayerIds = [...state.roundSubmittedPlayerIds, context.userId];
   const candidate: KabaRoomState = {

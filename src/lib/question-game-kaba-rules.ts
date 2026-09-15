@@ -60,6 +60,27 @@ const KO_RULES: readonly KabaMeaningRule[] = [
   [[koreanTerm("아기\\s*새|새끼\\s*새")], [koreanTerm("둥지")], [koreanPredicate(String.raw`있나요|있습니까|있는지요|사나요|살고\s*있나요`, ["있", "사"], ["있을", "살"])]],
 ];
 
+// 새 판정에서만 해요체와 같은 뜻의 색 이름을 추가한다. 기존 규칙은 기록 복원용으로 유지한다.
+const KO_POLITE_STEMS = [
+  "자", "걸어", "뛰어", "예뻐", "빨개", "파래", "와", "날아가", "짖어", "헤엄쳐",
+  "웃어", "흔들려", "빛나", "불어", "내려", "펴", "밝아", "쳐", "모아", "올라",
+  "따뜻해", "하얘", "살아", "울어", "있어",
+] as const;
+const KO_COLOR_PREDICATES: Partial<Record<number, RegExp>> = {
+  4: /(?:빨간|빨강|붉은)\s*색(?:인가요|입니까|이에요|이니|이냐|인가|이야|일까|일까요)\s*[?？]?$/u,
+  5: /(?:파란|파랑|푸른)\s*색(?:인가요|입니까|이에요|이니|이냐|인가|이야|일까|일까요)\s*[?？]?$/u,
+  21: /(?:하얀|하양|흰)\s*색(?:인가요|입니까|이에요|이니|이냐|인가|이야|일까|일까요)\s*[?？]?$/u,
+};
+const CURRENT_KO_RULES: readonly KabaMeaningRule[] = KO_RULES.map((groups, index) =>
+  groups.map((alternatives, groupIndex) => groupIndex === groups.length - 1
+    ? [
+        ...alternatives,
+        new RegExp(`${KO_POLITE_STEMS[index]}(?:요)?\\s*[?？]$`, "u"),
+        ...(KO_COLOR_PREDICATES[index] ? [KO_COLOR_PREDICATES[index]!] : []),
+      ]
+    : alternatives),
+);
+
 const KO_NEGATION_PATTERN = /(?:^|\s)(?:안|못)\s*|지\s*않(?:나요|습니까|니|냐|는지요)\s*[?？]?$/u;
 
 const EN_RULES: readonly KabaMeaningRule[] = [
@@ -100,25 +121,30 @@ function normalize(value: string, locale: KabaLocale): string {
   return locale === "en" ? normalized.toLocaleLowerCase("en") : normalized;
 }
 
-function ruleForSentence(sentence: string, locale: KabaLocale) {
+function ruleForSentence(sentence: string, locale: KabaLocale, ruleVersion: 1 | 2) {
   const normalized = normalize(sentence, locale);
   const index = KABA_SENTENCES[locale].findIndex(
     (candidate) => normalize(candidate, locale) === normalized,
   );
-  return index < 0 ? null : RULES[locale][index] ?? null;
+  const rules = locale === "ko" && ruleVersion === 2 ? CURRENT_KO_RULES : RULES[locale];
+  return index < 0 ? null : rules[index] ?? null;
 }
 
 export function isKabaQuestionRewrite(
   sentence: string,
   question: string,
   locale: string,
+  ruleVersion: 1 | 2 = 2,
 ): boolean {
   const resolvedLocale = resolveQuestionGameLocale(locale);
-  if (!isQuestionFormForLocale(question, resolvedLocale)) return false;
-  const rule = ruleForSentence(sentence, resolvedLocale);
+  if (!isQuestionFormForLocale(question, resolvedLocale, ruleVersion)) return false;
+  const rule = ruleForSentence(sentence, resolvedLocale, ruleVersion);
   if (!rule) return false;
   const normalizedQuestion = normalize(question, resolvedLocale);
   if (resolvedLocale === "ko" && KO_NEGATION_PATTERN.test(normalizedQuestion)) {
+    return false;
+  }
+  if (ruleVersion === 2 && resolvedLocale === "en" && /\b(?:not|never)\b|n['’]t\b/iu.test(normalizedQuestion)) {
     return false;
   }
   return rule.every((alternatives) =>

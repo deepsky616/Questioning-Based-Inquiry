@@ -2795,6 +2795,21 @@ describe("질문 사다리 서버 실행 경로", () => {
 });
 
 describe("까바놀이 서버 실행 경로", () => {
+  it("같은 뜻의 색깔 표현도 정답으로 저장하고 중복 요청에서 재집계하지 않는다", async () => {
+    await createKaba();
+    const state = runs.get("run-1")!.state as { sentencePlan: string[] };
+    const index = state.sentencePlan.indexOf("kaba-05");
+    if (index >= 0) [state.sentencePlan[0], state.sentencePlan[index]] = [state.sentencePlan[index], state.sentencePlan[0]];
+    else state.sentencePlan[0] = "kaba-05";
+    const response = await submitKabaAttempt(0, "사과가 빨간색인가요?");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ run: { questionCount: 1, correctCount: 1 } });
+    const replay = await submitKabaAttempt(0, "사과가 빨간색인가요?");
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, run: { questionCount: 1, correctCount: 1 } });
+    expect((await readResult()).status).toBe(200);
+    expect(activities).toHaveLength(1);
+  });
+
   it("만료된 실행을 한 단계 오른 버전으로 닫고 결과를 읽는다", async () => {
     await createKaba();
     const run = runs.get("run-1");
@@ -4019,6 +4034,10 @@ describe("카드 짝 찾기 서버 실행 경로", () => {
 
 describe("미스터리 박스 서버 실행 경로", () => {
   it.each([
+    ["puppy", "검은색인가요?", "yes"],
+    ["piano", "검은색인가요?", "yes"],
+    ["piano", "색깔이 주황색인가요?", "no"],
+    ["cat", "그것은 주황색인가요?", "yes"],
     ["puppy", "세글자인가요?", "yes"],
     ["carrot", "주황색인가요?", "yes"],
     ["banana", "색깔이 주황색인가요?", "no"],
@@ -4096,10 +4115,10 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(pointLogs).toHaveLength(0);
   });
 
-  it("색깔을 확정할 수 없으면 인공지능 호출·질문 횟수 소비 없이 다른 특징을 안내한다", async () => {
+  it("색깔의 복합 질문은 인공지능 호출·질문 횟수 소비 없이 나누어 질문하도록 안내한다", async () => {
     await createMystery();
     runs.get("run-1")!.state = { ...storedMysteryState(), privateItemId: "puppy" };
-    const response = await submitMysteryQuestion(0, 1, "주황색인가요?");
+    const response = await submitMysteryQuestion(0, 1, "검은색이고 주황색인가요?");
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({ mysteryAnswerUncertain: true });
     expect(mocks.generateJson).not.toHaveBeenCalled();
@@ -4492,6 +4511,26 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(activities).toHaveLength(1);
     expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
     expect(pointLogs).toHaveLength(0);
+  });
+
+  it.each(["solo", "ai"] as const)("%s 색깔 질문 후 새로고침·후속 질문·정산을 유지한다", async mode => {
+    await createMystery(mode);
+    storedMysteryState().privateItemId = "piano";
+    mocks.generateJson.mockRejectedValue(new Error("인공지능 연결 끊김"));
+    let actionIndex = 0;
+    let version = 1;
+    for (const question of ["검은색인가요?", "색깔이 주황색인가요?", "흰색이 있나요?"]) {
+      expect((await submitMysteryQuestion(actionIndex++, version++, question)).status).toBe(200);
+      if (mode === "ai") expect((await runMysteryAiTurn(actionIndex++, version++)).status).toBe(200);
+      expect((await readResult()).status).toBe(200);
+    }
+    const solved = await submitMysteryGuess(actionIndex, version, "피아노");
+    expect(solved.status).toBe(200);
+    expect(runs.get("run-1")!.status).toBe("SETTLED");
+    expect(pointLogs).toHaveLength(1);
+    expect((await submitMysteryGuess(actionIndex, version, "피아노")).status).toBe(200);
+    expect(pointLogs).toHaveLength(1);
+    expect(mocks.generateJson).not.toHaveBeenCalled();
   });
 
   it("인공지능 차례는 외부 모델과 클라이언트 선택값 없이 공개 단서로 결정한다", async () => {

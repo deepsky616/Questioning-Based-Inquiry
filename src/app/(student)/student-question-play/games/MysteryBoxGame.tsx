@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MysteryColorGuide } from "./MysteryColorGuide";
 import { useLocale, useTranslations } from "next-intl";
 import { MYSTERY_PRESENTATION } from "./mystery-box-presentation";
 import { Button } from "@/components/ui/button";
@@ -440,6 +441,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       />
 
       <p className="text-sm leading-relaxed text-muted-foreground">{t("mysteryAnswerGuide")}</p>
+      <MysteryColorGuide locale={mysteryLocale} />
 
       {error && (
         <div className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-950 dark:border-red-700 dark:bg-red-950 dark:text-red-100">

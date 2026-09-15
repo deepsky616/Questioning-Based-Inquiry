@@ -231,6 +231,13 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     expect(firstPrompt).not.toHaveProperty("itemId");
     expect(firstPrompt).not.toHaveProperty("hiddenItemId");
     expect(firstPrompt.candidateItems).toHaveLength(MYSTERY_ITEMS.length);
+    expect(firstPrompt.candidateItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "piano", representativeColors: ["black", "white"] }),
+      expect.objectContaining({ id: "carrot", representativeColors: ["orange"] }),
+    ]));
+    const colorVerifierPrompt = JSON.parse(mocks.generateJson.mock.calls[1][0].prompt);
+    expect(colorVerifierPrompt.candidateItems).toEqual(firstPrompt.candidateItems);
+
     expect(firstPrompt.candidateItems.map(
       (item: { id: string }) => item.id,
     )).toEqual(MYSTERY_ITEMS.map(({ id }) => id));
