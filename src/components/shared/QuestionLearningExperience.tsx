@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { AiEthicsLearning } from "@/components/shared/AiEthicsLearning";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuestionDetectiveSlides } from "@/components/shared/QuestionDetectiveSlides";
@@ -11,12 +12,15 @@ import { cn } from "@/lib/utils";
 import type { TeachingExamplesData } from "@/lib/question-teaching-examples-types";
 
 export type QuestionLearningAudience = "student" | "teacher";
-type TeacherView = "learning" | "teaching";
+type LearningView = "learning" | "ethics" | "teaching";
 type PendingFocus = "teachingTitle" | "teachingGuideTrigger" | null;
 
 export function QuestionLearningExperience({ audience, teachingExamples }: { audience: QuestionLearningAudience; teachingExamples?: TeachingExamplesData }) {
   const t = useTranslations("questionLearning");
-  const [teacherView, setTeacherView] = useState<TeacherView>("learning");
+  const [activeView, setActiveView] = useState<LearningView>("learning");
+  const id = useId();
+  const views: LearningView[] = audience === "teacher" ? ["learning", "ethics", "teaching"] : ["learning", "ethics"];
+  const ethicsTabRef = useRef<HTMLButtonElement>(null);
   const learningTabRef = useRef<HTMLButtonElement>(null);
   const teachingTabRef = useRef<HTMLButtonElement>(null);
   const teachingTitleRef = useRef<HTMLHeadingElement>(null);
@@ -24,10 +28,17 @@ export function QuestionLearningExperience({ audience, teachingExamples }: { aud
   const pendingFocus = useRef<PendingFocus>(null);
 
   useEffect(() => {
+    const syncHash = () => setActiveView(window.location.hash === "#ai-ethics" ? "ethics" : "learning");
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
+  useEffect(() => {
     const focusTarget = pendingFocus.current;
     const targetIsVisible =
-      (teacherView === "teaching" && focusTarget === "teachingTitle") ||
-      (teacherView === "learning" && focusTarget === "teachingGuideTrigger");
+      (activeView === "teaching" && focusTarget === "teachingTitle") ||
+      (activeView === "learning" && focusTarget === "teachingGuideTrigger");
     if (!targetIsVisible) return;
 
     requestAnimationFrame(() => {
@@ -35,41 +46,41 @@ export function QuestionLearningExperience({ audience, teachingExamples }: { aud
       (focusTarget === "teachingTitle" ? teachingTitleRef : teachingGuideTriggerRef).current?.focus();
       pendingFocus.current = null;
     });
-  }, [teacherView]);
+  }, [activeView]);
 
   const showTeaching = () => {
     pendingFocus.current = "teachingTitle";
-    setTeacherView("teaching");
+    setActiveView("teaching");
   };
 
   const returnToLearning = () => {
     pendingFocus.current = "teachingGuideTrigger";
-    setTeacherView("learning");
+    setActiveView("learning");
   };
 
-  const selectTeacherView = (next: TeacherView) => {
+  const selectView = (next: LearningView) => {
     pendingFocus.current = null;
-    setTeacherView(next);
+    setActiveView(next);
+    const url = new URL(window.location.href);
+    if (next === "ethics") url.hash = "ai-ethics";
+    else if (url.hash === "#ai-ethics") url.hash = "";
+    window.history.replaceState(window.history.state, "", url);
   };
 
-  const moveTeacherTab = (event: KeyboardEvent<HTMLButtonElement>, current: TeacherView) => {
-    const next =
-      event.key === "Home"
-        ? "learning"
-        : event.key === "End"
-          ? "teaching"
-          : event.key === "ArrowLeft" || event.key === "ArrowRight"
-            ? current === "learning"
-              ? "teaching"
-              : "learning"
-            : null;
+  const moveTab = (event: KeyboardEvent<HTMLButtonElement>, current: LearningView) => {
+    const currentIndex = views.indexOf(current);
+    const next = event.key === "Home" ? views[0]
+      : event.key === "End" ? views[views.length - 1]
+      : event.key === "ArrowRight" ? views[(currentIndex + 1) % views.length]
+      : event.key === "ArrowLeft" ? views[(currentIndex - 1 + views.length) % views.length]
+      : null;
 
     if (!next) return;
 
     event.preventDefault();
-    selectTeacherView(next);
+    selectView(next);
     requestAnimationFrame(() => {
-      (next === "learning" ? learningTabRef : teachingTabRef).current?.focus();
+      (next === "learning" ? learningTabRef : next === "ethics" ? ethicsTabRef : teachingTabRef).current?.focus();
     });
   };
 
@@ -92,56 +103,53 @@ export function QuestionLearningExperience({ audience, teachingExamples }: { aud
   return (
     <div className="space-y-6">
       <PageHeader iconHref={`/${audience}-question-learning`} title={t("title")} description={t("subtitle")} />
-      {audience === "student" ? (
-        <QuestionDetectiveSlides completionActions={completionActions} />
-      ) : (
-        <>
-          <div
-            role="tablist"
-            aria-label={t("teacherViewsLabel")}
-            className="flex min-h-11 gap-1 border-b"
+      <div
+        role="tablist"
+        aria-label={t("learningViewsLabel")}
+        className="flex min-h-11 gap-1 border-b"
+      >
+        {views.map((view) => (
+          <button
+            key={view}
+            ref={view === "learning" ? learningTabRef : view === "ethics" ? ethicsTabRef : teachingTabRef}
+            id={`${id}-view-${view}`}
+            type="button"
+            role="tab"
+            aria-selected={activeView === view}
+            aria-controls={`${id}-panel-${view}`}
+            tabIndex={activeView === view ? 0 : -1}
+            onClick={() => selectView(view)}
+            onKeyDown={(event) => moveTab(event, view)}
+            className={cn(
+              "min-h-11 border-b-2 px-3 text-sm font-bold sm:px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+              activeView === view
+                ? "border-sky-600 text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
           >
-            {(["learning", "teaching"] as const).map((view) => (
-              <button
-                key={view}
-                ref={view === "learning" ? learningTabRef : teachingTabRef}
-                id={`question-learning-view-${view}`}
-                type="button"
-                role="tab"
-                aria-selected={teacherView === view}
-                aria-controls={`question-learning-panel-${view}`}
-                tabIndex={teacherView === view ? 0 : -1}
-                onClick={() => selectTeacherView(view)}
-                onKeyDown={(event) => moveTeacherTab(event, view)}
-                className={cn(
-                  "min-h-11 border-b-2 px-4 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-                  teacherView === view
-                    ? "border-sky-600 text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {t(view === "learning" ? "learningView" : "teachingView")}
-              </button>
-            ))}
-          </div>
-          <section
-            id="question-learning-panel-learning"
-            role="tabpanel"
-            aria-labelledby="question-learning-view-learning"
-            hidden={teacherView !== "learning"}
-          >
-            <QuestionDetectiveSlides allowPresentation completionActions={completionActions} />
-          </section>
-          <section
-            id="question-learning-panel-teaching"
-            role="tabpanel"
-            aria-labelledby="question-learning-view-teaching"
-            hidden={teacherView !== "teaching"}
-          >
-            <TeacherQuestionLearningGuide titleRef={teachingTitleRef} onBack={returnToLearning} examplesData={teachingExamples} />
-          </section>
-        </>
-      )}
+            {t(view === "ethics" ? "ethicsTab" : view === "teaching" ? "teachingView" : audience === "student" ? "studentLearningView" : "learningView")}
+          </button>
+        ))}
+      </div>
+      <section
+        id={`${id}-panel-learning`}
+        role="tabpanel"
+        aria-labelledby={`${id}-view-learning`}
+        hidden={activeView !== "learning"}
+      >
+        <QuestionDetectiveSlides allowPresentation={audience === "teacher"} completionActions={completionActions} />
+      </section>
+      <section id={`${id}-panel-ethics`} role="tabpanel" aria-labelledby={`${id}-view-ethics`} hidden={activeView !== "ethics"}>
+        <AiEthicsLearning audience={audience} />
+      </section>
+      {audience === "teacher" && <section
+        id={`${id}-panel-teaching`}
+        role="tabpanel"
+        aria-labelledby={`${id}-view-teaching`}
+        hidden={activeView !== "teaching"}
+      >
+        <TeacherQuestionLearningGuide titleRef={teachingTitleRef} onBack={returnToLearning} examplesData={teachingExamples} />
+      </section>}
     </div>
   );
 }

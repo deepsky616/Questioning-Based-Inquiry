@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { createRef, StrictMode, type ReactElement } from "react";
@@ -958,4 +958,22 @@ describe("학생 질문 분석 결과", () => {
     expect(screen.queryByText("분석 결과")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
   });
+});
+
+
+it("사용 약속을 열고 닫아도 작성 중인 질문과 선택 수업을 보존한다", async () => {
+  Element.prototype.scrollIntoView = vi.fn();
+  appState.search = "sessionId=session-2";
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ configured: true }))));
+  renderWithIntl(<AskPage />);
+  const sessionSelect = await screen.findByLabelText(/질문수업 선택/);
+  await waitFor(() => expect(sessionSelect).toHaveValue("session-2"));
+  const input = screen.getByRole("textbox", { name: /질문/ });
+  fireEvent.change(input, { target: { value: "내가 먼저 생각한 질문이에요." } });
+  fireEvent.click(screen.getByRole("button", { name: "사용 약속 보기" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByRole("heading", { name: "질문 연구소 사용 약속" })).toBeVisible();
+  fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+  expect(input).toHaveValue("내가 먼저 생각한 질문이에요.");
+  expect(sessionSelect).toHaveValue("session-2");
 });

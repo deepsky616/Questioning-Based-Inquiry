@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { questionTeachingGuideForLocale } from "@/lib/question-teaching-guide-data";
 import { practiceSelectionSearch } from "@/lib/practice-selection";
 import type { TeachingExamplesData } from "@/lib/question-teaching-examples-types";
+import { AiEthicsTeachingGuide } from "@/components/shared/AiEthicsLearning";
 import { TeacherQuestionExamples } from "./TeacherQuestionExamples";
 
 interface TeacherQuestionLearningGuideProps {
@@ -53,6 +54,8 @@ export function TeacherQuestionLearningGuide({
           {t("backToLearning")}
         </Button>
       </div>
+
+      <AiEthicsTeachingGuide />
 
       {examplesData?.status === "ready" && <section className="rounded-xl border bg-muted/30 p-4" aria-label={t("gradeExamplesTitle")}>
         <div className="flex flex-wrap items-center justify-between gap-3">

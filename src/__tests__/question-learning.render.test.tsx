@@ -124,6 +124,9 @@ describe("질문학습 슬라이드", () => {
     expect(learningTab).toHaveAttribute("aria-selected", "true");
 
     fireEvent.keyDown(learningTab, { key: "ArrowRight" });
+    const ethicsTab = screen.getByRole("tab", { name: "AI 사용 약속" });
+    expect(ethicsTab).toHaveFocus();
+    fireEvent.keyDown(ethicsTab, { key: "ArrowRight" });
     expect(screen.getByRole("tab", { name: "수업 활용" })).toHaveFocus();
   });
 

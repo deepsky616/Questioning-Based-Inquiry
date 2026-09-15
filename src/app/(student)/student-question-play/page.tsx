@@ -1,5 +1,7 @@
 "use client";
 
+import { AiEthicsReminder } from "@/components/shared/AiEthicsReminder";
+
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -79,6 +81,8 @@ export default function StudentQuestionPlayPage() {
               )}
             </div>
           </div>
+
+          <AiEthicsReminder context="game" />
 
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-24 gap-4">

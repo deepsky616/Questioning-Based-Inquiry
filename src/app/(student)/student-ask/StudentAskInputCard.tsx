@@ -1,5 +1,7 @@
 "use client";
 
+import { AiEthicsReminder } from "@/components/shared/AiEthicsReminder";
+
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { Check, PencilLine } from "lucide-react";
@@ -142,6 +144,7 @@ export function StudentAskInputCard({
                 className="min-h-[10rem] resize-none text-base leading-7"
               />
               <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
+              <AiEthicsReminder context="question" />
               {draftStatus !== "empty" && (
                 <p role="status" className={`text-xs leading-5 ${draftStatus === "error" ? "text-destructive" : "text-muted-foreground"}`}>
                   {t(`draft_${draftStatus}`)}

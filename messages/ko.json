@@ -2530,6 +2530,9 @@
     "statsPracticeActionsTitle": "{type} 연습을 준비하고 학생에게 안내하세요."
   },
   "questionLearning": {
+    "ethicsTab": "AI 사용 약속",
+    "studentLearningView": "질문 배우기",
+    "learningViewsLabel": "질문학습 메뉴",
     "title": "질문학습",
     "subtitle": "질문을 살펴보고 탐구의 힘을 길러요.",
     "summaryTitle": "질문 유형 알아보기",

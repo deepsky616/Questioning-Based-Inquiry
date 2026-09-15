@@ -1,5 +1,7 @@
 "use client";
 
+import { AiEthicsReminder } from "@/components/shared/AiEthicsReminder";
+
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
@@ -243,6 +245,7 @@ export function CommentThread({
           })}
         </div>
       )}
+      {user.id && user.role === "STUDENT" && <AiEthicsReminder context="comment" />}
       {postError && <p role="alert" className="text-sm text-destructive">{t("postFailed")}</p>}
       {user.id && (
         <div className="flex gap-2">
