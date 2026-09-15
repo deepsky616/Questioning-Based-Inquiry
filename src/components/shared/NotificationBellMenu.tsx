@@ -51,6 +51,8 @@ const countClass: Record<NotificationTone, string> = {
   warning: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
 };
 
+const pillClass = "inline-flex min-h-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-bold leading-none";
+
 export function NotificationBellMenu({
   title,
   emptyText,
@@ -99,19 +101,19 @@ export function NotificationBellMenu({
           {item.meta && <span className="mt-0.5 block text-xs text-muted-foreground">{item.meta}</span>}
         </span>
         {typeof item.count === "number" && item.count > 0 && (
-          <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", countClass[tone])}>
+          <span className={cn(pillClass, countClass[tone])}>
             {item.count}
           </span>
         )}
         {item.unread && unreadText && (
-          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", countClass[tone])}>
+          <span className={cn(pillClass, countClass[tone])}>
             {unreadText}
           </span>
         )}
       </>
     );
     const itemClass = cn(
-      "flex w-full gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted",
+      "flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted",
       item.unread === false && "opacity-75",
     );
     const handleClick = () => {
@@ -143,7 +145,7 @@ export function NotificationBellMenu({
           {count > 0 && (
             <span
               aria-hidden="true"
-              className={cn("absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full px-1 text-center text-[10px] font-bold leading-[18px] text-white", badgeClass[badgeTone])}
+              className={cn("absolute -right-0.5 -top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center whitespace-nowrap rounded-full px-1 text-[10px] font-bold leading-none text-white", badgeClass[badgeTone])}
             >
               {count > 99 ? "99+" : count}
             </span>
