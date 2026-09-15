@@ -1519,7 +1519,7 @@
     "statComments": "{count} comments",
     "currentBasis": "Current: {questions} questions · {likes} likes · {comments} comments",
     "analysisStale": "Since analysis: +{questions} questions · +{likes} likes · +{comments} comments",
-    "aiAnalysisLabel": "AI analysis",
+    "aiAnalysisLabel": "Analysis complete",
     "latestAnalysisTime": "Last analyzed {time}",
     "analysisInfo": "Analysis details",
     "analysisTime": "Analyzed {time}",
