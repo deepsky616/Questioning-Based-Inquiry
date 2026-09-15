@@ -1519,7 +1519,7 @@
     "statComments": "댓글 {count}개",
     "currentBasis": "현재 기준: 질문 {questions}개 · 좋아요 {likes}개 · 댓글 {comments}개",
     "analysisStale": "분석 이후 질문 {questions}개 · 좋아요 {likes}개 · 댓글 {comments}개 추가",
-    "aiAnalysisLabel": "인공지능 분석",
+    "aiAnalysisLabel": "분석 완료",
     "latestAnalysisTime": "최근 분석일 {time}",
     "analysisInfo": "분석 정보",
     "analysisTime": "분석 일시 {time}",

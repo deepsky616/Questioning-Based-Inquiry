@@ -7,7 +7,7 @@ import { ReportAnalysisMetadata } from "@/components/reports/ReportAnalysisMetad
 afterEach(cleanup);
 it("교사는 최근 분석일을 바로 보고 분석 정보를 펼쳐 실제 저장된 모델을 확인한다", () => {
   renderWithIntl(<ReportAnalysisMetadata analysis={{ analyzedAt: "2026-09-08T00:00:00Z", analysisModel: "stored-model" }} showAnalysisModel />);
-  expect(screen.getByText("인공지능 분석", { exact: true })).toBeVisible();
+  expect(screen.getByText("분석 완료", { exact: true })).toBeVisible();
   expect(screen.getByText(/최근 분석일/)).toBeVisible();
   expect(screen.getByText(/stored-model/)).not.toBeVisible();
   fireEvent.click(screen.getByText("분석 정보", { exact: true }));
