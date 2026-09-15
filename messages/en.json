@@ -2530,6 +2530,9 @@
     "statsPracticeActionsTitle": "Prepare {type} practice and share it with your students."
   },
   "questionLearning": {
+    "ethicsTab": "AI use promises",
+    "studentLearningView": "Learn questions",
+    "learningViewsLabel": "Question learning views",
     "title": "Question Learning",
     "subtitle": "Explore questions and strengthen your inquiry skills.",
     "summaryTitle": "Learn the question types",

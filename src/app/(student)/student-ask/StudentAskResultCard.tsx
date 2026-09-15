@@ -1,5 +1,7 @@
 "use client";
 
+import { AiEthicsReminder } from "@/components/shared/AiEthicsReminder";
+
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ export function StudentAskResultCard({
         <CardTitle>{t("resultHeader")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <AiEthicsReminder context="analysis" />
         {result.analysisSource === "ai" && (
           <div
             role="status"

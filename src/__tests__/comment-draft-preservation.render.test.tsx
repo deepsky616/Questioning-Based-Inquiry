@@ -7,7 +7,7 @@
  * 사라진다. 폴링 갱신을 재현(setQueryData)한 뒤에도 댓글 입력창과
  * 입력 중이던 내용이 그대로 유지되는지 고정한다.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -153,4 +153,18 @@ describe("내 질문 댓글 초안 보존", () => {
     expect(after.length).toBeGreaterThan(0);
     expect(after[0]).toHaveValue(DRAFT);
   });
+});
+
+
+it("댓글 작성 중 사용 약속을 확인해도 댓글을 보내거나 지우지 않는다", async () => {
+  const fetchMock = stubFetch(() => [makeQuestion()]);
+  renderView(<ExploreQuestionsView />);
+  await screen.findByText("빛은 왜 굴절되나요?");
+  fireEvent.click(screen.getByRole("button", { name: /💬/ }));
+  const input = await screen.findByPlaceholderText(COMMENT_PLACEHOLDER);
+  fireEvent.change(input, { target: { value: DRAFT } });
+  fireEvent.click(screen.getByRole("button", { name: "사용 약속 보기" }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "닫기" }));
+  expect(input).toHaveValue(DRAFT);
+  expect(fetchMock.mock.calls.every(call => !((call as unknown[])[1] as RequestInit | undefined)?.method)).toBe(true);
 });

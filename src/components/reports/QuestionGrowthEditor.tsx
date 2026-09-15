@@ -1,5 +1,7 @@
 "use client";
 
+import { AiEthicsReminder } from "@/components/shared/AiEthicsReminder";
+
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -136,6 +138,7 @@ function AccountGrowthEditor({ userId, questionId, quick, onProtectionChange }: 
     {question && <>
       {query.data?.canEdit ? <>
         {draftStatus !== "empty" && message !== "saved" && <p role={draftStatus === "error" ? "alert" : "status"} className={`rounded-lg border p-3 text-sm leading-relaxed ${draftStatus === "error" ? "text-destructive" : "text-muted-foreground"}`}>{t(`draft_${draftStatus}`)}</p>}
+        <AiEthicsReminder context="growth" />
         {!quick && <QuestionGrowthContent record={content} questionOnly formLayout />}
         <div className={`grid gap-4 ${quick ? "" : "sm:grid-cols-2"}`}>
           <div className="flex min-w-0 flex-col rounded-xl border bg-background p-4">

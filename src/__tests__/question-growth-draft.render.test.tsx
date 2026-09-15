@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { QuestionGrowthEditor } from "@/components/reports/QuestionGrowthEditor";
@@ -69,4 +69,17 @@ it("임시 보관 실패 때 입력을 유지하고 확인 없이 작성 창을 
   expect(confirm).toHaveBeenCalled();
   expect(close).not.toHaveBeenCalled();
   expect(input).toHaveValue("보호할 내용");
+});
+
+
+it("성장 기록 안의 사용 약속을 닫아도 부모 창과 작성 내용은 유지한다", async () => {
+  const close = vi.fn();
+  renderWithIntl(<QuestionGrowthDialog questionId="q1" onClose={close} />);
+  const input = await screen.findByRole("textbox", { name: /질문을 만들거나 고친 점/ });
+  fireEvent.change(input, { target: { value: "AI의 제안 중 비교 대상을 정하는 부분만 받아들였어요." } });
+  fireEvent.click(screen.getByRole("button", { name: "사용 약속 보기" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "질문 연구소 사용 약속" })).getByRole("button", { name: "닫기" }));
+  expect(input).toHaveValue("AI의 제안 중 비교 대상을 정하는 부분만 받아들였어요.");
+  expect(close).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "성장 기록 저장" })).toBeEnabled();
 });
