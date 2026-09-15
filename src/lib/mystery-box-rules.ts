@@ -1,3 +1,4 @@
+import { resolveMysteryColorQuestion } from "./mystery-colors";
 import { resolveKnownMysteryQuestion, resolveMysteryAnatomyQuestion } from "./mystery-known-questions";
 
 export const MYSTERY_ATTRIBUTES = [
@@ -131,7 +132,7 @@ export interface MysteryKnownAnswerEvidence {
   question: string;
   locale: MysteryLocale;
   answer: "yes" | "no";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
 }
 
 export interface MysteryItem {
@@ -918,7 +919,7 @@ const MYSTERY_ITEM_DEFINITIONS = [
   }),
 ] as const satisfies readonly MysteryItemDefinition[];
 
-type BuiltInMysteryItemId = typeof MYSTERY_ITEM_DEFINITIONS[number]["id"];
+export type BuiltInMysteryItemId = typeof MYSTERY_ITEM_DEFINITIONS[number]["id"];
 
 const FACT_OVERRIDES: Record<string, Partial<Record<MysteryFact, boolean>>> = {
   apple: { plant: false, fruit: true, plantDerived: true },
@@ -1795,7 +1796,7 @@ export function isMysteryAnswerEvidence(
       typeof evidence.question === "string" && evidence.question.length > 0 &&
       [...evidence.question].length <= 200 && evidence.question === evidence.question.trim() &&
       (evidence.locale === "ko" || evidence.locale === "en") &&
-      (evidence.answer === "yes" || evidence.answer === "no") && (evidence.version === 1 || evidence.version === 2);
+      (evidence.answer === "yes" || evidence.answer === "no") && (evidence.version === 1 || evidence.version === 2 || evidence.version === 3);
   }
   if (evidence.kind === "dynamic") {
     return knowledgeVersion >= 4 &&
@@ -1827,7 +1828,9 @@ export function resolveMysteryAnswerEvidence(
 ): MysteryAnswer {
   if ("kind" in evidence && evidence.kind === "known") {
     return evidence.question === question &&
-      resolveKnownMysteryQuestion(item, question, evidence.locale) === evidence.answer
+      (evidence.version === 3
+        ? resolveMysteryColorQuestion(item, question, evidence.locale)
+        : resolveKnownMysteryQuestion(item, question, evidence.locale, "legacy")) === evidence.answer
       ? evidence.answer : "unknown";
   }
   if ("kind" in evidence) {
@@ -1853,7 +1856,11 @@ export function resolveKnownMysteryAnswer(
     ...request,
     answer,
     ...(answer === "unknown" ? {} : {
-      evidence: { kind: "known", question: request.question, locale: request.locale, answer, version: resolveMysteryAnatomyQuestion(item, request.question, request.locale) === null ? 1 : 2 },
+      evidence: {
+        kind: "known", question: request.question, locale: request.locale, answer,
+        version: resolveMysteryColorQuestion(item, request.question, request.locale) !== null
+          ? 3 : resolveMysteryAnatomyQuestion(item, request.question, request.locale) === null ? 1 : 2,
+      },
     }),
   };
 }

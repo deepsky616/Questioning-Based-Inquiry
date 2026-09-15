@@ -3,6 +3,16 @@ import { evaluateStoryDiceAnswerQuality } from "@/lib/question-game-story-answer
 
 describe("이야기 주사위 대답 관련성 판정", () => {
   it.each([
+    ["토끼는 왜 기분이 좋았나요?", "친구를 만났기 때문이에요.", "ko", "reason"],
+    ["누가 슬픈 기분을 느꼈나요?", "토끼예요.", "ko", "person"],
+    ["언제 기분이 좋아졌나요?", "아침이에요.", "ko", "time"],
+    ["Why did the rabbit feel happy?", "Because it met a friend.", "en", "reason"],
+    ["Who was feeling sad?", "The rabbit.", "en", "person"],
+  ] as const)("감정 단어만으로 질문의 뜻을 바꾸지 않는다: %s", (question, answer, locale, intent) => {
+    expect(evaluateStoryDiceAnswerQuality(question, answer, locale)).toMatchObject({ decision: "review", intent });
+  });
+
+  it.each([
     "그냥",
     "그냥요.",
     "몰라",

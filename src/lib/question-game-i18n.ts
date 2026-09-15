@@ -512,10 +512,15 @@ export function getRelayTopics(locale: string) {
   return RELAY_TOPICS[resolveQuestionGameLocale(locale)];
 }
 
-export function isQuestionFormForLocale(text: string, locale: string): boolean {
-  const trimmed = text.trim();
+export function isQuestionFormForLocale(text: string, locale: string, ruleVersion: 1 | 2 = 2): boolean {
+  // 까바놀이의 과거 오답 기록도 당시 기준으로 검증할 수 있게 이전 형식을 보존한다.
+  const trimmed = (ruleVersion === 1 ? text : text.normalize("NFC")).trim();
   if (!trimmed) return false;
   if (/[?？]$/.test(trimmed)) return true;
+  if (ruleVersion === 2) {
+    if (resolveQuestionGameLocale(locale) === "en" && /^(?:has|have|had|shall|must)\b/i.test(trimmed)) return true;
+    if (resolveQuestionGameLocale(locale) === "ko" && /(?:까|죠|지요)$/u.test(trimmed)) return true;
+  }
   if (resolveQuestionGameLocale(locale) === "en") {
     return /^(who|what|when|where|why|how|is|are|am|was|were|do|does|did|can|could|should|would|will|may|might)\b/i.test(trimmed);
   }

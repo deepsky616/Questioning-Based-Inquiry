@@ -1,3 +1,4 @@
+import { resolveMysteryColorQuestion } from "./mystery-colors";
 import { MYSTERY_REVIEWED_ANATOMY } from "./mystery-item-context";
 import type { MysteryAnswer, MysteryItem, MysteryLocale } from "./mystery-box-rules";
 
@@ -18,7 +19,7 @@ const colors: Record<string, string> = {
   pink: "pink", brown: "brown", black: "black", white: "white", gray: "gray", grey: "gray",
 };
 
-// 일반적으로 볼 수 있는 모습의 색만 사용한다. 품종·제품에 따라 다양한 것은 판정을 보류한다.
+// 기존 근거 버전 1·2의 기록 검증용이다. 새 질문은 mystery-colors의 대표 색상을 사용한다.
 const typicalColors: Partial<Record<string, readonly string[]>> = {
   apple: ["red", "green"], strawberry: ["red"], banana: ["yellow"],
   carrot: ["orange"], watermelon: ["green", "red"], pineapple: ["yellow", "brown", "green"],
@@ -43,7 +44,12 @@ export function resolveKnownMysteryQuestion(
   item: MysteryItem,
   question: string,
   locale: MysteryLocale,
+  colorRules: "legacy" | "game" = "game",
 ): MysteryAnswer | null {
+  if (colorRules === "game") {
+    const colorAnswer = resolveMysteryColorQuestion(item, question, locale);
+    if (colorAnswer !== null) return colorAnswer;
+  }
   const text = question.normalize("NFC").trim().toLowerCase().replace(/[?？]+$/u, "").trim();
   const nameMatch = locale === "ko"
     ? text.match(/^(?:정답(?:의)?\s*)?(?:이름(?:이|은)?\s*)?(?:한글(?:로)?\s*)?(\d{1,2}|한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉|열)\s*글자(?:인가요|입니까|예요|인가|야|죠|가\s*아닌가요|가\s*아닙니까)$/u)
@@ -57,7 +63,7 @@ export function resolveKnownMysteryQuestion(
   const colorMatch = locale === "ko"
     ? text.match(/^(?:(?:보통|주로)\s*)?(?:색(?:깔)?(?:이|은)\s*)?(빨간|빨강|붉은|주황|오렌지|노란|노랑|초록색|초록|녹색|파란|파랑|남색|보라|분홍|갈색|검은|검정|까만|하얀|흰|하양|회색)(?:색)?(?:인가요|입니까|이에요|예요|인가|이야|이\s*아닌가요|이\s*아닙니까)$/u)
     : text.match(/^is it (?:usually |mostly )?(red|orange|yellow|green|blue|indigo|purple|pink|brown|black|white|gr[ae]y)(?: in colou?r)?$/u);
-  if (colorMatch) {
+  if (colorRules === "legacy" && colorMatch) {
     const palette = typicalColors[item.id];
     return palette ? yesNo(palette.includes(colors[colorMatch[1]]), /아닌|아닙/u.test(text)) : "unknown";
   }

@@ -57,7 +57,7 @@ for (const role of ["STUDENT", "TEACHER"] as const) {
     await expect(page.locator("#question-growth-library")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "성장 기록 모아보기", exact: true })).toHaveCount(0);
     expect(growthRequests).toEqual([]);
-    await expect(analysis.getByText("인공지능 분석", { exact: true })).toBeVisible();
+    await expect(analysis.getByText("분석 완료", { exact: true })).toBeVisible();
     await expect(analysis.getByText(/최근 분석일/)).toBeVisible();
     if (role === "TEACHER") {
       await expect(analysis.getByText(/stored-analysis-model/)).not.toBeVisible();

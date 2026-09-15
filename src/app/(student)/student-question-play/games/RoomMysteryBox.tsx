@@ -9,6 +9,7 @@ import {
   Send,
   Target,
 } from "lucide-react";
+import { MysteryColorGuide } from "./MysteryColorGuide";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
@@ -448,6 +449,7 @@ export default function RoomMysteryBox({
             </p>
           </div>
           <p id="room-mystery-question-guide" className="text-sm leading-relaxed text-muted-foreground">{t("mysteryAnswerGuide")}</p>
+          <MysteryColorGuide locale={locale} />
           <textarea
             id="room-mystery-question"
             aria-describedby={`room-mystery-question-guide${questionError ? " room-mystery-question-error" : ""}`}

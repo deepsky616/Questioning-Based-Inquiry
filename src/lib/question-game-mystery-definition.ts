@@ -1,3 +1,4 @@
+import { resolveMysteryColorQuestion } from "./mystery-colors";
 import { randomInt } from "node:crypto";
 import { resolveMysteryAnatomyQuestion } from "./mystery-known-questions";
 import type { Prisma } from "@prisma/client";
@@ -362,6 +363,11 @@ function candidateItems(
         activity.answerEvidence.verification === "independent-item-agreement") continue;
       const filtered = candidates.filter((item) => {
         if (activity.answerEvidence && "kind" in activity.answerEvidence &&
+          activity.answerEvidence.kind === "known" && activity.answerEvidence.version === 3) {
+          const answer = resolveMysteryColorQuestion(item, activity.text, locale);
+          return answer === "unknown" || answer === activity.answer;
+        }
+        if (activity.answerEvidence && "kind" in activity.answerEvidence &&
           activity.answerEvidence.kind === "known" && activity.answerEvidence.version === 2) {
           const answer = resolveMysteryAnatomyQuestion(item, activity.text, locale);
           return answer === "unknown" || answer === activity.answer;
@@ -401,7 +407,7 @@ export function planMysteryAiActivity(
   const used = new Set(history.flatMap((activity) => {
     if (activity.kind !== "QUESTION") return [];
     if (activity.answerEvidence && "kind" in activity.answerEvidence &&
-      activity.answerEvidence.kind === "known" && activity.answerEvidence.version === 2) return [];
+      activity.answerEvidence.kind === "known" && activity.answerEvidence.version >= 2) return [];
     const analysis = analyzeRecordedMysteryQuestion(
       activity.text,
       MYSTERY_ITEMS[0],
