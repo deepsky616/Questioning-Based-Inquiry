@@ -642,9 +642,9 @@ export function ReportView({
                           {/* 세션 집계 배지 — 질문조회 탭 분석과 동일한 형식 */}
                           {typeof rv?.totalQuestions === "number" && (
                             <div className="flex flex-wrap gap-2 text-xs">
-                              <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: rv.totalQuestions ?? 0 })}</span>
-                              <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: rv.totalLikes ?? 0 })}</span>
-                              <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: rv.totalComments ?? 0 })}</span>
+                              <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 tabular-nums text-muted-foreground">{t("statQuestions", { count: rv.totalQuestions ?? 0 })}</span>
+                              <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 tabular-nums text-muted-foreground">{t("statLikes", { count: rv.totalLikes ?? 0 })}</span>
+                              <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 tabular-nums text-muted-foreground">{t("statComments", { count: rv.totalComments ?? 0 })}</span>
                             </div>
                           )}
                           {freshness?.hasCurrentCounts && (

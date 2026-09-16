@@ -100,7 +100,7 @@ function LikeButton({
       aria-label={tc(myLike ? "unlike" : "like")}
       onClick={click}
       disabled={pending}
-      className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 py-1 text-sm font-medium transition-colors ${
+      className={`inline-flex shrink-0 min-h-11 min-w-11 items-center justify-center gap-1 whitespace-nowrap tabular-nums rounded-full px-2 py-1 text-sm font-medium transition-colors ${
         myLike ? "bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900" : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-500"
       } ${pending ? "opacity-50" : ""}`}
     >
@@ -516,7 +516,7 @@ export function UnitDesignView() {
                               </ul>
                             </details>
                             {pub && (
-                              <div className="flex items-center gap-3 pt-1">
+                              <div className="flex flex-wrap items-center gap-3 pt-1">
                                 {likesVisible && (
                                   <LikeButton
                                     id={pub.id}
@@ -528,7 +528,7 @@ export function UnitDesignView() {
                                 <button
                                   type="button"
                                   onClick={() => setExpandedId((e) => (e === pub.id ? null : pub.id))}
-                                  className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-medium tabular-nums text-indigo-600 hover:text-indigo-800"
                                 >
                                   <span>💬 {pub.commentCount}</span>
                                   <span>{expandedId === pub.id ? t("close") : t("comment")}</span>

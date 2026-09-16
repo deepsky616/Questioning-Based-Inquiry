@@ -540,15 +540,15 @@ export default function StudentsPage() {
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                           <p className="text-[11px] text-muted-foreground">{t("colQuestion")}</p>
-                          <p className={`text-sm font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>{s.questionCount}</p>
+                          <p className={`whitespace-nowrap text-sm font-semibold tabular-nums ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>{s.questionCount}</p>
                         </div>
                         <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                           <p className="text-[11px] text-muted-foreground">{t("colAnswer")}</p>
-                          <p className={`text-sm font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>{s.commentCount}</p>
+                          <p className={`whitespace-nowrap text-sm font-semibold tabular-nums ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>{s.commentCount}</p>
                         </div>
                         <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                           <p className="text-[11px] text-muted-foreground">{t("colPoint")}</p>
-                          <p className={`text-sm font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>{s.totalPoints}</p>
+                          <p className={`whitespace-nowrap text-sm font-semibold tabular-nums ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>{s.totalPoints}</p>
                         </div>
                       </div>
                       <div className="mt-3 rounded-md bg-emerald-50 px-2 py-2 dark:bg-emerald-950/30">
@@ -578,17 +578,17 @@ export default function StudentsPage() {
                         <TableCell className="text-center text-muted-foreground">{s.studentNumber}</TableCell>
                         <TableCell className="font-medium">{s.name}{attentionReason(s) && <p className="mt-1 max-w-64 text-sm font-normal text-amber-800 dark:text-amber-200">{attentionReason(s)}</p>}</TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>
+                          <span className={`whitespace-nowrap font-semibold tabular-nums ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>
                             {s.questionCount}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                          <span className={`whitespace-nowrap font-semibold tabular-nums ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
                             {s.commentCount}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
+                          <span className={`whitespace-nowrap font-semibold tabular-nums ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
                             {s.totalPoints}
                           </span>
                         </TableCell>

@@ -78,7 +78,7 @@ export function TeacherQuestionLikeCount({
   };
 
   return (
-    <div className="group relative inline-block">
+    <div className="group relative inline-block shrink-0">
       <button
         type="button"
         onClick={handleToggleLike}
@@ -87,13 +87,13 @@ export function TeacherQuestionLikeCount({
         onMouseEnter={() => void loadLikedBy()}
         aria-label={likeToggleLabel ?? likeCountLabel}
         title={likeToggleLabel ?? likeCountLabel}
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium transition-colors ${
+        className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full tabular-nums px-2 py-1 text-sm font-medium transition-colors ${
           myLike
             ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
             : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-500"
         } ${isPending ? "opacity-50" : ""}`}
       >
-        <Heart className={`h-4 w-4 ${myLike ? "fill-current" : ""}`} aria-hidden="true" />
+        <Heart className={`h-4 w-4 shrink-0 ${myLike ? "fill-current" : ""}`} aria-hidden="true" />
         {likeCount}
       </button>
       {listIsCurrent && likeList.users.length > 0 && (

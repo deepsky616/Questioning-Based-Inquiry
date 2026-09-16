@@ -37,7 +37,7 @@ export function StudentMyQuestionsSummary({
       {cards.map((card) => (
         <div key={card.label} className="min-h-[96px] rounded-lg border bg-card p-3 md:p-4">
           <p className="text-xs font-medium text-muted-foreground">{card.label}</p>
-          <p className={`mt-2 text-2xl font-bold ${card.tone}`}>{card.value}</p>
+          <p className={`mt-2 whitespace-nowrap text-2xl font-bold tabular-nums ${card.tone}`}>{card.value}</p>
         </div>
       ))}
       <div className="col-span-2 rounded-lg border bg-muted/30 p-3 md:hidden">

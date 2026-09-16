@@ -394,19 +394,19 @@ export function StudentDetailDialog({
           <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-3 text-center">
             <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">{t("totalQuestions")}</p>
-            <p className="text-2xl font-black text-indigo-700">
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-indigo-700">
               {stats?.student.questionCount ?? student.questionCount}
             </p>
           </div>
           <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-3 text-center">
             <p className="text-xs text-emerald-800 dark:text-emerald-200 font-medium">{t("totalAnswers")}</p>
-            <p className="text-2xl font-black text-emerald-700">
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-emerald-700">
               {stats?.student.commentCount ?? student.commentCount}
             </p>
           </div>
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-3 text-center">
             <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">{t("totalPoints")}</p>
-            <p className="text-2xl font-black text-amber-700">
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-amber-700">
               {stats?.student.totalPoints ?? student.totalPoints}
             </p>
           </div>
@@ -416,19 +416,19 @@ export function StudentDetailDialog({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-500/30 p-3 text-center">
             <p className="text-xs text-rose-500 font-medium">{t("receivedLikes")}</p>
-            <p className="text-2xl font-black text-rose-600">{stats?.student.likesReceived ?? "-"}</p>
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-rose-600">{stats?.student.likesReceived ?? "-"}</p>
           </div>
           <div className="rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-500/30 p-3 text-center">
             <p className="text-xs text-sky-500 font-medium">{t("receivedAnswers")}</p>
-            <p className="text-2xl font-black text-sky-600">{stats?.student.commentsReceived ?? "-"}</p>
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-sky-600">{stats?.student.commentsReceived ?? "-"}</p>
           </div>
           <div className="rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-500/30 p-3 text-center">
             <p className="text-xs text-violet-500 font-medium">{t("goodQuestions")}</p>
-            <p className="text-2xl font-black text-violet-600">{stats?.student.goodQuestions ?? "-"}</p>
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-violet-600">{stats?.student.goodQuestions ?? "-"}</p>
           </div>
           <div className="rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-500/30 p-3 text-center">
             <p className="text-xs text-teal-500 font-medium">{t("gamePlays")}</p>
-            <p className="text-2xl font-black text-teal-600">{stats?.student.gamePlays ?? "-"}</p>
+            <p className="whitespace-nowrap text-2xl font-black tabular-nums text-teal-600">{stats?.student.gamePlays ?? "-"}</p>
           </div>
         </div>
 

@@ -102,7 +102,7 @@ function LikeButton({
       onClick={handleClick}
       disabled={isSelf || isPending || !user.id}
       title={isSelf ? t("likeSelfDisabled") : myLike ? t("unlike") : t("like")}
-      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap tabular-nums px-2 py-1 rounded-full text-xs font-medium transition-colors ${
         myLike
           ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
           : isSelf
@@ -225,7 +225,7 @@ function QuestionCard({
             </div>
           </div>
           {(commentsEnabled || (likesEnabled && q.likesVisibleToPeers !== false)) && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* 좋아요를 댓글 왼쪽에 함께 배치 */}
               {likesEnabled && q.likesVisibleToPeers !== false && (
                 <LikeButton
@@ -239,7 +239,7 @@ function QuestionCard({
               {commentsEnabled && (
                 <button
                   onClick={() => setShowComments((v) => !v)}
-                  className={`flex items-center gap-1 text-xs font-medium transition-colors ${
+                  className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-medium tabular-nums transition-colors ${
                     isTeacherShared && !showComments
                       ? "rounded-full bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700"
                       : "text-indigo-600 hover:text-indigo-800"

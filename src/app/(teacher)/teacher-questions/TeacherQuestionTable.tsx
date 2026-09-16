@@ -204,7 +204,7 @@ export function TeacherQuestionTable({
                   title={t("commentTooltip")}
                 >
                   <p className="text-[11px] text-muted-foreground">{t("colComments")}</p>
-                  <p className="text-sm font-semibold">💬 {commentCount}</p>
+                  <p className="whitespace-nowrap text-sm font-semibold tabular-nums">💬 {commentCount}</p>
                 </button>
                 <div className="flex flex-col items-center justify-center rounded-md bg-muted/40 px-2 py-2">
                   <p className="mb-1 text-[11px] text-muted-foreground">{t("colPublic")}</p>
@@ -332,7 +332,7 @@ export function TeacherQuestionTable({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="px-2 text-center whitespace-nowrap">
                     <TeacherQuestionLikeCount
                       questionId={question.id}
                       likeCount={question.likeCount}
@@ -344,11 +344,11 @@ export function TeacherQuestionTable({
                       onToggleLike={() => onToggleLike(question)}
                     />
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="px-2 text-center whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => onToggleComment(question.id)}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-medium tabular-nums text-indigo-600 hover:text-indigo-800"
                       title={t("commentTooltip")}
                     >
                       💬 {commentCountOverride[question.id] ?? question.commentCount ?? question.comments?.length ?? 0}

@@ -335,7 +335,7 @@ export function MyQuestionsView() {
               <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3">
                 <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                   <p className="text-[11px] text-muted-foreground">{t("colLikes")}</p>
-                  <p className="text-sm font-semibold text-rose-500">❤️ {q.likeCount ?? 0}</p>
+                  <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-rose-500">❤️ {q.likeCount ?? 0}</p>
                 </div>
                 <button
                   type="button"
@@ -343,7 +343,7 @@ export function MyQuestionsView() {
                   className="rounded-md bg-muted/40 px-2 py-2 text-center text-indigo-600 transition-colors hover:bg-muted"
                 >
                   <p className="text-[11px] text-muted-foreground">{t("colComments")}</p>
-                  <p className="text-sm font-semibold">💬 {commentCount}</p>
+                  <p className="whitespace-nowrap text-sm font-semibold tabular-nums">💬 {commentCount}</p>
                 </button>
               </div>
 
@@ -463,19 +463,19 @@ export function MyQuestionsView() {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center align-top">
+                  <TableCell className="px-2 text-center align-top whitespace-nowrap">
                     {/* 받은 좋아요(읽기 전용) — 탐구 탭과 같은 알약 모양 */}
-                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-medium text-rose-500">
+                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums text-rose-500">
                       <span>❤️</span>
                       <span>{q.likeCount ?? 0}</span>
                     </span>
                   </TableCell>
-                  <TableCell className="text-center align-top">
+                  <TableCell className="px-2 text-center align-top whitespace-nowrap">
                     {/* 댓글 토글 — 탐구 탭과 동일한 💬 개수 버튼 */}
                     <button
                       type="button"
                       onClick={() => toggleComments(q.id)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-800"
+                      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-medium tabular-nums text-indigo-600 transition-colors hover:text-indigo-800"
                     >
                       <span>💬 {commentCount}</span>
                       <span>{isExpanded ? tEx("close") : tEx("comment")}</span>
