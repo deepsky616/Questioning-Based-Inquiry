@@ -1,11 +1,11 @@
 "use client";
 
 // AI 개별 맞춤 답변 미리보기 다이얼로그 (전송 전 교사 확인·수정 단계).
-// 생성·전송 상태와 결과 메시지는 페이지 하단 액션 바와 공유하므로 페이지가 소유하고 props로 받는다.
+// 생성·전송 상태와 결과 메시지는 목록 안의 맞춤 답변 패널과 공유하므로 페이지가 소유하고 props로 받는다.
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import type { BulkPreview } from "./types";
 
 interface AiAnswerPreviewDialogProps {
@@ -54,9 +54,9 @@ export function AiAnswerPreviewDialog({
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{t("previewDialogTitle")}</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">
+          <DialogDescription className="mt-1">
             {t("previewDialogDesc")}
-          </p>
+          </DialogDescription>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
               {t("previewReady", { ready, total })}

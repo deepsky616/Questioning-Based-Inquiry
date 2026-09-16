@@ -509,6 +509,38 @@ function QuestionsContent() {
         displayed={displayed}
         totalCount={pageInfo.total}
         pageInfo={pageInfo}
+        bulkActions={selectedIds.size > 0 && (
+          <TeacherQuestionBulkActionBar
+            key={selectionScope}
+            selectedCount={selectedIds.size}
+            previewQuestions={previewQuestions}
+            hiddenPreviewCount={hiddenPreviewCount}
+            isGeneratingPreviews={isGeneratingPreviews}
+            isSendingPreviews={isSendingPreviews}
+            isBulkDeleting={isBulkDeleting}
+            bulkMsg={bulkMsg}
+            showBulkSuccess={showBulkSuccess}
+            onClearSelection={resetBulkState}
+            onPreviewBulkAi={handlePreviewBulkAi}
+            onBulkDelete={handleBulkDelete}
+            labels={{
+              selectedSummary: t("bulkSelectedSummary", { count: selectedIds.size }),
+              actionsLabel: t("bulkActionsLabel"),
+              openPanel: t("bulkOpenPanel"),
+              closePanel: t("bulkClosePanel"),
+              more: t("bulkMore"),
+              moreLabel: t("bulkMoreLabel"),
+              title: t("bulkPanelTitle"),
+              description: t("bulkPanelDesc"),
+              deselect: t("deselect"),
+              plusCount: (count) => t("plusCount", { count }),
+              aiGenerating: t("aiGeneratingBulk"),
+              aiPreview: t("aiPreviewBtn"),
+              bulkDeleting: t("bulkDeleting"),
+              bulkDelete: t("bulkDeleteBtn"),
+            }}
+          />
+        )}
         exportQueryPath={questionListPath}
         exportDisabled={isLoading || questionsQuery.isError || search.trim() !== debouncedSearch}
         search={search}
@@ -601,33 +633,6 @@ function QuestionsContent() {
         onDismiss={() => { setBulkPreviews(null); setEditedAnswers({}); }}
         onCancel={() => { setBulkPreviews(null); setEditedAnswers({}); setExcludedIds(new Set()); setBulkMsg(null); }}
       />}
-
-      {topTab === "questions" && (
-        <TeacherQuestionBulkActionBar
-        selectedCount={selectedIds.size}
-        previewQuestions={previewQuestions}
-        hiddenPreviewCount={hiddenPreviewCount}
-        isGeneratingPreviews={isGeneratingPreviews}
-        isSendingPreviews={isSendingPreviews}
-        isBulkDeleting={isBulkDeleting}
-        bulkMsg={bulkMsg}
-        showBulkSuccess={showBulkSuccess}
-        onClearSelection={resetBulkState}
-        onPreviewBulkAi={handlePreviewBulkAi}
-        onBulkDelete={handleBulkDelete}
-        labels={{
-          selectedLabel: t("bulkSelectedLabel"),
-          title: t("bulkPanelTitle"),
-          description: t("bulkPanelDesc"),
-          deselect: t("deselect"),
-          plusCount: (count) => t("plusCount", { count }),
-          aiGenerating: t("aiGeneratingBulk"),
-          aiPreview: t("aiPreviewBtn"),
-          bulkDeleting: t("bulkDeleting"),
-          bulkDelete: t("bulkDeleteBtn"),
-        }}
-        />
-      )}
       </>
     </div>
   );

@@ -53,6 +53,6 @@ describe("교사 질문 조회 연결과 주소 상태", () => {
     expect(pageSource).toContain("runForBulkSelection(");
     expect(pageSource).toContain("setIsGeneratingPreviews(false)");
     expect(pageSource).toContain("setIsSendingPreviews(false)");
-    expect(pageSource).toContain('{topTab === "questions" && (\n        <TeacherQuestionBulkActionBar');
+    // 패널 표시 범위와 선택 초기화는 question-bulk-actions.spec.ts에서 실제 화면으로 확인한다.
   });
 });

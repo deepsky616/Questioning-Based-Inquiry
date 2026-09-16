@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import type { useContentTranslation } from "@/components/shared/use-content-translation";
@@ -28,6 +29,7 @@ interface TeacherQuestionListPanelProps {
   displayed: Question[];
   totalCount: number;
   pageInfo: QuestionPageInfo;
+  bulkActions: ReactNode;
   exportQueryPath: string;
   exportDisabled: boolean;
   search: string;
@@ -70,6 +72,7 @@ export function TeacherQuestionListPanel({
   displayed,
   totalCount,
   pageInfo,
+  bulkActions,
   exportQueryPath,
   exportDisabled,
   search,
@@ -211,6 +214,7 @@ export function TeacherQuestionListPanel({
               </button>
             )}
           </div>
+          {bulkActions}
           <TeacherQuestionTable
             list={displayed}
             selectedIds={selectedIds}
