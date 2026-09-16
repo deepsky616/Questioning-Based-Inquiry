@@ -67,7 +67,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog.getByText(reason, { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: "이 페이지 질문으로 수업 화면 보기", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "현재 페이지 질문 3개" })).toBeVisible();
+    await expectNoHorizontalPageOverflow(page);
+    await page.getByRole("button", { name: "수업 화면으로 보기", exact: true }).evaluate(element => element.scrollIntoView({ block: "center" }));
+    await testInfo.attach(`질문-목록-${theme}`, { body: await page.screenshot({ path: testInfo.outputPath(`question-list-${theme}.png`) }), contentType: "image/png" });
+    await page.getByRole("button", { name: "수업 화면으로 보기", exact: true }).click();
     dialog = page.getByRole("dialog");
     await expect(dialog.getByText("질문 1 / 3", { exact: true })).toBeVisible();
     await expect(dialog.getByText("시험 학생", { exact: true })).toHaveCount(0);
@@ -87,11 +91,16 @@ for (const theme of ["light", "dark"] as const) {
     await testInfo.attach(`수업-화면-${theme}`, { body: await page.screenshot({ path: testInfo.outputPath(`presentation-${theme}.png`) }), contentType: "image/png" });
     await dialog.getByRole("button", { name: "수업 화면 닫기", exact: true }).click();
     await page.getByRole("checkbox").filter({ visible: true }).nth(2).check();
-    await page.getByRole("button", { name: "선택한 질문으로 수업 화면 보기", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "선택한 질문 1개" })).toBeVisible();
+    await page.getByRole("button", { name: "수업 화면으로 보기", exact: true }).click();
     await expect(dialog.getByText("질문 1 / 1", { exact: true })).toBeVisible();
     await expect(dialog.getByText("우리 지역에 관한 시험 질문입니다.", { exact: true })).toBeVisible();
     await expect(dialog.getByText("시험 학생", { exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "다음 질문", exact: true })).toBeDisabled();
+    await dialog.getByRole("button", { name: "수업 화면 닫기", exact: true }).click();
+    await page.getByRole("checkbox").filter({ visible: true }).nth(2).uncheck();
+    await expect(page.getByRole("status").filter({ hasText: "현재 페이지 질문 3개" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "수업 화면으로 보기", exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

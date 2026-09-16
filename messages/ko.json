@@ -2711,7 +2711,7 @@
     "hide": "분류·설명 숨기기",
     "close": "수업 화면 닫기",
     "studentQuestions": "학생 질문",
-    "selected": "선택한 질문으로 수업 화면 보기",
-    "currentPage": "이 페이지 질문으로 수업 화면 보기"
+    "selectedCount": "선택한 질문 {count}개",
+    "currentPageCount": "현재 페이지 질문 {count}개"
   }
 }

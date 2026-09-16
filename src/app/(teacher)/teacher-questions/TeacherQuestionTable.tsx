@@ -75,6 +75,8 @@ export function TeacherQuestionTable({
   const tCls = useTranslations("classification");
   const tTarget = useTranslations("targetSelector");
   const allChecked = list.length > 0 && list.every((question) => selectedIds.has(question.id));
+  const selectedQuestions = list.filter((question) => selectedIds.has(question.id));
+  const presentationQuestions = selectedQuestions.length > 0 ? selectedQuestions : list;
   const sessionsForTranslation = useMemo(
     () => list.map((question) => question.session).filter((session): session is NonNullable<Question["session"]> => Boolean(session)),
     [list],
@@ -97,10 +99,20 @@ export function TeacherQuestionTable({
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <ClassroomPresentation title={tp("studentQuestions")} label={tp(list.some(question => selectedIds.has(question.id)) ? "selected" : "currentPage")} items={(list.some(question => selectedIds.has(question.id)) ? list.filter(question => selectedIds.has(question.id)) : list).map(question => ({
-          id: question.id, content: contentTranslation.text({ type: "QUESTION", id: question.id }, question.content),
-          classification: isUnclassifiedQuestion(question) ? tCls("unclassified") : `${closureLabel(question.closure)} · ${cognitiveLabel(question.cognitive)}`, authorName: question.author.name,
-        }))} />
+        <ClassroomPresentation
+          title={tp("studentQuestions")}
+          items={presentationQuestions.map((question) => ({
+            id: question.id,
+            content: contentTranslation.text({ type: "QUESTION", id: question.id }, question.content),
+            classification: isUnclassifiedQuestion(question)
+              ? tCls("unclassified")
+              : `${closureLabel(question.closure)} · ${cognitiveLabel(question.cognitive)}`,
+            authorName: question.author.name,
+          }))}
+        />
+        <span className="whitespace-nowrap text-sm text-muted-foreground tabular-nums" role="status">
+          {tp(selectedQuestions.length > 0 ? "selectedCount" : "currentPageCount", { count: presentationQuestions.length })}
+        </span>
       </div>
       <div className="space-y-3 lg:hidden">
         <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium">
