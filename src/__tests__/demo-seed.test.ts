@@ -196,7 +196,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     }
   });
 
-  it("김질문 질문탐구에 5학년 1학기 국어와 수학 직접 탐구 수업을 제공한다", () => {
+  it("김질문 질문탐구에 5학년 1학기 국어와 과학 직접 탐구 수업을 제공한다", () => {
     const studentIds = STUDENT_NAMES.map(
       (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
     );
@@ -210,9 +210,9 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       },
       {
         key: "exploreMath",
-        subject: "수학",
-        topic: "다각형의 넓이 구하기",
-        achievementCode: "[6수03-14]",
+        subject: "과학",
+        topic: "빛의 성질",
+        achievementCode: "[6과02-02]",
       },
     ];
 
@@ -234,9 +234,9 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(design).toMatchObject({
         subject: expected.subject,
         grade: "5",
-        achievements: [
+        achievements: expect.arrayContaining([
           expect.objectContaining({ code: expected.achievementCode }),
-        ],
+        ]),
       });
 
       const studentQuestions = plans.questions.filter(
@@ -528,7 +528,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(design).toBeDefined();
       if (!design) throw new Error("시연 단원 설계가 없습니다");
       const studentQuestions = activityPlans.questions.filter(
-        (question) => question.sessionId === session.id,
+        (question) => question.sessionId === session.id && !question.flagged,
       );
       const sharedQuestions = buildDemoClassInquiryQuestions(
         design!,

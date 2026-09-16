@@ -17,7 +17,7 @@ function snapshot() {
       { questionId: 'old-one', originalContent: original, revisedContent: original, changeNote: '질문을 고쳤어요', reflection: '잘 알았어요', revision: 1 },
       { questionId: 'old-two', originalContent: '유물이 뭐니?', revisedContent: '유물을 무엇이라고 하니?', changeNote: '더 자세히 바꿨다.', reflection: '자세히 써야 한다.', revision: 3 },
     ],
-    questions: [{ id: 'old-one', authorId: FEATURE_STUDENTS[0] }, { id: 'old-two', authorId: FEATURE_STUDENTS[0] }],
+    questions: [{ id: 'old-one', content: original, authorId: FEATURE_STUDENTS[0] }, { id: 'old-two', content: '유물을 무엇이라고 하니?', authorId: FEATURE_STUDENTS[0] }],
     pointLogs: [], sessions: [], designs: [], bank: [], practices: [], comments: [], likes: [], reviews: [], analyses: [], runs: [], activities: [], claims: [],
   };
 }
@@ -38,10 +38,10 @@ describe('최근 기능을 연결한 5학년 시연 자료', () => {
     expect(() => buildFeatureLearningPlan({ ...before, growth: before.growth.map((row, i) => i ? row : { ...row, reflection: '나중에 직접 쓴 기록' }) }, anchor)).toThrow('기존 성장 기록');
   });
 
-  it('5학년 4교과와 간단 수업을 연결하고 배포 상태를 구분한다', () => {
+  it('5학년 3교과와 간단 수업을 연결하고 배포 상태를 구분한다', () => {
     const { creates } = buildFeatureLearningPlan(snapshot(), anchor);
     expect(creates.sessions).toHaveLength(5);
-    expect(new Set(creates.designs.map(row => row.subject))).toEqual(new Set(['국어', '수학', '과학', '사회']));
+    expect(new Set(creates.designs.map(row => row.subject))).toEqual(new Set(['국어', '과학', '사회']));
     for (const design of creates.designs) {
       expect(design.grade).toBe('5');
       expect(design.achievements.length).toBeGreaterThan(0);

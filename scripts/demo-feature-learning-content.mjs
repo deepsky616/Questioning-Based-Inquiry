@@ -1,3 +1,5 @@
+import { takeDemoQuestion, takeDemoComment, demoTextKey } from './demo-question-variety.mjs';
+import { SCIENCE_FEATURE_WEATHER, SCIENCE_PRACTICE, SCIENCE_WEATHER_REVIEW } from './demo-science-content.mjs';
 import { GRADE_FIVE_LESSONS, buildGradeFiveDesign } from './demo-grade-five-content.mjs';
 import { VARIETY_STUDENT_IDS, canonical } from './demo-learning-variety.mjs';
 
@@ -28,20 +30,7 @@ export const FEATURE_LESSONS = [
   },
   {
     key: 'pastMath', slug: 'average', participants: [2, 4, 6, 8, 10, 13, 17, 20, 24],
-    questions: [
-      ['평균이 같으면 똑같나요?', '읽은 책이 1권·4권·7권인 모둠과 모두 4권인 모둠은 평균이 같은데 독서 모습도 같다고 할 수 있을까요?', 'open', 'conceptual',
-        '평균이 같은 두 모둠의 실제 자료를 넣었어요. 계산한 값과 친구들의 독서 모습이 어떻게 다른지 비교하고 싶었어요.',
-        '두 모둠 모두 평균은 4권이지만 개인별로 읽은 권수는 달라요. 평균만 보지 않고 각각의 값도 확인해야 해요.',
-        ['첫 모둠은 읽은 권수의 차이가 크고 둘째 모둠은 모두 같아요. 평균과 개인별 기록을 함께 표로 보면 차이가 잘 보여요.', '두 모둠 모두 합계가 12권이라 평균은 4권이에요. 그렇다고 첫 모둠 친구들이 실제로 4권씩 읽은 것은 아니에요.', '책의 권수 외에도 조사 기간이 같았는지 확인해야 비교가 공정할 것 같아요.']],
-      ['평균은 어떻게 구하나요?', '세 친구가 걸은 거리가 2킬로미터·3킬로미터·7킬로미터일 때 평균 거리는 몇 킬로미터일까요?', 'closed', 'factual',
-        '', '',
-        ['합계 12킬로미터를 세 사람에게 고르게 나누면 평균은 4킬로미터예요. 단위도 함께 적어야 해요.', '세 친구가 모두 4킬로미터를 걸었다는 뜻은 아니에요. 실제로 걸은 거리는 2·3·7킬로미터예요.']],
-    ],
-    peerNotes: [
-      ['2권·4권·6권이라는 실제 자료와 평균 4권의 뜻을 연결해서 물었어요.', '평균 4권은 고르게 나눈 값이에요. 모두가 실제로 4권씩 읽었다는 뜻은 아니에요.'],
-      ['합계뿐 아니라 모둠 인원수도 생각해서 질문했어요.', '인원수가 다른 모둠을 비교할 때 한 사람당 평균을 구하면 도움이 돼요.'],
-      ['네 자료를 모두 더한 뒤 자료 수로 나누도록 계산 순서를 생각하며 질문했어요.', ''],
-    ],
+    ...SCIENCE_FEATURE_WEATHER,
   },
   {
     key: 'today', slug: 'insulation', participants: [3, 5, 7, 11, 14, 18],
@@ -81,15 +70,15 @@ export const FEATURE_LESSONS = [
 
 export const FEATURE_BANK = [
   {mode:'quiz',content:'5명이 찬성 또는 반대 중 하나를 고른 설문에서 찬성이 3명이면 반대는 몇 명인가요?',closure:'closed',cognitive:'factual',explanation:'모두 찬성 또는 반대로 답했다는 조건에서 반대는 2명으로 정해져 있어요. 제시된 수로 확인하는 닫힌 사실적 질문이에요.'},
-  {mode:'quiz',content:'읽은 책이 2권·4권·6권일 때 평균은 몇 권인가요?',closure:'closed',cognitive:'factual',explanation:'합계 12권을 3명으로 나눈 평균은 4권이에요. 하나의 계산 결과를 확인하는 닫힌 사실적 질문이에요.'},
-  {mode:'quiz',content:'평균이 같은 두 모둠의 개인별 기록을 함께 살펴야 하는 까닭은 무엇인가요?',closure:'open',cognitive:'conceptual',explanation:'평균과 개별 자료의 관계를 설명하는 질문이에요. 서로 다른 자료나 예를 들어 설명할 수 있어 열린 개념적 질문이에요.'},
+  SCIENCE_PRACTICE[1],
+  SCIENCE_PRACTICE[2],
   {mode:'quiz',content:'단열 재료를 비교할 때 물의 양과 처음 온도를 같게 해야 하는 까닭은 무엇인가요?',closure:'open',cognitive:'conceptual',explanation:'실험 조건과 공정한 비교의 관계를 묻고 있어요. 조건이 다른 여러 사례로 설명할 수 있는 열린 개념적 질문이에요.'},
   {mode:'quiz',content:'학급 신문에 설문 결과를 소개할 때 적은 수의 반대 의견도 함께 실어야 할까요?',closure:'open',cognitive:'controversial',explanation:'찬반 선택과 함께 어떤 기준을 중요하게 보는지 설명해야 해요. 여러 입장을 근거로 비교하는 열린 논쟁적 질문이에요.'},
   {mode:'quiz',content:'옛 생활을 살펴볼 수 있는 유적과 유물에는 어떤 것들이 있나요?',closure:'open',cognitive:'factual',explanation:'집터·토기·돌도구처럼 확인 가능한 여러 사례를 답할 수 있어요. 사실을 묻는 질문도 답의 범위가 넓으면 열린 질문이에요.'},
   {mode:'transform',source:'이 설문 자료는 믿을 만한가요?',target:'open',hint:'예 또는 아니요로 끝나지 않도록 자료에서 무엇을 확인할지 물어보세요.',example:'이 설문 자료를 믿을 만한지 판단하려면 조사 대상과 방법에서 무엇을 확인해야 할까요?'},
-  {mode:'transform',source:'이 모둠의 평균은 몇 권인가요?',target:'conceptual',hint:'계산한 값과 각각의 자료가 어떤 관계인지 생각해 보세요.',example:'두 모둠의 평균이 같아도 개인별 독서량이 다를 수 있는 까닭은 무엇일까요?'},
+  SCIENCE_PRACTICE[7],
   {mode:'transform',source:'컵을 감싼 재료는 무엇인가요?',target:'controversial',hint:'재료를 고르는 기준을 정하고 서로 다른 선택의 이유를 비교해 보세요.',example:'보온 덮개를 고를 때 보온 성능과 재사용 중 어느 기준을 더 중요하게 생각해야 할까요?'},
-  {mode:'create',title:'두 모둠의 같은 평균',passage:'가 모둠의 세 친구는 책을 1권, 4권, 7권 읽었고, 나 모둠은 모두 4권씩 읽었습니다. 두 모둠의 조사 기간과 책을 센 기준은 같습니다. 평균과 개인별 기록을 함께 살펴보고 비교할 질문을 만들어 보세요.'},
+  SCIENCE_PRACTICE[9],
   {mode:'create',title:'우리 반 보온 덮개 고르기',passage:'같은 양과 처음 온도의 물을 같은 컵에 담았습니다. 한 컵은 천으로 감싸고 다른 컵은 감싸지 않았습니다. 같은 장소에서 정해진 시간 뒤 온도를 비교하려고 합니다. 같게 할 조건과 알아보고 싶은 점을 생각하며 질문을 만들어 보세요.'},
   {mode:'create',title:'유물 사진에서 찾은 단서',passage:'박물관 자료에는 같은 시기의 토기 사진과 집터 그림이 있습니다. 토기에는 그을음이, 집터에는 화덕 흔적이 보입니다. 사진에서 확인한 사실과 생활 모습에 대한 추측을 구분하며 더 알아보고 싶은 질문을 만들어 보세요.'},
 ];
@@ -116,6 +105,8 @@ export function buildFeatureLearningPlan(before, anchor = new Date()) {
     const sum = before.pointLogs.filter(log => log.studentId === user.id && log.status === 'APPROVED').reduce((total, log) => total + log.points, 0);
     if (sum !== user.totalPoints) throw new Error('기존 포인트가 실제 지급 합계와 일치하지 않습니다.');
   }
+  const usedQuestions = new Set(before.questions.filter(q => q.source !== 'TEACHER_SHARED').map(q => demoTextKey(q.content)));
+  const usedComments = new Set(before.comments.map(c => demoTextKey(c.content)));
   const dates = schoolDays(anchor);
   const creates = Object.fromEntries(['sessions', 'designs', 'questions', 'growth', 'reviews', 'comments', 'likes', 'bank', 'practices', 'pointLogs'].map(key => [key, []]));
   const updates = { users: [], growth: [] };
@@ -163,21 +154,29 @@ export function buildFeatureLearningPlan(before, anchor = new Date()) {
       const questionId = `${FEATURE_PREFIX}question-${activity.slug}-01-${qi + 1}`;
       const questionTime = minute(date, 10 + qi * 8);
       creates.questions.push({ id: questionId, sessionId, authorId: student(1), content, closure, cognitive, context: lesson.topic, source: 'STUDENT', inquiryType: cognitive, isPublic: true, createdAt: questionTime, updatedAt: questionTime });
+      if (usedQuestions.has(demoTextKey(content))) throw new Error('추가 시연 질문이 기존 문장과 중복됩니다.');
+      usedQuestions.add(demoTextKey(content));
       ownQuestions.push(questionId);
       if (changeNote !== null) creates.growth.push({ questionId, originalContent: original, revisedContent: content, changeNote, reflection, revision: 1, createdAt: questionTime, updatedAt: minute(date, 50 + qi) });
+      for (const text of replies) {
+        if (usedComments.has(demoTextKey(text))) throw new Error('추가 시연 답변이 기존 문장과 중복됩니다.');
+        usedComments.add(demoTextKey(text));
+      }
       for (const [ri, text] of replies.entries()) creates.comments.push({ id: `${FEATURE_PREFIX}comment-${activity.slug}-01-${qi + 1}-${ri + 1}`, questionId, authorId: student(activity.participants[(ri + qi) % activity.participants.length]), content: text, createdAt: minute(date, 32 + qi * 5 + ri) });
     }
     for (const [pi, number] of activity.participants.entries()) {
-      const q = lesson.questions[pi % lesson.questions.length];
+      // 앞의 세 질문은 성장 기록의 관찰 메모와 연결되므로 개념을 유지한다.
+      const q = takeDemoQuestion(activity.key, lesson, pi % lesson.questions.length, usedQuestions);
       const questionId = `${FEATURE_PREFIX}question-${activity.slug}-${number}-1`;
       const questionTime = minute(date, 12 + pi * 2);
       creates.questions.push({ id: questionId, sessionId, authorId: student(number), content: q.content, closure: q.closure, cognitive: q.type, context: lesson.topic, source: 'STUDENT', inquiryType: q.type, isPublic: pi !== activity.participants.length - 1, createdAt: questionTime, updatedAt: questionTime });
       if (pi < 3) {
-        const [changeNote, reflection] = activity.peerNotes[pi];
-        creates.growth.push({ questionId, originalContent: q.content, revisedContent: q.content, changeNote, reflection, revision: 1, createdAt: questionTime, updatedAt: minute(date, 55 + pi) });
+        const [note, reflection] = activity.peerNotes[pi];
+        const changeNote = q.content === lesson.questions[pi].content ? note : `궁금한 상황을 구체적으로 적고, 알아볼 내용을 질문에 넣었어요. ${q.hint}`;
+        creates.growth.push({ questionId, originalContent: q.content, revisedContent: q.content, changeNote, reflection: reflection ? q.answer : '', revision: 1, createdAt: questionTime, updatedAt: minute(date, 55 + pi) });
       }
       // 댓글은 해당 질문의 예상 답변과 후속 탐구 제안으로 구성하고, 질문별로 한 번씩만 사용한다.
-      if (pi < lesson.questions.length) creates.comments.push({ id: `${FEATURE_PREFIX}comment-${activity.slug}-peer-${number}`, questionId, authorId: student(1), content: q.answer, createdAt: minute(date, 40 + pi) });
+      if (pi < lesson.questions.length) creates.comments.push({ id: `${FEATURE_PREFIX}comment-${activity.slug}-peer-${number}`, questionId, authorId: student(1), content: takeDemoComment(activity.key, lesson, q, usedComments), createdAt: minute(date, 40 + pi) });
     }
     const sessionQuestions = creates.questions.filter(q => q.sessionId === sessionId && q.source === 'STUDENT' && q.isPublic);
     for (const [qi, q] of sessionQuestions.entries()) {
@@ -188,7 +187,7 @@ export function buildFeatureLearningPlan(before, anchor = new Date()) {
     const own = creates.questions.find(q => q.id === ownQuestions[0]);
     const reasons = [
       '학교 전체로 결론을 넓혀도 되는지 판단 기준과 근거를 비교하므로 논쟁적 질문으로 확인했습니다. 조사 대상의 범위를 넣어 논의할 쟁점이 분명해졌습니다.',
-      '평균 계산만 요구하지 않고 평균과 개인별 자료의 관계를 설명하므로 개념적 질문입니다. 두 모둠의 구체적인 수치를 넣어 비교하기 좋습니다.',
+      SCIENCE_WEATHER_REVIEW,
       '단열 조건과 온도 변화의 관계를 설명하는 개념적 질문입니다. 물의 양·처음 온도·측정 시간을 적어 공정한 비교가 가능하도록 다듬었습니다.',
       '여러 유적·유물의 단서를 연결해 생활 모습을 추론하는 개념적 질문입니다. 관찰한 사실과 추측을 구분하고 추가로 필요한 자료도 생각해 보세요.',
     ];

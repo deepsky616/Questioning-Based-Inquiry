@@ -1,8 +1,10 @@
+import { takeDemoQuestion, takeDemoComment, demoTextKey } from './demo-question-variety.mjs';
+import { buildDemoModerationQuestions } from './demo-moderation-content.mjs';
 import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { GRADE_FIVE_LESSONS, buildGradeFiveDesign, gradeFiveVariedComment, gradeFiveAnalysis } from "./demo-grade-five-content.mjs";
+import { GRADE_FIVE_LESSONS, buildGradeFiveDesign, gradeFiveAnalysis } from "./demo-grade-five-content.mjs";
 
 export const STUDENT_NAMES = Array.from({ length: 28 }, (_, index) => index === 0 ? "김질문" : `학생${index + 1}`);
 
@@ -77,7 +79,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     key: "pastMath",
     id: DEMO.sessionIds.pastMath,
     offsetDays: -3,
-    subject: "수학",
+    subject: "과학",
     unitDesignId: DEMO.unitDesignIds.pastMath,
   },
   {
@@ -100,7 +102,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     key: "exploreMath",
     id: DEMO.sessionIds.exploreMath,
     offsetDays: 3,
-    subject: "수학",
+    subject: "과학",
     semester: "1",
     studentExplore: true,
     unitDesignId: DEMO.unitDesignIds.exploreMath,
@@ -212,30 +214,11 @@ const KIM_QUESTION_PLANS = [
   ["exploreKorean", 1], ["exploreKorean", 3], ["exploreMath", 0], ["exploreMath", 1],
 ].map(([sessionKey, questionIndex]) => {
   const item = GRADE_FIVE_LESSONS[sessionKey].questions[questionIndex];
-  return { sessionKey, content: sessionKey.startsWith("explore") ? `직접 확인해 보면 ${item.content}` : item.content, closure: item.closure, cognitive: item.type,
+  return { sessionKey, content: item.content, closure: item.closure, cognitive: item.type,
     ...(!sessionKey.startsWith("explore") ? { similarityIndex: questionIndex } : {}) };
 });
 const STUDENT_ANALYSIS_COPY = Object.fromEntries(ANALYSIS_SESSION_BLUEPRINTS.map((session, index) => [session.key, gradeFiveAnalysis(session.key, index)]));
 const COMMENT_CONTENTS = ["질문의 근거와 조건을 함께 살펴보아요."];
-
-const SIMILAR_QUESTION_OPENERS = [
-  "수업에서 ",
-  "자료를 찾아보면 ",
-  "친구들의 생각을 비교하면 ",
-  "실제 사례를 살펴보면 ",
-  "다른 조건에서도 ",
-  "우리 생활에서도 ",
-  "직접 확인해 보면 ",
-  "여러 관점에서 생각하면 ",
-];
-
-function buildSemanticallySimilarQuestion(baseQuestion, variantIndex) {
-  const opener = SIMILAR_QUESTION_OPENERS[variantIndex];
-  if (!opener) {
-    throw new Error("비슷한 학생 질문 문장 종류가 부족합니다.");
-  }
-  return `${opener}${baseQuestion}`;
-}
 
 function pickUniqueQuestion(candidates, usedQuestionIds, startIndex) {
   for (let offset = 0; offset < candidates.length; offset += 1) {
@@ -254,15 +237,17 @@ export function buildDemoLearningActivityPlans(studentIds) {
     ANALYSIS_SESSION_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint]),
   );
   const questions = [];
-  const similarQuestionUseCount = new Map();
+  const usedQuestions = new Set();
 
   for (const [index, plan] of KIM_QUESTION_PLANS.entries()) {
     const session = sessionByKey.get(plan.sessionKey);
+    usedQuestions.add(demoTextKey(plan.content));
     questions.push({
       id: `usb-demo-question-01-${pad(index + 1)}`,
       authorId: studentIds[0],
       sessionId: session.id,
       content: plan.content,
+      flagged: false,
       context: session.topic,
       closure: plan.closure,
       cognitive: plan.cognitive,
@@ -285,18 +270,14 @@ export function buildDemoLearningActivityPlans(studentIds) {
         + questionIndex
       ) % bank.length;
       const similarityKey = `${session.key}:${bankIndex}`;
-      const variantIndex = similarQuestionUseCount.get(similarityKey) ?? 0;
-      similarQuestionUseCount.set(similarityKey, variantIndex + 1);
-      const content = buildSemanticallySimilarQuestion(
-        bank[bankIndex],
-        variantIndex,
-      );
+      const { content } = takeDemoQuestion(session.key, GRADE_FIVE_LESSONS[session.key], bankIndex, usedQuestions);
       const inquiryType = SESSION_QUESTION_TYPES[session.key][bankIndex];
       questions.push({
         id: `usb-demo-question-${pad(studentIndex + 1)}-${pad(questionIndex + 1)}`,
         authorId: studentIds[studentIndex],
         sessionId: session.id,
         content,
+        flagged: false,
         context: session.topic,
         closure: GRADE_FIVE_LESSONS[session.key].questions[bankIndex].closure,
         cognitive: inquiryType,
@@ -312,13 +293,15 @@ export function buildDemoLearningActivityPlans(studentIds) {
 
   for (const [sessionIndex, session] of STUDENT_EXPLORE_SESSION_BLUEPRINTS.entries()) {
     const bank = SESSION_QUESTION_BANKS[session.key];
-    for (const [questionIndex, content] of bank.entries()) {
+    for (const [questionIndex] of bank.entries()) {
+      const { content } = takeDemoQuestion(session.key, GRADE_FIVE_LESSONS[session.key], questionIndex, usedQuestions);
       const authorIndex = 1 + sessionIndex * bank.length + questionIndex;
       questions.push({
         id: `usb-demo-explore-question-${session.key}-${pad(questionIndex + 1)}`,
         authorId: studentIds[authorIndex],
         sessionId: session.id,
         content,
+        flagged: false,
         context: session.topic,
         closure: GRADE_FIVE_LESSONS[session.key].questions[questionIndex].closure,
         cognitive: SESSION_QUESTION_TYPES[session.key][questionIndex],
@@ -396,14 +379,11 @@ export function buildDemoLearningActivityPlans(studentIds) {
     [...questions, ...classInquiryQuestions]
       .map((question) => [question.id, question]),
   );
-  const commentVariants = new Map();
+  const usedComments = new Set();
   for (const comment of comments) {
     const question = questionById.get(comment.questionId);
-    const lesson = Object.entries(GRADE_FIVE_LESSONS).find(([, item]) => item.topic === question.context);
-    const key = `${lesson[0]}:${lesson[1].questions.findIndex(item => question.content.includes(item.content))}`;
-    const index = commentVariants.get(key) ?? 0;
-    comment.content = gradeFiveVariedComment(question, index);
-    commentVariants.set(key, index + 1);
+    const [key, lesson] = Object.entries(GRADE_FIVE_LESSONS).find(([, item]) => item.topic === question.context);
+    comment.content = takeDemoComment(key, lesson, question, usedComments);
   }
   const analyses = ANALYSIS_SESSION_BLUEPRINTS.map((session, index) => {
     const totalQuestions = questions.filter(
@@ -431,6 +411,8 @@ export function buildDemoLearningActivityPlans(studentIds) {
     };
   });
 
+  const moderation = buildDemoModerationQuestions({ sessionId: 'usb-demo-session-explore-math', context: GRADE_FIVE_LESSONS.exploreMath.topic, studentIds });
+  questions.push(...moderation.map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...q }) => ({ ...q, similarityKey: undefined, createdDays: 0 })));
   return { questions, classInquiryQuestions, comments, likes, analyses };
 }
 
@@ -645,7 +627,7 @@ export function buildDemoClassInquiryQuestions(
   studentQuestions,
 ) {
   const questionsInSession = studentQuestions.filter(
-    (question) => question.sessionId === sessionId,
+    (question) => question.sessionId === sessionId && !question.flagged,
   );
   const designQuestionsByType = new Map();
   for (const question of design.inquiryQuestions) {
@@ -1028,7 +1010,9 @@ async function createInquiryLearningData(tx, studentIds) {
         inquiryType: question.inquiryType,
         sessionId: question.sessionId,
         authorId: question.authorId,
-        isPublic: true,
+        isPublic: question.isPublic ?? true,
+        flagged: question.flagged ?? false,
+        flagReason: question.flagReason ?? null,
         createdAt: offsetDate(question.createdDays),
       },
     });

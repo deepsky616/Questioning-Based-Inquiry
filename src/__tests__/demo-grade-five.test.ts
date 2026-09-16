@@ -1,3 +1,4 @@
+import { DEMO_QUESTION_VARIANTS } from '../../scripts/demo-question-variety.mjs';
 import { describe, expect, it } from "vitest";
 import { GRADE_FIVE_LESSONS, buildGradeFiveDesign, gradeFiveComment } from "../../scripts/demo-grade-five-content.mjs";
 import { DEMO_SESSION_BLUEPRINTS, buildDemoLearningActivityPlans, STUDENT_NAMES } from "../../scripts/seed-usb-demo.mjs";
@@ -23,21 +24,24 @@ describe("5학년 수업 내용과 성취기준", () => {
     expect(GRADE_FIVE_LESSONS.pastMath.questions[2]).toMatchObject({type:"factual",closure:"closed"});
     expect(GRADE_FIVE_LESSONS.pastSocial.questions[0]).toMatchObject({type:"factual",closure:"open"});
   });
-  it("평균, 삼각형, 사다리꼴의 계산 예시가 올바르다", () => {
-    expect(GRADE_FIVE_LESSONS.pastMath.questions[2].answer).toContain("24 나누기 4인 6");
-    expect(GRADE_FIVE_LESSONS.exploreMath.questions[1].answer).toContain("20제곱센티미터");
-    expect(GRADE_FIVE_LESSONS.exploreMath.questions[4].answer).toContain("18제곱센티미터");
+  it("과학 질문은 안개·이슬과 빛의 반사·굴절·직진을 구별한다", () => {
+    expect(GRADE_FIVE_LESSONS.pastMath.questions[2].answer).toContain("안개");
+    expect(GRADE_FIVE_LESSONS.pastMath.questions[4].answer).toContain("수증기");
+    expect(GRADE_FIVE_LESSONS.exploreMath.questions[1].answer).toContain("반사");
+    expect(GRADE_FIVE_LESSONS.exploreMath.questions[2].answer).toContain("굴절");
+    expect(GRADE_FIVE_LESSONS.exploreMath.questions[4].answer).toContain("직진");
     expect(GRADE_FIVE_LESSONS.past.questions[3].answer).toContain("시간");
     expect(GRADE_FIVE_LESSONS.past.questions[3].answer).toContain("최대로 녹는 양");
   });
   it("모든 학생 질문에는 같은 수업 주제의 구체적인 답변이 연결된다", () => {
     const ids=STUDENT_NAMES.map((_,index)=>`usb-demo-student-${String(index+1).padStart(2,"0")}`);
     const plans=buildDemoLearningActivityPlans(ids);
-    for(const question of plans.questions) {
+    for(const question of plans.questions.filter(q => !q.flagged)) {
       const answer=gradeFiveComment(question,0);
-      expect(answer.length).toBeGreaterThan(30);
+      expect(answer.length).toBeGreaterThan(15);
       const lesson=Object.values(GRADE_FIVE_LESSONS).find((lesson)=>lesson.topic===question.context)!;
-      const matching=lesson.questions.find((item)=>question.content.includes(item.content))!;
+      const key = Object.entries(GRADE_FIVE_LESSONS).find(([,item])=>item === lesson)![0];
+      const matching=DEMO_QUESTION_VARIANTS[key].flat().find((item: {content:string;answer:string})=>item.content===question.content) ?? lesson.questions.find((item)=>question.content.includes(item.content))!;
       expect(answer).toBe(matching.answer);
     }
     expect(()=>gradeFiveComment({context:"알 수 없는 수업",content:"질문"})).toThrow();

@@ -1,4 +1,5 @@
-import { GRADE_FIVE_LESSONS, gradeFiveComment } from './demo-grade-five-content.mjs';
+import { takeDemoQuestion, takeDemoComment, demoTextKey } from './demo-question-variety.mjs';
+import { GRADE_FIVE_LESSONS } from './demo-grade-five-content.mjs';
 
 export const VARIETY_PREFIX = 'usb-demo-variety-v1-';
 export const VARIETY_STUDENT_IDS = Array.from({length:28},(_,i)=>`usb-demo-student-${String(i+1).padStart(2,'0')}`);
@@ -53,6 +54,8 @@ export function buildDemoVarietyPlan(before, anchor = new Date()) {
   const c=plan.creates;
   const point=(id,studentId,data)=>c.pointLogs.push({id:VARIETY_PREFIX+id,studentId,status:'APPROVED',...data});
   const lessons=Object.values(GRADE_FIVE_LESSONS);
+  const usedQuestions = new Set(before.questions.filter(q => q.source !== 'TEACHER_SHARED').map(q => demoTextKey(q.content)));
+  const usedComments = new Set(before.comments.map(c => demoTextKey(c.content)));
   for(const [i,user] of before.users.entries()){
     const preferred=preferences[i%preferences.length];
     for(let turn=0;turn<gameCounts[i];turn++){
@@ -87,8 +90,9 @@ export function buildDemoVarietyPlan(before, anchor = new Date()) {
     });
     let added=0;
     for(let step=0;step<candidates.length&&added<questionCounts[i];step++){
-      const {session,question}=candidates[(i*7+step*11)%candidates.length];
-      if([...before.questions,...c.questions].some(q=>q.authorId===user.id&&q.sessionId===session.id&&q.content.includes(question.content)))continue;
+      const {session,question:baseQuestion}=candidates[(i*7+step*11)%candidates.length];
+      const [key, lesson] = Object.entries(GRADE_FIVE_LESSONS).find(([,l])=>l.topic===session.topic);
+      const question = takeDemoQuestion(key, lesson, lesson.questions.indexOf(baseQuestion), usedQuestions);
       const oldest=before.questions.filter(q=>q.sessionId===session.id).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt))[0];
       if(!oldest)continue;
       const createdAt=new Date(new Date(oldest.createdAt).getTime()+(12+i*2+added*8)*60000);
@@ -113,12 +117,14 @@ export function buildDemoVarietyPlan(before, anchor = new Date()) {
   const questions=[...before.questions,...c.questions];
   for(const [i,user] of before.users.entries()){
     const count=i===0?4:questionCounts[i];
-    const targets=questions.filter(q=>q.authorId!==user.id&&lessons.some(l=>l.topic===q.context));
+    const targets=questions.filter(q=>q.authorId!==user.id&&!q.flagged&&lessons.some(l=>l.topic===q.context));
     let added=0;
     for(let step=0;step<targets.length&&added<count;step++){
       const target=targets[(i*11+step*7)%targets.length];
       if([...before.comments,...c.comments].some(c=>c.authorId===user.id&&c.questionId===target.id))continue;
-      c.comments.push({id:`${VARIETY_PREFIX}comment-${i+1}-${++added}`,authorId:user.id,questionId:target.id,content:gradeFiveComment(target,i+added),normalizedContent:gradeFiveComment(target,i+added),createdAt:new Date(new Date(target.createdAt).getTime()+(30+i+added*9)*60000)});
+      const [key, lesson] = Object.entries(GRADE_FIVE_LESSONS).find(([,l])=>l.topic===target.context);
+      const content = takeDemoComment(key, lesson, target, usedComments);
+      c.comments.push({id:`${VARIETY_PREFIX}comment-${i+1}-${++added}`,authorId:user.id,questionId:target.id,content,normalizedContent:content,createdAt:new Date(new Date(target.createdAt).getTime()+(30+i+added*9)*60000)});
     }
     if(added!==count)throw new Error('답변을 연결할 질문이 부족합니다.');
     const likeCount=gameCounts[i]+(i===0?3:i%3);added=0;
