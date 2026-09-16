@@ -143,29 +143,29 @@ export const TeacherStudentStatsCard = forwardRef<HTMLDivElement, TeacherStudent
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="text-sm text-muted-foreground">{t("colTotal")}</p>
-                        <p className="text-xl font-bold text-foreground">{student.total}</p>
+                        <p className="whitespace-nowrap tabular-nums text-xl font-bold text-foreground">{student.total}</p>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                       <div className="rounded-md bg-blue-50 px-2 py-2 text-center dark:bg-blue-950/30">
                         <p className="text-sm text-blue-600">{tCls("closed.label")}</p>
-                        <p className="text-sm font-semibold text-blue-600">{student.distribution.closed}</p>
+                        <p className="whitespace-nowrap tabular-nums text-sm font-semibold text-blue-600">{student.distribution.closed}</p>
                       </div>
                       <div className="rounded-md bg-green-50 px-2 py-2 text-center dark:bg-green-950/30">
                         <p className="text-sm text-green-600">{tCls("open.label")}</p>
-                        <p className="text-sm font-semibold text-green-600">{student.distribution.open}</p>
+                        <p className="whitespace-nowrap tabular-nums text-sm font-semibold text-green-600">{student.distribution.open}</p>
                       </div>
                       <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                         <p className="text-sm text-muted-foreground">{tCls("factual.label")}</p>
-                        <p className="text-sm font-semibold text-foreground">{student.cognitiveDistribution.factual}</p>
+                        <p className="whitespace-nowrap tabular-nums text-sm font-semibold text-foreground">{student.cognitiveDistribution.factual}</p>
                       </div>
                       <div className="rounded-md bg-purple-50 px-2 py-2 text-center dark:bg-purple-950/30">
                         <p className="text-sm text-purple-600">{tCls("conceptual.label")}</p>
-                        <p className="text-sm font-semibold text-purple-600">{student.cognitiveDistribution.conceptual}</p>
+                        <p className="whitespace-nowrap tabular-nums text-sm font-semibold text-purple-600">{student.cognitiveDistribution.conceptual}</p>
                       </div>
                       <div className="rounded-md bg-orange-50 px-2 py-2 text-center dark:bg-orange-950/30">
                         <p className="text-sm text-orange-600">{tCls("controversial.label")}</p>
-                        <p className="text-sm font-semibold text-orange-600">{student.cognitiveDistribution.controversial}</p>
+                        <p className="whitespace-nowrap tabular-nums text-sm font-semibold text-orange-600">{student.cognitiveDistribution.controversial}</p>
                       </div>
                       <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                         <p className="text-sm text-muted-foreground">{t("colTrend")}</p>
@@ -184,7 +184,7 @@ export const TeacherStudentStatsCard = forwardRef<HTMLDivElement, TeacherStudent
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t("colStudent")}</TableHead>
-                      <TableHead className="w-12 text-center">{t("colTotal")}</TableHead>
+                      <TableHead className="min-w-20 whitespace-nowrap px-3 text-center">{t("colTotal")}</TableHead>
                       <TableHead className="whitespace-nowrap px-3 text-center text-blue-600">{tCls("closed.label")}</TableHead>
                       <TableHead className="whitespace-nowrap px-3 text-center text-green-600">{tCls("open.label")}</TableHead>
                       <TableHead className="whitespace-nowrap px-3 text-center text-muted-foreground">{tCls("factual.label")}</TableHead>
@@ -202,12 +202,12 @@ export const TeacherStudentStatsCard = forwardRef<HTMLDivElement, TeacherStudent
                           <div className="font-medium">{student.name}</div>
                           <StudentClassMeta student={student} />
                         </TableCell>
-                        <TableCell className="text-center font-bold">{student.total}</TableCell>
-                        <TableCell className="text-center text-blue-600">{student.distribution.closed}</TableCell>
-                        <TableCell className="text-center text-green-600">{student.distribution.open}</TableCell>
-                        <TableCell className="text-center text-muted-foreground">{student.cognitiveDistribution.factual}</TableCell>
-                        <TableCell className="text-center text-purple-600">{student.cognitiveDistribution.conceptual}</TableCell>
-                        <TableCell className="text-center text-orange-600">{student.cognitiveDistribution.controversial}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 text-center font-bold tabular-nums">{student.total}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 text-center tabular-nums text-blue-600">{student.distribution.closed}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 text-center tabular-nums text-green-600">{student.distribution.open}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 text-center tabular-nums text-muted-foreground">{student.cognitiveDistribution.factual}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 text-center tabular-nums text-purple-600">{student.cognitiveDistribution.conceptual}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 text-center tabular-nums text-orange-600">{student.cognitiveDistribution.controversial}</TableCell>
                         <TableCell className="whitespace-nowrap text-center">
                           <span className="inline-flex items-center gap-1.5">
                             <Sparkline data={student.sparkline} />

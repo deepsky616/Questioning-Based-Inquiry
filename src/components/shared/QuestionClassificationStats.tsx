@@ -105,10 +105,10 @@ export function QuestionClassificationStats({
     <div key={name} className="mb-2 w-full px-1.5">
       <div className="flex items-center gap-2 py-0.5">
         <span className="w-20 shrink-0 whitespace-nowrap text-center text-xs text-muted-foreground">{name}</span>
-        <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
+        <div className="min-w-0 flex-1 h-3.5 rounded bg-muted overflow-hidden">
           <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
         </div>
-        <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
+        <span className="min-w-24 shrink-0 whitespace-nowrap text-right text-xs font-semibold tabular-nums text-foreground">{value} ({pct(value)}%)</span>
       </div>
       <p className="pl-[5.5rem] text-[11px] leading-tight text-muted-foreground">{desc}</p>
     </div>
@@ -124,7 +124,7 @@ export function QuestionClassificationStats({
       <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
         <div>
           <p className="text-xs text-muted-foreground font-semibold mb-2">{t("category1")} — {t("closure")}</p>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-center gap-3 sm:flex-row md:flex-col xl:flex-row">
             <ClassificationDonut
               size={108}
               slices={[
@@ -132,7 +132,7 @@ export function QuestionClassificationStats({
                 { name: t("open.label"), value: s.closure.open, fill: "#10b981" },
               ]}
             />
-            <div className="flex-1 min-w-0">
+            <div className="w-full flex-1 min-w-0">
               {bar(t("closed.label"), s.closure.closed, "#3b82f6", t("closed.desc"))}
               {bar(t("open.label"), s.closure.open, "#10b981", t("open.desc"))}
             </div>
@@ -140,7 +140,7 @@ export function QuestionClassificationStats({
         </div>
         <div>
           <p className="text-xs text-muted-foreground font-semibold mb-2">{t("category2")} — {t("cognitive")}</p>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-center gap-3 sm:flex-row md:flex-col xl:flex-row">
             <ClassificationDonut
               size={108}
               slices={[
@@ -149,7 +149,7 @@ export function QuestionClassificationStats({
                 { name: t("controversial.label"), value: s.cognitive.controversial, fill: "#f97316" },
               ]}
             />
-            <div className="flex-1 min-w-0">
+            <div className="w-full flex-1 min-w-0">
               {bar(t("factual.label"), s.cognitive.factual, "#94a3b8", t("factual.desc"))}
               {bar(t("conceptual.label"), s.cognitive.conceptual, "#a855f7", t("conceptual.desc"))}
               {bar(t("controversial.label"), s.cognitive.controversial, "#f97316", t("controversial.desc"))}

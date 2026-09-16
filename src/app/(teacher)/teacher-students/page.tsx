@@ -330,20 +330,20 @@ export default function StudentsPage() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-2xl bg-muted/40 border border-border p-4 text-center">
               <p className="text-xs text-muted-foreground font-medium">{t("allStudents")}</p>
-              <p className="text-2xl font-black text-foreground mt-1">{t("studentCount", { n: visibleSummary.studentCount })}</p>
+              <p className="whitespace-nowrap tabular-nums text-2xl font-black text-foreground mt-1">{t("studentCount", { n: visibleSummary.studentCount })}</p>
             </div>
             <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-4 text-center">
               <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">{t("totalQuestions")}</p>
-              <p className="text-2xl font-black text-indigo-700 mt-1">{visibleSummary.totalQuestions}</p>
+              <p className="whitespace-nowrap tabular-nums text-2xl font-black text-indigo-700 mt-1">{visibleSummary.totalQuestions}</p>
             </div>
             <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-4 text-center">
               <p className="text-xs text-emerald-800 dark:text-emerald-200 font-medium">{t("totalAnswers")}</p>
-              <p className="text-2xl font-black text-emerald-700 mt-1">{visibleSummary.totalAnswers}</p>
+              <p className="whitespace-nowrap tabular-nums text-2xl font-black text-emerald-700 mt-1">{visibleSummary.totalAnswers}</p>
             </div>
             <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-4 text-center">
               <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">{t("totalPointsAvg")}</p>
               <p className="text-2xl font-black text-amber-800 dark:text-amber-200 mt-1">
-                {visibleSummary.totalPoints}<span className="text-sm font-normal text-amber-800 dark:text-amber-200 ml-1">/ {visibleSummary.averagePoints}</span>
+                <span className="whitespace-nowrap tabular-nums">{visibleSummary.totalPoints}</span><span className="whitespace-nowrap text-sm font-normal tabular-nums text-amber-800 dark:text-amber-200 ml-1">/ {visibleSummary.averagePoints}</span>
               </p>
             </div>
           </div>
@@ -575,7 +575,7 @@ export default function StudentsPage() {
                     {classStudents.map((s) => (
                       <TableRow key={s.id} className="cursor-pointer hover:bg-muted/40"
                         onClick={() => setSelected(s)}>
-                        <TableCell className="text-center text-muted-foreground">{s.studentNumber}</TableCell>
+                        <TableCell className="whitespace-nowrap text-center tabular-nums text-muted-foreground">{s.studentNumber}</TableCell>
                         <TableCell className="font-medium">{s.name}{attentionReason(s) && <p className="mt-1 max-w-64 text-sm font-normal text-amber-800 dark:text-amber-200">{attentionReason(s)}</p>}</TableCell>
                         <TableCell className="text-center">
                           <span className={`whitespace-nowrap font-semibold tabular-nums ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>

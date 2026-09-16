@@ -36,7 +36,7 @@ export function PriorityTaskList<TItem extends PriorityTaskListItem>({
               </span>
             )}
           </span>
-          <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
+          <span className="shrink-0 whitespace-nowrap text-sm font-bold tabular-nums text-foreground">
             {item.countLabel}
           </span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

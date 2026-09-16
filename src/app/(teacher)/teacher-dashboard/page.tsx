@@ -391,7 +391,7 @@ function TeacherDashboard() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">{t("totalQuestions")}</p>
-                  <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
+                  <p className="shrink-0 whitespace-nowrap tabular-nums text-4xl font-bold mt-0.5">{stats.total}</p>
                 </div>
                 <div className="text-xs text-muted-foreground text-right">
                   {period === "week" && t("periodWeekBasis")}
@@ -416,25 +416,25 @@ function TeacherDashboard() {
                     { name: tCls("open.label"), value: stats.byClosure.open, fill: "#22c55e" },
                   ]}
                 />
-                <div className="grid grid-cols-2 gap-6 flex-1 w-full">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 flex-1 w-full">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
                         <span className="text-sm font-medium break-keep text-center">{tCls("closed.label")}</span>
                       </div>
-                      <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                     </div>
                     <StatBar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
                     <p className="text-xs text-muted-foreground">{tCls("closed.desc")}</p>
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
                         <span className="text-sm font-medium break-keep text-center">{tCls("open.label")}</span>
                       </div>
-                      <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                     </div>
                     <StatBar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
                     <p className="text-xs text-muted-foreground">{tCls("open.desc")}</p>
@@ -458,36 +458,36 @@ function TeacherDashboard() {
                     { name: tCls("controversial.label"), value: stats.byCognitive.controversial, fill: "#f97316" },
                   ]}
                 />
-                <div className="grid grid-cols-3 gap-6 flex-1 w-full">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 flex-1 w-full">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
                         <span className="text-sm font-medium break-keep text-center">{tCls("factual.label")}</span>
                       </div>
-                      <span className="text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
                     </div>
                     <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
                     <p className="text-xs text-muted-foreground">{tCls("factual.desc")}</p>
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
                         <span className="text-sm font-medium break-keep text-center">{tCls("conceptual.label")}</span>
                       </div>
-                      <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
                     </div>
                     <StatBar value={stats.byCognitive.conceptual} total={stats.total} color="bg-purple-500" />
                     <p className="text-xs text-muted-foreground">{tCls("conceptual.desc")}</p>
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
                         <span className="text-sm font-medium break-keep text-center">{tCls("controversial.label")}</span>
                       </div>
-                      <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
                     </div>
                     <StatBar value={stats.byCognitive.controversial} total={stats.total} color="bg-orange-500" />
                     <p className="text-xs text-muted-foreground">{tCls("controversial.desc")}</p>

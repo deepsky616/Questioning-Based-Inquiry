@@ -84,7 +84,7 @@ export function ClassificationDonut({
       </ResponsiveContainer>
       {/* 가운데 총계 */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-xl font-bold text-foreground leading-none">{total}</span>
+        <span className="whitespace-nowrap text-xl font-bold tabular-nums text-foreground leading-none">{total}</span>
         <span className="text-[11px] text-muted-foreground mt-0.5">{t("totalQuestions")}</span>
       </div>
     </div>

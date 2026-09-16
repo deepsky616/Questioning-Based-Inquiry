@@ -58,14 +58,14 @@ export function AiAnswerPreviewDialog({
             {t("previewDialogDesc")}
           </DialogDescription>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+            <span className="shrink-0 whitespace-nowrap tabular-nums rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
               {t("previewReady", { ready, total })}
             </span>
-            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            <span className="shrink-0 whitespace-nowrap tabular-nums rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
               {t("previewPending", { total })}
             </span>
             {overLimitCount > 0 && (
-              <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+              <span className="shrink-0 whitespace-nowrap tabular-nums rounded-full bg-amber-50 dark:bg-amber-950/40 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
                 {t("previewOverLimit", { count: overLimitCount })}
               </span>
             )}

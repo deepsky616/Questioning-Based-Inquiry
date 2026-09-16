@@ -198,9 +198,9 @@ export function SessionAnalysisCard({ sessionId }: SessionAnalysisCardProps) {
           ) : analysis ? (
             <>
               <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: analysis.totalQuestions ?? 0 })}</span>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: analysis.totalLikes ?? 0 })}</span>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: analysis.totalComments ?? 0 })}</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 tabular-nums text-muted-foreground">{t("statQuestions", { count: analysis.totalQuestions ?? 0 })}</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 tabular-nums text-muted-foreground">{t("statLikes", { count: analysis.totalLikes ?? 0 })}</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 tabular-nums text-muted-foreground">{t("statComments", { count: analysis.totalComments ?? 0 })}</span>
                 {analysis.analyzedAt && (
                   <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
                     {t("analysisTime", { time: formatDateTime(analysis.analyzedAt) })}

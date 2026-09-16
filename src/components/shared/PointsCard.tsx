@@ -119,13 +119,13 @@ export default function PointsCard() {
         <span className="absolute top-2 right-3 text-3xl opacity-20">⭐</span>
         <span className="absolute bottom-2 left-3 text-2xl opacity-20">✨</span>
         <p className="text-white text-sm font-medium relative">{t("myPoints")}</p>
-        <p className="text-5xl font-black mt-1 relative">
+        <p className="whitespace-nowrap text-5xl font-black tabular-nums mt-1 relative">
           {loaded ? totalPoints : isError ? "-" : "..."}
         </p>
         <div className="mt-3 relative flex flex-wrap gap-x-3 gap-y-1 text-sm text-white">
-          <span>{t("ourClass")} <b className="font-black">{rankText(ranks.class)}</b></span>
-          <span>{t("school")} <b className="font-black">{rankText(ranks.school)}</b></span>
-          <span>{t("all")} <b className="font-black">{rankText(ranks.all)}</b></span>
+          <span>{t("ourClass")} <b className="whitespace-nowrap font-black tabular-nums">{rankText(ranks.class)}</b></span>
+          <span>{t("school")} <b className="whitespace-nowrap font-black tabular-nums">{rankText(ranks.school)}</b></span>
+          <span>{t("all")} <b className="whitespace-nowrap font-black tabular-nums">{rankText(ranks.all)}</b></span>
         </div>
         <button
           type="button"
@@ -175,8 +175,8 @@ export default function PointsCard() {
                         {t("rejected")}
                       </span>
                     )}
-                    <span className="text-muted-foreground text-xs w-12 text-right">{(() => { const r = relativeTime(log.createdAt); return t(r.key, r.v); })()}</span>
-                    <span className={`font-black w-10 text-right ${
+                    <span className="min-w-12 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">{(() => { const r = relativeTime(log.createdAt); return t(r.key, r.v); })()}</span>
+                    <span className={`min-w-10 whitespace-nowrap font-black tabular-nums text-right ${
                       isPending ? "text-amber-500" : isRejected ? "text-muted-foreground" : "text-indigo-600"
                     }`}>
                       {isPending ? `(+${log.points})` : `+${log.points}`}

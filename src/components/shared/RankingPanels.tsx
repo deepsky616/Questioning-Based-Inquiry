@@ -156,7 +156,7 @@ export function RankingPanel({
       </div>
       {highlightSelf && data?.me?.rank != null && (
         <p className="text-xs text-muted-foreground">
-          {t("myRankLabel")}<span className="font-bold text-indigo-600">{t("rankValue", { rank: data.me.rank })}</span> · {t("pointValue", { points: data.me.totalPoints })}
+          {t("myRankLabel")}<span className="whitespace-nowrap font-bold tabular-nums text-indigo-600">{t("rankValue", { rank: data.me.rank })}</span> · {t("pointValue", { points: data.me.totalPoints })}
         </p>
       )}
       {isLoading ? (
@@ -182,24 +182,24 @@ export function RankingPanel({
                     ref={isMe ? selfRef : undefined}
                     className={`border-b last:border-0 ${isMe ? "bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400" : ""}`}
                   >
-                    <td className="py-1.5 text-center font-semibold">{medal(i + 1)}</td>
+                    <td className="whitespace-nowrap tabular-nums py-1.5 text-center font-semibold">{medal(i + 1)}</td>
                     <td className="py-1.5">
                       <span className="font-medium text-foreground">{s.name}</span>
                       {isMe && <span className="ml-1 text-xs text-indigo-600">{t("me")}</span>}
                       {sub(s) && <span className="ml-1.5 text-xs text-muted-foreground">{sub(s)}</span>}
                     </td>
-                    <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
+                    <td className="whitespace-nowrap tabular-nums py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
                   </tr>
                 );
               })}
               {highlightSelf && !selfInList && data.me.rank != null && (
                 <tr ref={selfRef} className="border-t-2 bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400">
-                  <td className="py-1.5 text-center font-semibold">{data.me.rank}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-center font-semibold">{data.me.rank}</td>
                   <td className="py-1.5">
                     <span className="font-medium text-foreground">{data.me.name}</span>
                     <span className="ml-1 text-xs text-indigo-600">{t("me")}</span>
                   </td>
-                  <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{data.me.totalPoints}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-right font-bold text-rose-500 pr-1">{data.me.totalPoints}</td>
                 </tr>
               )}
             </tbody>
@@ -302,15 +302,15 @@ export function StudentRankPanel({
                   ref={s.isMe ? selfRef : undefined}
                   className={`border-b last:border-0 ${s.isMe ? "bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400" : ""}`}
                 >
-                  <td className="py-1.5 text-center font-semibold text-foreground">{s.studentNumber ?? "-"}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-center font-semibold text-foreground">{s.studentNumber ?? "-"}</td>
                   <td className="py-1.5 text-left">
                     <span className="font-medium text-foreground">{s.name}</span>
                     {s.isMe && <span className="ml-1 text-xs text-indigo-600">{t("me")}</span>}
                   </td>
-                  <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
-                  <td className="py-1.5 text-center text-indigo-600 dark:text-indigo-400 font-bold">{s.classRank}</td>
-                  <td className="py-1.5 text-center text-foreground">{s.schoolRank}</td>
-                  <td className="py-1.5 text-center text-foreground">{s.allRank}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-center text-indigo-600 dark:text-indigo-400 font-bold">{s.classRank}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-center text-foreground">{s.schoolRank}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-center text-foreground">{s.allRank}</td>
                 </tr>
               ))}
             </tbody>
@@ -396,7 +396,7 @@ export function ClassRankingPanel({
       </div>
       {data?.myClass && (
         <p className="text-xs text-muted-foreground">
-          {t("myClassLabel")}<span className="font-bold text-indigo-600">{t("rankValue", { rank: data.myClass.rank })}</span> · {t("avgValue", { avg: data.myClass.avgPoints })}
+          {t("myClassLabel")}<span className="whitespace-nowrap font-bold tabular-nums text-indigo-600">{t("rankValue", { rank: data.myClass.rank })}</span> · {t("avgValue", { avg: data.myClass.avgPoints })}
         </p>
       )}
       {isLoading ? (
@@ -423,25 +423,25 @@ export function ClassRankingPanel({
                     ref={mine ? selfRef : undefined}
                     className={`border-b last:border-0 ${mine ? "bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400" : ""}`}
                   >
-                    <td className="py-1.5 text-center font-semibold">{medal(c.rank)}</td>
+                    <td className="whitespace-nowrap tabular-nums py-1.5 text-center font-semibold">{medal(c.rank)}</td>
                     <td className="py-1.5">
                       <span className="font-medium text-foreground">{classLabel(c)}</span>
                       {mine && <span className="ml-1 text-xs text-indigo-600">{t("myClassTag")}</span>}
                     </td>
-                    <td className="py-1.5 text-right text-xs text-muted-foreground">{t("memberCount", { count: c.memberCount })}</td>
-                    <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{c.avgPoints}</td>
+                    <td className="whitespace-nowrap tabular-nums py-1.5 text-right text-xs text-muted-foreground">{t("memberCount", { count: c.memberCount })}</td>
+                    <td className="whitespace-nowrap tabular-nums py-1.5 text-right font-bold text-rose-500 pr-1">{c.avgPoints}</td>
                   </tr>
                 );
               })}
               {highlightSelf && !myClassInList && data.myClass && (
                 <tr ref={selfRef} className="border-t-2 bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400">
-                  <td className="py-1.5 text-center font-semibold">{data.myClass.rank}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-center font-semibold">{data.myClass.rank}</td>
                   <td className="py-1.5">
                     <span className="font-medium text-foreground">{classLabel(data.myClass)}</span>
                     <span className="ml-1 text-xs text-indigo-600">{t("myClassTag")}</span>
                   </td>
-                  <td className="py-1.5 text-right text-xs text-muted-foreground">{t("memberCount", { count: data.myClass.memberCount })}</td>
-                  <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{data.myClass.avgPoints}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-right text-xs text-muted-foreground">{t("memberCount", { count: data.myClass.memberCount })}</td>
+                  <td className="whitespace-nowrap tabular-nums py-1.5 text-right font-bold text-rose-500 pr-1">{data.myClass.avgPoints}</td>
                 </tr>
               )}
             </tbody>
