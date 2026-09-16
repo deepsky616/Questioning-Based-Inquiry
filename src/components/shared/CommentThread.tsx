@@ -2,7 +2,7 @@
 
 import { AiEthicsReminder } from "@/components/shared/AiEthicsReminder";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
@@ -59,6 +59,15 @@ export function CommentThread({
   const [isPosting, setIsPosting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const reportedCount = useRef(preloaded?.length);
+
+  // 부모 목록의 개수는 댓글 렌더가 끝난 뒤 변경된 경우에만 알린다.
+  // 상태 갱신 함수 안에서 부모 상태를 변경하면 등록·삭제 시 렌더 경고가 발생한다.
+  useEffect(() => {
+    if (isLoading || loadError || reportedCount.current === comments.length) return;
+    reportedCount.current = comments.length;
+    onCountChange?.(comments.length);
+  }, [comments.length, isLoading, loadError, onCountChange]);
 
   useEffect(() => {
     if (preloaded) return;
@@ -96,11 +105,7 @@ export function CommentThread({
       });
       if (!res.ok) throw new Error();
       const created: ThreadComment & { awardedPoints?: number } = await res.json();
-      setComments((prev) => {
-        const next = [...prev, created];
-        onCountChange?.(next.length);
-        return next;
-      });
+      setComments((prev) => [...prev, created]);
       if ((created.awardedPoints ?? 0) > 0) {
         void queryClient.invalidateQueries({ queryKey: ["points-card"] });
       }
@@ -153,11 +158,7 @@ export function CommentThread({
     try {
       const res = await fetch(`/api/questions/${questionId}/comments/${commentId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      setComments((prev) => {
-        const next = prev.filter((c) => c.id !== commentId);
-        onCountChange?.(next.length);
-        return next;
-      });
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch {
       toast({ variant: "destructive", description: t("deleteFailed") });
     }
@@ -180,17 +181,26 @@ export function CommentThread({
             const isMine = !!user.id && c.author.id === user.id;
             const isEditing = editingId === c.id;
             return (
-            <div key={c.id} className={`rounded-md border p-3 dark:bg-card ${c.flagged ? "border-red-300 bg-red-50" : "bg-white"}`}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
+            <article key={c.id} className={`rounded-md border p-3 ${c.flagged
+              ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40"
+              : isMine
+                ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40"
+                : "bg-white dark:bg-card"}`}>
+              <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-foreground">{c.author.name}</span>
+                  {isMine && (
+                    <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+                      {t("myComment")}
+                    </span>
+                  )}
                   {c.flagged && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/60 dark:text-red-200">
                       ⚠️ {c.flagReason || t("flagSuspected")}
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
                   {formatDateTime(c.createdAt)}
                 </span>
               </div>
@@ -211,7 +221,7 @@ export function CommentThread({
                 </div>
               ) : (
                 <>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">
                     {ct.text({ type: "COMMENT", id: c.id }, c.content)}
                   </p>
                   {ct.canTranslate && (
@@ -240,7 +250,7 @@ export function CommentThread({
                   )}
                 </div>
               )}
-            </div>
+            </article>
             );
           })}
         </div>

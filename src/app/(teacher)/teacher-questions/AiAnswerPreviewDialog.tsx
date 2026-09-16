@@ -1,7 +1,7 @@
 "use client";
 
-// AI 개별 맞춤 답변 미리보기 다이얼로그 (전송 전 교사 확인·수정 단계).
-// 생성·전송 상태와 결과 메시지는 목록 안의 맞춤 답변 패널과 공유하므로 페이지가 소유하고 props로 받는다.
+// 인공지능 맞춤 댓글 미리보기 다이얼로그 (등록 전 교사 확인·수정 단계).
+// 생성·등록 상태와 결과 메시지는 목록 안의 맞춤 댓글 패널과 공유하므로 페이지가 소유하고 props로 받는다.
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,25 +116,25 @@ export function AiAnswerPreviewDialog({
                   <p className="text-sm leading-relaxed text-foreground">{preview.questionContent}</p>
                 </div>
                 <div className="px-4 py-3">
-                  <div className="mb-1.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold text-indigo-600">{t("aiGeneratedAnswer")}</p>
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("aiGeneratedAnswer")}</p>
                       {edited && (
                         <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
                           {t("editedBadge")}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${overLimit ? "text-amber-700" : "text-muted-foreground"}`}>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`whitespace-nowrap text-xs font-medium tabular-nums ${overLimit ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"}`}>
                         {t("charCount", { n: answerLength })}
                       </span>
-                      {/* 이 답변만 AI 재생성 */}
+                      {/* 이 댓글만 인공지능으로 재생성 */}
                       <button
                         type="button"
                         onClick={() => onRegenerate(preview.questionId)}
                         disabled={isSending || Boolean(regeneratingId) || excluded}
-                        className="rounded-md border border-indigo-200 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                        className="whitespace-nowrap rounded-md border border-indigo-200 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
                       >
                         {regenerating ? t("regenerating") : `🔄 ${t("regenerateBtn")}`}
                       </button>

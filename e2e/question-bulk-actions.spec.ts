@@ -3,7 +3,7 @@ import { preparePage } from "./helpers/session-filter-page";
 import { expectNoHorizontalPageOverflow } from "./helpers/question-game-room";
 
 for (const width of [375, 1440]) {
-  test(`${width}px 질문 선택과 맞춤 답변 패널 열기·생성·전송을 각각 실행한다`, async ({ page, baseURL }, testInfo) => {
+  test(`${width}px 질문 선택과 맞춤 댓글 패널 열기·생성·전송을 각각 실행한다`, async ({ page, baseURL }, testInfo) => {
     const { errors } = await preparePage(page, "TEACHER", baseURL!);
     await page.setViewportSize({ width, height: 1000 });
     if (width === 375) await page.addInitScript(() => localStorage.setItem("question-lab-theme", "dark"));
@@ -28,20 +28,20 @@ for (const width of [375, 1440]) {
     await page.goto("/teacher-questions");
     const checkbox = page.getByRole("checkbox", { name: "시험 학생: 날씨에 관한 시험 질문입니다.", exact: true }).filter({ visible: true });
     const actions = page.getByRole("group", { name: "선택한 질문 작업", exact: true });
-    const panel = page.getByRole("region", { name: "인공지능 개별 맞춤 답변", exact: true });
+    const panel = page.getByRole("region", { name: "인공지능 개별 맞춤 댓글", exact: true });
     await checkbox.check();
     await expect(actions.getByText("질문 1개 선택됨", { exact: true })).toBeVisible();
     await expect(panel).toHaveCount(0);
     expect(generated).toEqual([]);
     expect(sent).toEqual([]);
 
-    await actions.getByRole("button", { name: "맞춤 답변 작성", exact: true }).click();
+    await actions.getByRole("button", { name: "맞춤 댓글 작성", exact: true }).click();
     await expect(panel).toBeVisible();
     expect(generated).toEqual([]);
     await panel.getByRole("button", { name: "패널 닫기", exact: true }).click();
     await expect(panel).toHaveCount(0);
     await expect(checkbox).toBeChecked();
-    await expect(actions.getByRole("button", { name: "맞춤 답변 작성", exact: true })).toBeFocused();
+    await expect(actions.getByRole("button", { name: "맞춤 댓글 작성", exact: true })).toBeFocused();
     // 패널을 닫은 뒤에도 같은 질문을 엑셀 다운로드와 수업 화면 보기에 활용한다.
     await page.getByRole("button", { name: "엑셀 다운로드", exact: true }).click();
     await expect(page.getByRole("dialog").getByRole("radio", { name: "선택한 질문 1개", exact: true })).toBeChecked();
@@ -50,17 +50,19 @@ for (const width of [375, 1440]) {
     await expect(page.getByRole("dialog").getByText("질문 1 / 1", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "수업 화면 닫기", exact: true }).click();
 
-    await actions.getByRole("button", { name: "맞춤 답변 작성", exact: true }).click();
+    await actions.getByRole("button", { name: "맞춤 댓글 작성", exact: true }).click();
     await panel.evaluate(element => element.scrollIntoView({ block: "center" }));
     await expectNoHorizontalPageOverflow(page);
-    await testInfo.attach(`맞춤-답변-패널-${width}`, { body: await page.screenshot({ path: testInfo.outputPath("answer-panel.png"), animations: "disabled" }), contentType: "image/png" });
-    await panel.getByRole("button", { name: "답변 생성하기", exact: true }).click();
-    const preview = page.getByRole("dialog");
+    await testInfo.attach(`맞춤-댓글-패널-${width}`, { body: await page.screenshot({ path: testInfo.outputPath("answer-panel.png"), animations: "disabled" }), contentType: "image/png" });
+    await panel.getByRole("button", { name: "댓글 생성하기", exact: true }).click();
+    const preview = page.getByRole("dialog", { name: "맞춤 댓글 미리보기", exact: true });
     await expect(preview.getByRole("textbox")).toHaveValue("온도를 바꾸어 관찰하고 결과를 비교해 보세요.");
     expect(generated).toEqual(["question-filter-weather"]);
     expect(sent).toEqual([]);
     await preview.getByRole("textbox").fill("물의 양을 같게 하고 온도를 바꾸어 비교해 보세요.");
-    await preview.getByRole("button", { name: "1개 답변 전송", exact: true }).click();
+    await expectNoHorizontalPageOverflow(page);
+    await testInfo.attach(`맞춤-댓글-미리보기-${width}`, { body: await page.screenshot({ path: testInfo.outputPath("comment-preview.png"), animations: "disabled" }), contentType: "image/png" });
+    await preview.getByRole("button", { name: "댓글 1개 등록", exact: true }).click();
     await expect(preview).toHaveCount(0);
     expect(sent).toEqual([{ id: "question-filter-weather", content: "물의 양을 같게 하고 온도를 바꾸어 비교해 보세요." }]);
     await expect(actions).toHaveCount(0);
@@ -68,13 +70,14 @@ for (const width of [375, 1440]) {
     // 전송 후 새로 선택하면 패널을 자동으로 다시 열지 않는다.
     await checkbox.check();
     await expect(panel).toHaveCount(0);
-    await actions.getByRole("button", { name: "맞춤 답변 작성", exact: true }).click();
+    await actions.getByRole("button", { name: "맞춤 댓글 작성", exact: true }).click();
     await actions.getByRole("button", { name: "선택 해제", exact: true }).click();
     await expect(panel).toHaveCount(0);
     await expect(checkbox).not.toBeChecked();
     await checkbox.check();
-    await actions.getByRole("button", { name: "맞춤 답변 작성", exact: true }).click();
+    await actions.getByRole("button", { name: "맞춤 댓글 작성", exact: true }).click();
     await page.getByRole("button", { name: "열린 질문", exact: true }).click();
+    await expect(page).toHaveURL(url => url.searchParams.get("closure") === "open");
     await expect(actions).toHaveCount(0);
     await expect(panel).toHaveCount(0);
     await expect(checkbox).not.toBeChecked();
@@ -96,7 +99,7 @@ for (const width of [375, 1440]) {
   });
 }
 
-test("페이지·질문수업·탭을 바꾸면 선택과 맞춤 답변 패널을 초기화한다", async ({ page, baseURL }) => {
+test("페이지·질문수업·탭을 바꾸면 선택과 맞춤 댓글 패널을 초기화한다", async ({ page, baseURL }) => {
   const { errors } = await preparePage(page, "TEACHER", baseURL!);
   const rows = Array.from({ length: 31 }, (_, index) => ({
     id: `scope-question-${index}`, content: `증발에 관한 질문 ${index + 1}`, closure: "open", cognitive: "conceptual",
@@ -113,10 +116,10 @@ test("페이지·질문수업·탭을 바꾸면 선택과 맞춤 답변 패널�
   });
   await page.goto("/teacher-questions");
   const actions = page.getByRole("group", { name: "선택한 질문 작업", exact: true });
-  const panel = page.getByRole("region", { name: "인공지능 개별 맞춤 답변", exact: true });
+  const panel = page.getByRole("region", { name: "인공지능 개별 맞춤 댓글", exact: true });
   async function selectAndOpen() {
     await page.getByRole("checkbox").filter({ visible: true }).nth(1).check();
-    await actions.getByRole("button", { name: "맞춤 답변 작성", exact: true }).click();
+    await actions.getByRole("button", { name: "맞춤 댓글 작성", exact: true }).click();
     await expect(panel).toBeVisible();
   }
   await selectAndOpen();
@@ -126,14 +129,19 @@ test("페이지·질문수업·탭을 바꾸면 선택과 맞춤 답변 패널�
   await expect(panel).toHaveCount(0);
   await selectAndOpen();
   await page.getByRole("combobox", { name: "질문수업", exact: true }).selectOption("filter-weather");
+  await expect(page).toHaveURL(url => url.searchParams.get("session") === "filter-weather");
   await expect(actions).toHaveCount(0);
   await expect(panel).toHaveCount(0);
   await page.getByRole("combobox", { name: "질문수업", exact: true }).selectOption("all");
+  // 수업 선택은 주소로 반영된다. 이전 목록에서 체크한 직후 주소가 바뀌는 경합을 피한다.
+  await expect(page).toHaveURL(url => !url.searchParams.has("session"));
   await selectAndOpen();
   await page.getByRole("button", { name: "🧩 탐구 설계", exact: true }).click();
+  await expect(page).toHaveURL(url => url.searchParams.get("tab") === "design");
   await expect(actions).toHaveCount(0);
   await expect(panel).toHaveCount(0);
   await page.getByRole("button", { name: "🔎 전체 질문 탐구", exact: true }).click();
+  await expect(page).toHaveURL(url => !url.searchParams.has("tab"));
   await expect(page.getByRole("checkbox").filter({ visible: true }).nth(1)).not.toBeChecked();
   await page.getByRole("checkbox").filter({ visible: true }).nth(1).check();
   await expect(panel).toHaveCount(0);

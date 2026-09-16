@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const userRole = (session.user as { role?: string }).role;
   if (userRole !== "TEACHER") {
-    return NextResponse.json({ error: "교사만 AI 답변을 생성할 수 있습니다" }, { status: 403 });
+    return NextResponse.json({ error: "교사만 인공지능 댓글을 생성할 수 있습니다" }, { status: 403 });
   }
 
   const userId = (session.user as { id: string }).id;
@@ -56,6 +56,6 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
     }
     logger.error("AI answer generation error:", error);
-    return NextResponse.json({ error: "AI 답변 생성에 실패했습니다" }, { status: 500 });
+    return NextResponse.json({ error: "인공지능 댓글 생성에 실패했습니다" }, { status: 500 });
   }
 }
