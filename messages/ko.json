@@ -526,7 +526,7 @@
     "pageStatus": "{page} / {totalPages} 페이지 · 총 {total}개",
     "searchPlaceholder": "질문 또는 이름으로 검색...",
     "flaggedTooltip": "AI·사전이 부적절로 의심한 질문·댓글만 모아 봅니다",
-    "flaggedOnly": "⚠️ 부적절 의심만",
+    "flaggedOnly": "⚠️ 부적절 의심",
     "selectSessionPrompt": "질문수업을 선택해 주세요",
     "sequenceTitle": "질문 중심 탐구설계",
     "sequenceAlreadyDeployed": "이 수업에는 이미 배포한 탐구설계가 있어요. 배포 목록에서 확인하거나 수정해 주세요.",
