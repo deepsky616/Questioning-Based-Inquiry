@@ -541,3 +541,12 @@ describe("질문수업 제출 권한", () => {
     expect(mPointCreate).not.toHaveBeenCalled();
   });
 });
+
+ it('분류 결과를 위조해 보내도 의미 없는 글은 저장하거나 포인트를 지급하지 않는다', async () => {
+  mAuth.mockResolvedValue({ user: { id: 's1', role: 'STUDENT' } });
+  const response = await POST(new Request('http://localhost/api/questions', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({content:'ㅋㅋㅋㅋ',closure:'closed',cognitive:'factual',sessionId:'session-1'}) }));
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({code:'UNCLASSIFIABLE_QUESTION'});
+  expect(prisma.question.create).not.toHaveBeenCalled();
+  expect(prisma.pointLog.create).not.toHaveBeenCalled();
+});

@@ -1,3 +1,4 @@
+import { getQuestionContentIssue, UNCLASSIFIABLE_QUESTION_CODE } from "@/lib/question-content-quality";
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -116,6 +117,10 @@ export async function PATCH(req: Request, { params }: Params) {
     }
     // 내용이 바뀌면 정규화 키와 부적절 표현 플래그도 함께 갱신한다
     const nextContent = data.content?.trim();
+    if (data.content !== undefined || closure !== undefined || cognitive !== undefined) {
+      const issue = getQuestionContentIssue(nextContent ?? existing.content);
+      if (issue) return NextResponse.json({ error: issue, code: UNCLASSIFIABLE_QUESTION_CODE }, { status: 400 });
+    }
     const normalizedContent = data.content !== undefined
       ? await normalizeContentForPersistence(nextContent ?? "")
       : null;

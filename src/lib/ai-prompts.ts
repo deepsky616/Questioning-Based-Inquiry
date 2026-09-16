@@ -1,3 +1,12 @@
+import { isUnclassifiedQuestion } from "@/lib/question-content-quality";
+
+function questionTypeLabel(question: { closure: string; cognitive: string }): string {
+  if (isUnclassifiedQuestion(question)) return "분류 불가";
+  const closure = question.closure === "closed" ? "닫힌" : "열린";
+  const cognitive = question.cognitive === "factual" ? "사실" : question.cognitive === "conceptual" ? "개념" : "논쟁";
+  return `${closure}·${cognitive}`;
+}
+
 interface QuestionSummary {
   content: string;
   closure: string;
@@ -71,7 +80,7 @@ export function buildSessionAnalysisPrompt(
   subject: string,
   topic: string
 ): string {
-  const total = questions.length;
+  const total = questions.filter((question) => !isUnclassifiedQuestion(question)).length;
   const closedCount = questions.filter((q) => q.closure === "closed").length;
   const openCount = questions.filter((q) => q.closure === "open").length;
   const factualCount = questions.filter((q) => q.cognitive === "factual").length;
@@ -107,10 +116,7 @@ export function buildSessionAnalysisPrompt(
             .map(formatComment)
             .join("\n");
           const kindLabel = q.kind === "deployed" ? "배포" : "학생";
-          return `${i + 1}. [${kindLabel}·${q.closure === "closed" ? "닫힌" : "열린"}·${
-            q.cognitive === "factual" ? "사실" :
-            q.cognitive === "conceptual" ? "개념" : "논쟁"
-          }·❤️${q.likeCount ?? 0}] ${q.content}${commentLines ? `\n${commentLines}` : "\n  (댓글 없음)"}`;
+          return `${i + 1}. [${kindLabel}·${questionTypeLabel(q)}·❤️${q.likeCount ?? 0}] ${q.content}${commentLines ? `\n${commentLines}` : "\n  (댓글 없음)"}`;
         }).join("\n")
       : "(질문 없음)";
 
@@ -144,6 +150,7 @@ ${topLikedText}
 ${questionList}
 
 분석 관점:
+- "분류 불가" 기록은 정상 질문 유형과 성취 평가에서 제외하고, 궁금한 점을 다시 적도록 안내하세요.
 - 질문 자체의 수준과 분포를 해석하세요.
 - 좋아요(공감)가 어떤 질문에 몰렸는지로 학생들이 무엇에 흥미·공감했는지 해석하세요.
 - 학생 댓글에서 드러난 이해, 오개념, 추가 궁금증, 상호작용의 깊이를 해석하세요.
@@ -185,9 +192,7 @@ export interface StudentSessionActivity {
 export function buildStudentSessionPrompt(a: StudentSessionActivity): string {
   const qList = a.questions.length > 0
     ? a.questions.map((q, i) =>
-        `${i + 1}. [${q.closure === "closed" ? "닫힌" : "열린"}·${
-          q.cognitive === "factual" ? "사실" : q.cognitive === "conceptual" ? "개념" : "논쟁"
-        }·❤️${q.likeCount}·💬${q.commentCount}] ${q.content}`,
+        `${i + 1}. [${questionTypeLabel(q)}·❤️${q.likeCount}·💬${q.commentCount}] ${q.content}`,
       ).join("\n")
     : "(이 세션에서 직접 만든 질문 없음)";
   const cList = a.myComments.length > 0
@@ -211,6 +216,7 @@ ${cList}
 [이전 활동(성장 비교용)] ${priorText}
 
 분석 관점:
+- "분류 불가" 기록은 정상 질문 유형과 성취 평가에서 제외하고, 궁금한 점을 다시 적도록 안내하세요.
 - 어떤 유형(닫힌/열린, 사실/개념/논쟁)의 질문을 주로 했는지, 좋은 점은 무엇인지.
 - 친구 질문에 좋아요·댓글로 얼마나 참여했는지.
 - 더 깊은 질문이나 활발한 참여를 위한 구체적이고 쉬운 다음 도전 한 가지.

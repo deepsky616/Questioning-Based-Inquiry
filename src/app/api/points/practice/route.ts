@@ -45,6 +45,7 @@ import {
 import { lockPointUserTransactions } from "@/lib/point-user-transaction-lock";
 import { JsonExtractionError } from "@/lib/json-extract";
 import { AiInvalidResponseError } from "@/lib/ai-errors";
+import { getQuestionContentIssue, UNCLASSIFIABLE_QUESTION_CODE } from "@/lib/question-content-quality";
 
 // 질문 연습 판정 + 포인트 지급.
 // 채점을 서버가 다시 수행하므로 클라이언트 값은 신뢰하지 않는다.
@@ -436,6 +437,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "연습을 이용할 권한이 없습니다" }, { status: 403 });
     }
     const body = bodySchema.parse(await req.json());
+    if (body.mode !== "quiz") {
+      const issue = getQuestionContentIssue(body.content);
+      if (issue) return NextResponse.json({ error: issue, code: UNCLASSIFIABLE_QUESTION_CODE }, { status: 400 });
+    }
 
     if (body.mode === "quiz") {
       const builtInItem = PRACTICE_QUIZ_BANK.find((q) => q.id === body.itemId);

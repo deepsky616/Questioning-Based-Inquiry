@@ -1,5 +1,7 @@
 "use client";
 
+import { QuestionTypeBadges } from "@/components/shared/QuestionTypeBadges";
+
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -9,10 +11,6 @@ import { Input } from "@/components/ui/input";
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, compareByStudent, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { EmptyState } from "@/components/shared/EmptyState";
-import {
-  CLOSURE_STYLE,
-  COGNITIVE_STYLE,
-} from "@/lib/question-labels";
 import { sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -140,10 +138,6 @@ function QuestionCard({
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(q.commentCount ?? 0);
   const isTeacherShared = q.source === "TEACHER_SHARED";
-  const closureLabel = (value: string) =>
-    value === "closed" ? tCls("closed.label")
-      : value === "open" ? tCls("open.label")
-      : value;
   const cognitiveLabel = (value: string) =>
     value === "factual" ? tCls("factual.label")
       : value === "conceptual" ? tCls("conceptual.label")
@@ -197,12 +191,7 @@ function QuestionCard({
             </div>
           )}
           <div className="flex gap-2 mt-2 flex-wrap items-center">
-            <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
-              {closureLabel(q.closure)}
-            </span>
-            <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
-              {cognitiveLabel(q.cognitive)}
-            </span>
+            <QuestionTypeBadges closure={q.closure} cognitive={q.cognitive} />
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:items-end">

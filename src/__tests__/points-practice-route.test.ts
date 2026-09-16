@@ -836,3 +836,12 @@ describe("연습 포인트 — AI 실시간 출제 문항", () => {
     expect((await POST(req({ mode: "transform-ai", target: "open", content: "질문" }))).status).toBe(400);
   });
 });
+
+ it('질문 만들기에서 반복 자음을 제출하면 채점과 포인트 지급을 하지 않는다', async () => {
+  mAuth.mockResolvedValue({user:{id:'s1',role:'STUDENT'}});
+  const response=await POST(req({mode:'create',topicId:'c01',target:'open',content:'ㅋㅋㅋㅋ'}));
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({code:'UNCLASSIFIABLE_QUESTION'});
+  expect(mGen).not.toHaveBeenCalled();
+  expect(mCreate).not.toHaveBeenCalled();
+});

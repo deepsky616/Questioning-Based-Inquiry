@@ -1,5 +1,8 @@
 "use client";
 
+import { QuestionTypeBadges } from "@/components/shared/QuestionTypeBadges";
+import { isUnclassifiedQuestion } from "@/lib/question-content-quality";
+
 import { QuestionClassificationReview } from "@/components/shared/QuestionClassificationReview";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,10 +31,6 @@ import { StudentMyQuestionsSummary } from "@/components/student/StudentMyQuestio
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
-import {
-  CLOSURE_STYLE,
-  COGNITIVE_STYLE,
-} from "@/lib/question-labels";
 import { sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { StudentMonthlyDateSelect, StudentMonthlySessionLookup } from "@/components/student/StudentMonthlySessionLookup";
@@ -94,7 +93,6 @@ export function MyQuestionsView() {
   const growthId = searchParams.get("growth");
   const tEx = useTranslations("explore");
   const tAsk = useTranslations("ask");
-  const tCls = useTranslations("classification");
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
@@ -264,15 +262,6 @@ export function MyQuestionsView() {
   const toggleComments = (questionId: string) => {
     setExpandedQuestionId((prev) => (prev === questionId ? null : questionId));
   };
-  const closureLabel = (value: string) =>
-    value === "closed" ? tCls("closed.label")
-      : value === "open" ? tCls("open.label")
-      : value;
-  const cognitiveLabel = (value: string) =>
-    value === "factual" ? tCls("factual.label")
-      : value === "conceptual" ? tCls("conceptual.label")
-      : value === "controversial" ? tCls("controversial.label")
-      : value;
 
   // 렌더 본문 안에서 정의한 컴포넌트(<QuestionRows/>)는 매 렌더마다 타입이 새로 만들어져
   // React가 하위 트리 전체를 리마운트한다 — 12초 폴링 갱신 때 작성 중인 댓글 초안이
@@ -320,15 +309,14 @@ export function MyQuestionsView() {
                   ) : (
                     <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                   )}
-                  <QuestionClassificationReview questionId={q.id} reviewed={Boolean(q.hasClassificationReview)} />
+                  {!isUnclassifiedQuestion(q) && <QuestionClassificationReview questionId={q.id} reviewed={Boolean(q.hasClassificationReview)} />}
                   <QuestionGrowthLink questionId={q.id} complete={q.growthComplete} className="mt-2" />
                   {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
                 </div>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[q.closure]}`}>{closureLabel(q.closure)}</span>
-                <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{cognitiveLabel(q.cognitive)}</span>
+                <QuestionTypeBadges closure={q.closure} cognitive={q.cognitive} />
                 <span className={`rounded px-2 py-0.5 text-xs ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -453,13 +441,12 @@ export function MyQuestionsView() {
                     ) : (
                       <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                     )}
-                    <QuestionClassificationReview questionId={q.id} reviewed={Boolean(q.hasClassificationReview)} />
+                    {!isUnclassifiedQuestion(q) && <QuestionClassificationReview questionId={q.id} reviewed={Boolean(q.hasClassificationReview)} />}
                     <QuestionGrowthLink questionId={q.id} complete={q.growthComplete} className="mt-2" />
                     {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                     {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{closureLabel(q.closure)}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{cognitiveLabel(q.cognitive)}</span>
+                      <QuestionTypeBadges closure={q.closure} cognitive={q.cognitive} />
                       <span className={`text-xs px-2 py-0.5 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
                     </div>
                     {/* 수업세션(📚 칩) · 작성일시(🕒) — 한눈에 구분 */}

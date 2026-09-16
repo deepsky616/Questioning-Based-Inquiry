@@ -414,7 +414,10 @@ function AskContent() {
         }),
       });
 
-      if (!res.ok) throw new Error(t("saveFailed"));
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || t("saveFailed"));
+      }
       markSubmitted(savedAnalysis.content);
       const saved = await res.json().catch(() => null);
       const savedQuestion = {

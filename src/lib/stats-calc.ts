@@ -117,11 +117,12 @@ export function summarizeQuestionTypes(
 ): QuestionTypeSummary {
   const closure = { closed: 0, open: 0 };
   const cognitive = { factual: 0, conceptual: 0, controversial: 0 };
-  for (const q of questions) {
+  const classified = questions.filter(q => q.closure !== "unclassified" && q.cognitive !== "unclassified");
+  for (const q of classified) {
     if (q.closure === "closed" || q.closure === "open") closure[q.closure]++;
     if (q.cognitive === "factual" || q.cognitive === "conceptual" || q.cognitive === "controversial") {
       cognitive[q.cognitive]++;
     }
   }
-  return { total: questions.length, closure, cognitive };
+  return { total: classified.length, closure, cognitive };
 }

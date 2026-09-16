@@ -56,6 +56,8 @@
     "unlike": "Unlike"
   },
   "classification": {
+    "unclassified": "Cannot classify",
+    "unclassifiedHelp": "This entry has no clear question meaning. Ask the student to write what they want to know.",
     "category1": "Type 1",
     "category2": "Type 2",
     "category1Sub": "Answer openness",

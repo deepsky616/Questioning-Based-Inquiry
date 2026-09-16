@@ -152,6 +152,15 @@ beforeEach(() => {
 });
 
 describe("학생 질문 내용 수정 가드 (반응 전까지만)", () => {
+  it("의미 없는 내용으로 수정하거나 기존 반복 글에 정상 유형만 붙일 수 없다", async () => {
+    const invalidEdit = await PATCH(patchReq({ content: "ㅋㅋㅋㅋ", closure: "closed", cognitive: "factual" }), ctx);
+    expect(invalidEdit.status).toBe(400);
+    expect(await invalidEdit.json()).toMatchObject({ code: "UNCLASSIFIABLE_QUESTION" });
+    mFind.mockResolvedValue(cleanQuestion({ content: "ㅋㅋㅋㅋ" }));
+    expect((await PATCH(patchReq({ closure: "closed", cognitive: "factual" }), ctx)).status).toBe(400);
+    expect(mUpdate).not.toHaveBeenCalled();
+  });
+
   it("학생은 교사의 분류 확인 이유를 기록할 수 없다", async () => {
     const response = await PATCH(patchReq({ closure: "open", reviewReason: "학생이 교사 이유를 대신 제출" }), ctx);
     expect(response.status).toBe(400);

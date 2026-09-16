@@ -1,23 +1,27 @@
 export const CLOSURE_LABEL: Record<string, string> = {
   closed: "닫힌 질문",
   open: "열린 질문",
+  unclassified: "분류 불가",
 };
 
 export const CLOSURE_STYLE: Record<string, string> = {
   closed: "bg-blue-100 text-blue-700",
   open: "bg-green-100 text-green-700",
+  unclassified: "bg-amber-100 text-amber-800",
 };
 
 export const COGNITIVE_LABEL: Record<string, string> = {
   factual: "사실적 질문",
   conceptual: "개념적 질문",
   controversial: "논쟁적 질문",
+  unclassified: "분류 불가",
 };
 
 export const COGNITIVE_STYLE: Record<string, string> = {
   factual: "bg-gray-100 text-gray-700",
   conceptual: "bg-purple-100 text-purple-700",
   controversial: "bg-orange-100 text-orange-700",
+  unclassified: "bg-amber-100 text-amber-800",
 };
 
 export const COGNITIVE_CATEGORIES = [
@@ -26,7 +30,8 @@ export const COGNITIVE_CATEGORIES = [
   { value: "controversial", label: "논쟁적 질문", values: ["controversial"] },
 ] as const;
 
-export function normalizeCognitiveType(value: string | null | undefined): "factual" | "conceptual" | "controversial" {
+export function normalizeCognitiveType(value: string | null | undefined): "factual" | "conceptual" | "controversial" | null {
+  if (value === "unclassified") return null;
   if (value === "conceptual") return "conceptual";
   if (value === "controversial") return "controversial";
   return "factual";

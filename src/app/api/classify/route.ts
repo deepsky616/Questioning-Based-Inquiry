@@ -13,6 +13,7 @@ import {
 } from "@/lib/ai";
 import { JsonExtractionError } from "@/lib/json-extract";
 import { AiInvalidResponseError } from "@/lib/ai-errors";
+import { getQuestionContentIssue, UNCLASSIFIABLE_QUESTION_CODE } from "@/lib/question-content-quality";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
@@ -82,6 +83,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { apiKey: requestApiKey, model: requestModel, content } = classifySchema.parse(body);
+    const issue = getQuestionContentIssue(content);
+    if (issue) return NextResponse.json({ error: issue, code: UNCLASSIFIABLE_QUESTION_CODE }, { status: 400 });
     fallbackContent = content;
 
     const generated = await generateJsonWithMetadata<unknown>({

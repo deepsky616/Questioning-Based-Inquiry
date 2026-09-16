@@ -1,3 +1,4 @@
+import { isUnclassifiedQuestion } from "@/lib/question-content-quality";
 import { normalizeCognitiveType } from "@/lib/question-labels";
 
 export interface InquiryGraphQuestion {
@@ -35,13 +36,14 @@ export function buildInquiryGraphSummary(
   highlightLimit = 4,
 ): InquiryGraphSummary {
   const usableSharedQuestions = sharedQuestions.filter((question) => question.content.trim());
-  const usableStudentQuestions = studentQuestions.filter((question) => question.content.trim());
+  const usableStudentQuestions = studentQuestions.filter((question) => question.content.trim() && !isUnclassifiedQuestion(question));
 
   const byCognitive = { factual: 0, conceptual: 0, controversial: 0 };
   const byClosure = { closed: 0, open: 0 };
 
   for (const question of usableStudentQuestions) {
-    byCognitive[normalizeCognitiveType(question.cognitive)]++;
+    const cognitive = normalizeCognitiveType(question.cognitive);
+    if (cognitive) byCognitive[cognitive]++;
     if (question.closure === "closed") byClosure.closed++;
     else byClosure.open++;
   }

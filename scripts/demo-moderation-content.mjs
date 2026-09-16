@@ -14,7 +14,8 @@ export function buildDemoModerationQuestions({ sessionId, context, studentIds, c
   return DEMO_MODERATION_EXAMPLES.map(([content, reason], index) => ({
     id: `${DEMO_MODERATION_PREFIX}${String(index + 1).padStart(2, '0')}`,
     sessionId, authorId: studentIds[index + 1], content, context,
-    closure: index === 4 ? 'open' : 'closed', cognitive: 'factual', inquiryType: 'factual',
+    closure: index === 2 ? 'unclassified' : index === 4 ? 'open' : 'closed',
+    cognitive: index === 2 ? 'unclassified' : 'factual', inquiryType: index === 2 ? null : 'factual',
     source: 'STUDENT', isPublic: false, flagged: true,
     flagReason: `시연용 · ${reason} · 교사 확인 필요`,
     createdAt, updatedAt: createdAt,

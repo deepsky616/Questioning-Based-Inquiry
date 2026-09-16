@@ -287,6 +287,10 @@ export const REQUIRED_TRIGGERS = [
 
 export const REQUIRED_CHECK_CONSTRAINTS = [
   {
+    name: "questions_unclassified_pair_check",
+    tableName: "questions",
+  },
+  {
     name: "activity_award_claims_bonus_type_check",
     tableName: "activity_award_claims",
   },

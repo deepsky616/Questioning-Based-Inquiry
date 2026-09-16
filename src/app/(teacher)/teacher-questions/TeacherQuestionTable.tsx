@@ -1,5 +1,8 @@
 "use client";
 
+import { QuestionTypeBadges } from "@/components/shared/QuestionTypeBadges";
+import { isUnclassifiedQuestion } from "@/lib/question-content-quality";
+
 import { QuestionClassificationReview } from "@/components/shared/QuestionClassificationReview";
 import { ClassroomPresentation } from "@/components/teacher/ClassroomPresentation";
 
@@ -24,9 +27,7 @@ import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-
 import { formatDateTime } from "@/lib/datetime";
 import {
   CLOSURE_LABEL,
-  CLOSURE_STYLE,
   COGNITIVE_LABEL,
-  COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import type { Question } from "./types";
 import { TeacherQuestionLikeCount } from "./TeacherQuestionLikeCount";
@@ -98,7 +99,7 @@ export function TeacherQuestionTable({
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <ClassroomPresentation title={tp("studentQuestions")} label={tp(list.some(question => selectedIds.has(question.id)) ? "selected" : "currentPage")} items={(list.some(question => selectedIds.has(question.id)) ? list.filter(question => selectedIds.has(question.id)) : list).map(question => ({
           id: question.id, content: contentTranslation.text({ type: "QUESTION", id: question.id }, question.content),
-          classification: `${closureLabel(question.closure)} · ${cognitiveLabel(question.cognitive)}`, authorName: question.author.name,
+          classification: isUnclassifiedQuestion(question) ? tCls("unclassified") : `${closureLabel(question.closure)} · ${cognitiveLabel(question.cognitive)}`, authorName: question.author.name,
         }))} />
       </div>
       <div className="space-y-3 lg:hidden">
@@ -164,14 +165,9 @@ export function TeacherQuestionTable({
                   )}
 
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[question.closure]}`}>
-                      {closureLabel(question.closure)}
-                    </span>
-                    <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[question.cognitive]}`}>
-                      {cognitiveLabel(question.cognitive)}
-                    </span>
+                    <QuestionTypeBadges closure={question.closure} cognitive={question.cognitive} />
                   </div>
-                  <QuestionClassificationReview questionId={question.id} reviewed={Boolean(question.hasClassificationReview)} teacher />
+                  {!isUnclassifiedQuestion(question) && <QuestionClassificationReview questionId={question.id} reviewed={Boolean(question.hasClassificationReview)} teacher />}
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     {selectedSessionId === "all" && question.session && (
                       <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
@@ -320,14 +316,9 @@ export function TeacherQuestionTable({
                       <TranslateToggle item={{ type: "QUESTION", id: question.id }} ct={contentTranslation} className="mt-0.5" />
                     )}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[question.closure]}`}>
-                        {closureLabel(question.closure)}
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[question.cognitive]}`}>
-                        {cognitiveLabel(question.cognitive)}
-                      </span>
+                      <QuestionTypeBadges closure={question.closure} cognitive={question.cognitive} />
                     </div>
-                    <QuestionClassificationReview questionId={question.id} reviewed={Boolean(question.hasClassificationReview)} teacher />
+                    {!isUnclassifiedQuestion(question) && <QuestionClassificationReview questionId={question.id} reviewed={Boolean(question.hasClassificationReview)} teacher />}
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       {selectedSessionId === "all" && question.session && (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">

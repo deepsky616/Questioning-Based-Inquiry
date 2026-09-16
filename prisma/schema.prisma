@@ -196,8 +196,8 @@ model Question {
   content        String  @map("content")
   normalizedContent String @default("") @map("normalized_content")
   dedupeKey      String? @map("dedupe_key")
-  closure        String  @map("closure")
-  cognitive      String  @map("cognitive")
+  closure        String  @map("closure") // closed | open | unclassified
+  cognitive      String  @map("cognitive") // factual | conceptual | controversial | unclassified
   closureScore   Float?  @map("closure_score")
   cognitiveScore Float?  @map("cognitive_score")
   context        String? @map("context")

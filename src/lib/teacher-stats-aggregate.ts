@@ -1,3 +1,4 @@
+import { isUnclassifiedQuestion } from "@/lib/question-content-quality";
 import { normalizeCognitiveType } from "@/lib/question-labels";
 import { compareByClassAndNumber } from "@/lib/student-sort";
 import { calcTrend, type StudentStat, type TimelineEntry } from "@/lib/stats-calc";
@@ -47,13 +48,14 @@ export function aggregateTeacherStats(
   let total = 0;
 
   for (const question of questions) {
+    if (isUnclassifiedQuestion(question)) continue;
     total += 1;
     if (question.closure === "closed" || question.closure === "open") {
       byClosure[question.closure] += 1;
     }
 
     const cognitive = normalizeCognitiveType(question.cognitive);
-    byCognitive[cognitive] += 1;
+    if (cognitive) byCognitive[cognitive] += 1;
 
     const date = question.createdAt.toISOString().split("T")[0];
     timeline.set(date, (timeline.get(date) ?? 0) + 1);
@@ -80,7 +82,7 @@ export function aggregateTeacherStats(
     if (question.closure === "closed" || question.closure === "open") {
       student.distribution[question.closure] += 1;
     }
-    student.cognitiveDistribution[cognitive] += 1;
+    if (cognitive) student.cognitiveDistribution[cognitive] += 1;
 
     if (question.createdAt < midpoint) {
       student.firstHalf += 1;

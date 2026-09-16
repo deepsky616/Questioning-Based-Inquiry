@@ -45,13 +45,24 @@ beforeEach(() => {
 });
 
 describe("POST /api/classify", () => {
+  it.each(['ㅋㅋㅋㅋ', 'ㅋ ㅋ ㅋ ㅋ ?', 'ㅎㅎㅎㅎ!!!', 'ㄱㄴㄷㄹ', 'ᄏᄏᄏᄏ', '?!…', '😂😂😂', '가가가가가가'])('의미 없는 입력은 유형과 점수를 만들지 않는다: %s', async (content) => {
+    mGenerate.mockResolvedValue({ data: { closure: 'closed', cognitive: 'factual', closureScore: 0.9, cognitiveScore: 0.9 }, model: 'gemini-2.5-flash' });
+    const response = await POST(request(content));
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.code).toBe('UNCLASSIFIABLE_QUESTION');
+    expect(data.closure).toBeUndefined();
+    expect(data.cognitive).toBeUndefined();
+    expect(mGenerate).not.toHaveBeenCalled();
+  });
+
   it.each(['', '  \n  ', '가'.repeat(201)])("비어 있거나 글자 수 제한을 넘는 입력은 분석을 호출하지 않는다", async (content) => {
     const response = await POST(request(content));
     expect(response.status).toBe(400);
     expect(mGenerate).not.toHaveBeenCalled();
   });
 
-  it.each(['왜?', '주황색인가요?', '색깔이 주황색인가요?', '평균이 3.5이면\n모든 값도 3.5인가요? 📊', '물의 온도가 "0도"보다 낮으면 <얼음>이 될까요?', '가'.repeat(199) + '?'])("다양한 입력도 응답 실패 시 기본 분석과 입력 흐름을 유지한다: %s", async (content) => {
+  it.each(['왜?', '주황색인가요?', '색깔이 주황색인가요?', '평균이 3.5이면\n모든 값도 3.5인가요? 📊', '물의 온도가 "0도"보다 낮으면 <얼음>이 될까요?', '온도와 습도, 바람의 방향을 날마다 관찰하면 날씨 변화를 더 정확하게 설명할 수 있나요? '.repeat(5).slice(0, 199) + '?'])("다양한 입력도 응답 실패 시 기본 분석과 입력 흐름을 유지한다: %s", async (content) => {
     mGenerate.mockRejectedValue(new AiInvalidResponseError());
     const response = await POST(request(content));
     expect(response.status).toBe(200);

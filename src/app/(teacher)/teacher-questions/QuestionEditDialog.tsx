@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
+import { isUnclassifiedQuestion } from "@/lib/question-content-quality";
 import { normalizeCognitiveType } from "@/lib/question-labels";
 import type { Question } from "./types";
 
@@ -33,6 +34,8 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
   const tc = useTranslations("common");
   const sessionText = useSessionMetaTranslation(question?.session ? [question.session] : []);
 
+  const unclassified = !!question && isUnclassifiedQuestion(question);
+
   const [closure, setClosure] = useState("");
   const [cognitive, setCognitive] = useState("");
   const [comment, setComment] = useState("");
@@ -45,7 +48,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
   useEffect(() => {
     if (!question) return;
     setClosure(question.closure);
-    setCognitive(normalizeCognitiveType(question.cognitive));
+    setCognitive(normalizeCognitiveType(question.cognitive) ?? "");
     setComment("");
     setReviewReason("");
     setMsg(null);
@@ -72,12 +75,17 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
     setIsSaving(true);
     setMsg(null);
     try {
-      const patchRes = await fetch(`/api/questions/${question.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ closure, cognitive, reviewReason }),
-      });
-      if (!patchRes.ok) throw new Error(t("classifyUpdateFailed"));
+      if (!unclassified) {
+        const patchRes = await fetch(`/api/questions/${question.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ closure, cognitive, reviewReason }),
+        });
+        if (!patchRes.ok) {
+          const data = await patchRes.json().catch(() => null);
+          throw new Error(data?.error || t("classifyUpdateFailed"));
+        }
+      }
 
       if (comment.trim()) {
         const commentRes = await fetch(`/api/questions/${question.id}/comments`, {
@@ -125,6 +133,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
                 </p>
               )}
             </div>
+            {unclassified ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{tCls("unclassifiedHelp")}</p> : <>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="question-review-closure">{tCls("closure")}</Label>
@@ -153,13 +162,14 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
               <Textarea id="classification-review-reason" value={reviewReason} onChange={event => setReviewReason(event.target.value)} maxLength={400} disabled={isSaving} placeholder={tr("reasonHint")} className="min-h-24 text-base" />
               <p className="text-xs leading-relaxed text-muted-foreground">{tr("reasonHelp")}</p>
             </div>
+            </>}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="question-review-comment">{t("commentOptional")}</Label>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={isGeneratingAi}
+                  disabled={isGeneratingAi || unclassified}
                   onClick={handleGenerateAi}
                   className="text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-xs h-7"
                 >
@@ -183,7 +193,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{tc("cancel")}</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || (unclassified && !comment.trim())}>
             {isSaving ? t("saving") : tc("save")}
           </Button>
         </DialogFooter>

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { getQuestionContentIssue, UNCLASSIFIABLE_QUESTION_CODE } from "@/lib/question-content-quality";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
@@ -378,7 +379,7 @@ export async function getStudentDashboardQuestionSummary(sessionUser: QuestionRo
   return {
     recent,
     stats: {
-      total: closureGroups.reduce((sum, group) => sum + group._count._all, 0),
+      total: (closureCounts.closed ?? 0) + (closureCounts.open ?? 0),
       byClosure: {
         closed: closureCounts.closed ?? 0,
         open: closureCounts.open ?? 0,
@@ -539,7 +540,7 @@ export async function listTeacherQuestionPage(
   const cognitiveCounts = Object.fromEntries(
     cognitiveGroups.map((group) => [group.cognitive, group._count._all]),
   ) as Record<string, number>;
-  const summaryTotal = closureGroups.reduce((sum, group) => sum + group._count._all, 0);
+  const summaryTotal = (closureCounts.closed ?? 0) + (closureCounts.open ?? 0);
 
   return {
     items: pageRows.map(({ _count, comments, likes, ...question }) => {
@@ -707,6 +708,8 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
   const body = await req.json();
   const data = createQuestionSchema.parse(body);
   const userId = requireUserId(sessionUser);
+  const issue = getQuestionContentIssue(data.content);
+  if (issue) throw new QuestionRouteError(issue, 400, UNCLASSIFIABLE_QUESTION_CODE);
   const viewer = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, school: true, grade: true, className: true },
