@@ -233,6 +233,13 @@ interface StudentSortAuthor {
   studentNumber: string | null;
 }
 
+function compareTeacherQuestionAuthors(left: StudentSortAuthor, right: StudentSortAuthor, direction: "asc" | "desc") {
+  const comparison = compareNumberSortValue(left.grade, right.grade) ||
+    compareNumberSortValue(left.className, right.className) ||
+    compareNumberSortValue(left.studentNumber, right.studentNumber);
+  return (direction === "desc" ? -1 : 1) * comparison || left.id.localeCompare(right.id);
+}
+
 async function listTeacherQuestionRowsByStudent({
   client,
   where,
@@ -264,15 +271,10 @@ async function listTeacherQuestionRowsByStudent({
     className: null,
     studentNumber: null,
   });
-  const multiplier = direction === "desc" ? -1 : 1;
   const orderedGroups = [...authorGroups].sort((left, right) => {
     const leftAuthor = authorById.get(left.authorId) ?? fallbackAuthor(left.authorId);
     const rightAuthor = authorById.get(right.authorId) ?? fallbackAuthor(right.authorId);
-    const comparison =
-      compareNumberSortValue(leftAuthor.grade, rightAuthor.grade) ||
-      compareNumberSortValue(leftAuthor.className, rightAuthor.className) ||
-      compareNumberSortValue(leftAuthor.studentNumber, rightAuthor.studentNumber);
-    return multiplier * comparison || left.authorId.localeCompare(right.authorId);
+    return compareTeacherQuestionAuthors(leftAuthor, rightAuthor, direction);
   });
 
   // 학생별 질문 묶음에서 현재 페이지와 겹치는 구간만 계산한다.
@@ -447,17 +449,14 @@ export async function getStudentSessionQuestion(
   return { existingQuestion };
 }
 
-export async function listTeacherQuestionPage(
-  req: Request,
+async function teacherQuestionListFilters(
+  searchParams: URLSearchParams,
   sessionUser: QuestionRouteUser,
 ) {
   if (sessionUser.role !== "TEACHER") {
     throw new QuestionRouteError("교사만 조회할 수 있습니다", 403);
   }
 
-  const { searchParams } = new URL(req.url);
-  const page = positiveInteger(searchParams.get("page"), 1);
-  const pageSize = Math.min(positiveInteger(searchParams.get("pageSize"), 30), 100);
   const search = searchParams.get("search")?.trim() ?? "";
 
   const scopedWhere = buildQuestionWhereClause({
@@ -496,6 +495,44 @@ export async function listTeacherQuestionPage(
     pageFilters.push(flaggedFilter);
   }
   const pageWhere = withQuestionFilters(searchedWhere, pageFilters);
+  return { pageWhere, searchedWhere, flaggedFilter };
+}
+
+// 목록과 같은 필터·접근 범위를 사용하되, 페이지 경계 없이 한 번에 읽는다.
+// 한도를 초과하면 일부만 내보내지 않고 범위를 좁히도록 안내한다.
+export async function listTeacherQuestionExportRows(req: Request, sessionUser: QuestionRouteUser, questionIds?: string[]) {
+  const { searchParams } = new URL(req.url);
+  const { pageWhere } = await teacherQuestionListFilters(searchParams, sessionUser);
+  const ids = questionIds ? [...new Set(questionIds)] : null;
+  const rows = await prisma.question.findMany({
+    where: ids ? withQuestionFilters(pageWhere, [{ id: { in: ids } }]) : pageWhere,
+    select: {
+      id: true, content: true, closure: true, cognitive: true, createdAt: true,
+      isPublic: true, flagged: true, flagReason: true,
+      session: teacherQuestionPageSelect.session,
+      author: teacherQuestionPageSelect.author,
+      _count: { select: { likes: true, comments: true } },
+      comments: teacherQuestionPageSelect.comments,
+    },
+    orderBy: teacherQuestionOrderBy(searchParams),
+    take: 10_001,
+  });
+  if (rows.length > 10_000) throw new QuestionRouteError("한 번에 10,000개까지 내려받을 수 있습니다. 수업이나 검색 조건으로 범위를 좁혀 주세요.", 413, "EXPORT_TOO_LARGE");
+  if (ids && rows.length !== ids.length) throw new QuestionRouteError("선택한 질문이 변경되었거나 조회 범위를 벗어났습니다. 목록을 새로고침한 후 다시 선택해 주세요.", 409, "EXPORT_SELECTION_CHANGED");
+  if (!rows.length) throw new QuestionRouteError("내려받을 질문이 없습니다. 검색·필터 조건을 확인해 주세요.", 404, "EXPORT_EMPTY");
+  const studentSort = searchParams.get("studentSort");
+  if (studentSort === "asc" || studentSort === "desc") {
+    rows.sort((left, right) => compareTeacherQuestionAuthors(left.author, right.author, studentSort) ||
+      right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id));
+  }
+  return rows;
+}
+
+export async function listTeacherQuestionPage(req: Request, sessionUser: QuestionRouteUser) {
+  const { searchParams } = new URL(req.url);
+  const page = positiveInteger(searchParams.get("page"), 1);
+  const pageSize = Math.min(positiveInteger(searchParams.get("pageSize"), 30), 100);
+  const { pageWhere, searchedWhere, flaggedFilter } = await teacherQuestionListFilters(searchParams, sessionUser);
   const studentSort = searchParams.get("studentSort");
   const skip = (page - 1) * pageSize;
 

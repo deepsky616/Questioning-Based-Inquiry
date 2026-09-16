@@ -15,6 +15,7 @@ import {
 import type { Question, QuestionPageInfo } from "./types";
 import { TeacherQuestionTable } from "./TeacherQuestionTable";
 import { TeacherQuestionPageNavigation } from "./TeacherQuestionPageNavigation";
+import { TeacherQuestionExport } from "./TeacherQuestionExport";
 
 type ClosureFilter = "all" | "closed" | "open";
 type CognitiveFilter = "all" | "factual" | "conceptual" | "controversial";
@@ -27,6 +28,8 @@ interface TeacherQuestionListPanelProps {
   displayed: Question[];
   totalCount: number;
   pageInfo: QuestionPageInfo;
+  exportQueryPath: string;
+  exportDisabled: boolean;
   search: string;
   showFlaggedOnly: boolean;
   flaggedCount: number;
@@ -67,6 +70,8 @@ export function TeacherQuestionListPanel({
   displayed,
   totalCount,
   pageInfo,
+  exportQueryPath,
+  exportDisabled,
   search,
   showFlaggedOnly,
   flaggedCount,
@@ -145,6 +150,13 @@ export function TeacherQuestionListPanel({
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <QuestionSortControl field={sortField} dir={sortDir} onChange={onSortChange} />
+          <TeacherQuestionExport
+            key={`${exportQueryPath}:${[...selectedIds].join(",")}`}
+            queryPath={exportQueryPath}
+            questionIds={displayed.filter(question => selectedIds.has(question.id)).map(question => question.id)}
+            totalCount={totalCount}
+            disabled={exportDisabled}
+          />
         </div>
       </div>
 

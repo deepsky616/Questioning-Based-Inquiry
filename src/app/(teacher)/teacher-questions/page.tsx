@@ -119,6 +119,10 @@ function QuestionsContent() {
     resetBulkState();
     setExpandedCommentId(null);
   }, [resetBulkState, selectionScope]);
+  const questionListPath = buildTeacherQuestionPagePath({
+    selectedSessionId, filterDate, filterSubject, filterTopic, filterClosure, filterCognitive,
+    showFlaggedOnly, search: debouncedSearch, sortField, sortDir, page, pageSize: TEACHER_QUESTION_PAGE_SIZE,
+  });
   const questionsQuery = useQuery<TeacherQuestionPageResponse>({
     queryKey: [
       "teacher-question-page",
@@ -135,20 +139,7 @@ function QuestionsContent() {
       page,
     ],
     queryFn: async () => {
-      const response = await fetch(buildTeacherQuestionPagePath({
-        selectedSessionId,
-        filterDate,
-        filterSubject,
-        filterTopic,
-        filterClosure,
-        filterCognitive,
-        showFlaggedOnly,
-        search: debouncedSearch,
-        sortField,
-        sortDir,
-        page,
-        pageSize: TEACHER_QUESTION_PAGE_SIZE,
-      }));
+      const response = await fetch(questionListPath);
       if (!response.ok) throw new Error("질문을 불러오지 못했습니다");
       return response.json();
     },
@@ -518,6 +509,8 @@ function QuestionsContent() {
         displayed={displayed}
         totalCount={pageInfo.total}
         pageInfo={pageInfo}
+        exportQueryPath={questionListPath}
+        exportDisabled={isLoading || questionsQuery.isError || search.trim() !== debouncedSearch}
         search={search}
         showFlaggedOnly={showFlaggedOnly}
         flaggedCount={flaggedCount}
