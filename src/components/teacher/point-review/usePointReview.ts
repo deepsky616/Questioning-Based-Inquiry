@@ -134,6 +134,8 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
           ? "aiErrorQuota"
           : failed[0].aiErrorType === "busy"
           ? "aiErrorBusy"
+          : failed[0].aiErrorType === "output_truncated"
+          ? "aiErrorOutputTruncated"
           : failed[0].aiErrorType === "invalid_response"
           ? "aiErrorInvalidResponse"
           : "aiErrorUnknown";

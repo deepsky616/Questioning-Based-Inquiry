@@ -32,6 +32,13 @@ async function prepare(ids: string[]) {
 }
 
 describe("포인트 채점 실행 결과", () => {
+  it("응답 길이 초과는 형식 오류와 구분해서 안내한다", async () => {
+    replies = [Response.json({ aiStatus: "failed", aiErrorType: "output_truncated", createdPending: 0 })];
+    const { result } = await prepare(["session-1"]);
+    await act(async () => { await result.current.runAnalyze(); });
+    expect(result.current.message).toBe("aiErrorOutputTruncated");
+    expect(result.current.selectedAnalysisSessionIds).toEqual(new Set(["session-1"]));
+  });
   it("중간 수업의 서버 응답이 잘못되어도 나머지를 완료하고 실패 수업만 재선택한다", async () => {
     replies = [success(), new Response("서버 응답 실패", { status: 504 }), success()];
     const { result } = await prepare(["session-1", "session-2", "session-3"]);

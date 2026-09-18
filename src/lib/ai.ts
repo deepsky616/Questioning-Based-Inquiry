@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { resolveUserAiConfig, type ResolvedAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
@@ -54,6 +54,17 @@ export interface GenerateTextResult {
 /** 분석·수업자료 생성 등 일관성이 중요한 작업의 기본 온도 */
 export const CONSISTENT_TEMPERATURE = 0.1;
 
+function checkDemoRateLimit(userId: string): void {
+  const { success } = rateLimit(`demo-ai:${userId}`, { limit: 10, windowMs: 60_000 });
+  if (!success) throw new AiBusyError();
+}
+
+interface GenerationSession {
+  userId: string;
+  config: ResolvedAiConfig;
+  deadline: number;
+}
+
 /**
  * 통합 AI 호출 계층. resolveUserAiConfig로 키를 결정하고 Gemini를 호출한다.
  * - 모델은 프롬프트 크기에 따라 자동 선택(짧은 작업 flash-lite / 긴 작업 flash, pro 설정은 존중)
@@ -77,8 +88,8 @@ async function callGeminiWithMetadata({
   timeoutMs,
   responseMimeType,
   responseJsonSchema,
-}: GenerateOptions): Promise<GenerateTextResult> {
-  const resolved = await resolveUserAiConfig(userId);
+}: GenerateOptions, session?: GenerationSession): Promise<GenerateTextResult> {
+  const resolved = session?.config ?? await resolveUserAiConfig(userId);
   const cfg = resolved.isDemo || !apiKeyOverride
     ? resolved
     : {
@@ -88,11 +99,7 @@ async function callGeminiWithMetadata({
       };
   if (!cfg.apiKey) throw new AiKeyMissingError();
   if (cfg.isDemo) {
-    const { success } = rateLimit(`demo-ai:${userId}`, {
-      limit: 10,
-      windowMs: 60_000,
-    });
-    if (!success) throw new AiBusyError();
+    if (!session) checkDemoRateLimit(userId);
     const { consumeDemoAiQuota } = await import("@/lib/demo-ai-quota");
     await consumeDemoAiQuota(userId);
   }
@@ -112,6 +119,10 @@ async function callGeminiWithMetadata({
   const runWith = async (modelName: GeminiModel, attempts: number): Promise<GenerateTextResult> => {
     for (let attempt = 1; ; attempt++) {
       try {
+        const requestTimeout = session
+          ? Math.min(timeoutMs ?? 45_000, session.deadline - Date.now())
+          : timeoutMs;
+        if (requestTimeout !== undefined && requestTimeout <= 0) throw new AiBusyError();
         // Pro는 사고를 끌 수 없다. 대체 모델에는 원래 요청한 값을 사용한다.
         // https://ai.google.dev/gemini-api/docs/generate-content/thinking
         const requiresThinking = modelName === "gemini-2.5-pro" && thinkingBudget === 0;
@@ -128,8 +139,8 @@ async function callGeminiWithMetadata({
           ...(modelThinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget: modelThinkingBudget } }
             : {}),
-          ...(timeoutMs !== undefined
-            ? { httpOptions: { timeout: timeoutMs } }
+          ...(requestTimeout !== undefined
+            ? { httpOptions: { timeout: requestTimeout } }
             : {}),
           ...(responseMimeType !== undefined ? { responseMimeType } : {}),
           ...(responseJsonSchema !== undefined ? { responseJsonSchema } : {}),
@@ -182,6 +193,31 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
 export async function generateJson<T = unknown>(opts: GenerateOptions): Promise<T> {
   const result = await callGeminiWithMetadata(opts);
   return extractJsonObject(result.text) as T;
+}
+
+/**
+ * 서버에서 한 분석을 분할할 때 사용하는 제한된 생성기.
+ * 분당 제한은 사용자 실행 단위로, 일일 사용량과 출력 상한은 각 묶음에 적용한다.
+ * 계정·수명·호출 횟수를 고정하여 일반 요청의 제한을 우회하는 데 재사용하지 못한다.
+ */
+export async function createJsonGenerationSession(userId: string) {
+  const config = await resolveUserAiConfig(userId);
+  if (!config.apiKey) throw new AiKeyMissingError();
+  if (config.isDemo) checkDemoRateLimit(userId);
+  const deadline = Date.now() + 240_000;
+  const session: GenerationSession = { userId, config, deadline };
+  let calls = 0;
+  return async <T = unknown>(opts: GenerateOptions): Promise<T> => {
+    if (opts.userId !== session.userId) throw new Error("AI_GENERATION_USER_MISMATCH");
+    const remaining = deadline - Date.now();
+    if (calls >= 64 || remaining <= 0) throw new AiBusyError();
+    calls++;
+    const result = await callGeminiWithMetadata({
+      ...opts,
+      timeoutMs: Math.min(opts.timeoutMs ?? 45_000, remaining),
+    }, session);
+    return extractJsonObject(result.text) as T;
+  };
 }
 
 /** JSON 배열 응답을 공통 파서(extractJsonArray)로 파싱해 반환한다. */

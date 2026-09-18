@@ -700,6 +700,7 @@
     "aiErrorMissingKey": "Gemini API 키가 없어 AI 추천 분석을 실행하지 못했습니다. 교사 설정에서 API 키를 등록해 주세요.",
     "aiErrorBusy": "Gemini 모델이 혼잡해 AI 추천 분석을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "aiErrorInvalidResponse": "AI 응답 형식이 올바르지 않아 추천 분석을 완료하지 못했습니다. 다시 분석해 주세요.",
+    "aiErrorOutputTruncated": "AI가 채점 결과를 끝까지 생성하지 못했습니다. 잠시 후 다시 분석해 주세요.",
     "aiErrorUnknown": "AI 추천 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     "fallbackUsed": "정규화된 중복 후보는 함께 표시했습니다.",
     "networkError": "네트워크 오류",

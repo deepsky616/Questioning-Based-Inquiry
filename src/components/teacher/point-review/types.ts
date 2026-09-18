@@ -50,7 +50,7 @@ export type AnalyzeResponse = {
   questionCount?: number;
   commentCount?: number;
   aiStatus?: "success" | "skipped" | "failed";
-  aiErrorType?: "missing_key" | "busy" | "quota" | "invalid_response" | "unknown" | null;
+  aiErrorType?: "missing_key" | "busy" | "quota" | "output_truncated" | "invalid_response" | "unknown" | null;
   fallbackUsed?: boolean;
   error?: string;
 };

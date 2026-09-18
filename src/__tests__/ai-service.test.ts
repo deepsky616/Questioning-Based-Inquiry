@@ -16,7 +16,7 @@ vi.mock("@google/genai", () => ({
   },
 }));
 
-import { generateText, generateJson, generateJsonWithMetadata, AiKeyMissingError } from "@/lib/ai";
+import { generateText, generateJson, generateJsonWithMetadata, createJsonGenerationSession, AiKeyMissingError } from "@/lib/ai";
 import { AiInvalidResponseError, AiOutputTruncatedError } from "@/lib/ai-errors";
 
 const reply = (text: string) => ({ text });
@@ -32,6 +32,68 @@ beforeEach(() => {
 });
 
 describe("lib/ai 서비스 계층", () => {
+  it("한 분석의 내부 분할은 분당 요청을 중복 차감하지 않고 일일 사용량과 출력 상한을 지킨다", async () => {
+    aiState.isDemo = true;
+    generateContent.mockResolvedValue(reply('{"ok":true}'));
+    const generate = await createJsonGenerationSession("demo-analysis-batches");
+    for (let index = 0; index < 12; index++) {
+      await expect(generate({ userId: "demo-analysis-batches", prompt: "분할 채점", maxOutputTokens: 4096, thinkingBudget: 0 })).resolves.toEqual({ ok: true });
+    }
+    expect(consumeQuota).toHaveBeenCalledTimes(12);
+    expect(generateContent.mock.calls.every(([input]) => input.config.maxOutputTokens === 2048)).toBe(true);
+  });
+
+  it("분할 생성기를 다른 계정에 재사용할 수 없다", async () => {
+    const generate = await createJsonGenerationSession("owner");
+    await expect(generate({ userId: "other", prompt: "분할 채점" })).rejects.toThrow();
+    expect(generateContent).not.toHaveBeenCalled();
+  });
+
+  it("새 분석을 반복하면 기존 시연 분당 제한을 적용한다", async () => {
+    aiState.isDemo = true;
+    for (let index = 0; index < 10; index++) await createJsonGenerationSession("demo-new-analyses");
+    await expect(createJsonGenerationSession("demo-new-analyses")).rejects.toThrow("AI_BUSY");
+  });
+
+  it("분할 생성 중 일일 한도를 소진하면 모델을 호출하지 않는다", async () => {
+    aiState.isDemo = true;
+    generateContent.mockResolvedValue(reply('{}'));
+    const generate = await createJsonGenerationSession("demo-daily-batches");
+    await generate({ userId: "demo-daily-batches", prompt: "첫 묶음" });
+    consumeQuota.mockRejectedValueOnce(new Error("일일 한도"));
+    await expect(generate({ userId: "demo-daily-batches", prompt: "둘째 묶음" })).rejects.toThrow("일일 한도");
+    expect(generateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("분할 생성 횟수와 유효 시간이 끝나면 추가 요청을 차단한다", async () => {
+    generateContent.mockResolvedValue(reply('{}'));
+    const generate = await createJsonGenerationSession("bounded-analysis");
+    for (let index = 0; index < 64; index++) await generate({ userId: "bounded-analysis", prompt: "묶음" });
+    await expect(generate({ userId: "bounded-analysis", prompt: "추가 묶음" })).rejects.toThrow("AI_BUSY");
+    expect(generateContent).toHaveBeenCalledTimes(64);
+    vi.useFakeTimers();
+    try {
+      const expired = await createJsonGenerationSession("expired-analysis");
+      vi.advanceTimersByTime(240_001);
+      await expect(expired({ userId: "expired-analysis", prompt: "시간 만료" })).rejects.toThrow("AI_BUSY");
+      expect(generateContent).toHaveBeenCalledTimes(64);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("모델 혼잡 재시도에도 전체 분석의 남은 시간만 사용한다", async () => {
+    vi.useFakeTimers();
+    try {
+      const generate = await createJsonGenerationSession("analysis-deadline");
+      generateContent.mockImplementationOnce(async () => {
+        vi.setSystemTime(Date.now() + 239_000);
+        throw new Error("503 Service Unavailable");
+      }).mockResolvedValueOnce(reply('{}'));
+      const pending = generate({ userId: "analysis-deadline", prompt: "묶음", timeoutMs: 45_000 });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toEqual({});
+      expect(generateContent.mock.calls[1][0].config.httpOptions.timeout).toBe(200);
+    } finally { vi.useRealTimers(); }
+  });
   it("질문놀이 외의 요청도 기본적으로 잘린 응답을 다시 생성한다", async () => {
     generateContent
       .mockResolvedValueOnce({ text: '중간 답변', candidates: [{ finishReason: "MAX_TOKENS" }] })

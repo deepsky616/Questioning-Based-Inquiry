@@ -4,7 +4,11 @@ import { AiBusyError, AiKeyMissingError, AiInvalidResponseError, AiOutputTruncat
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: vi.fn(() => null) }));
-vi.mock("@/lib/ai", () => ({ generateJson: vi.fn() }));
+vi.mock("@/lib/ai", () => {
+  const generateJson = vi.fn();
+  return { generateJson, createJsonGenerationSession: async () => generateJson };
+});
+vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { findUnique: vi.fn() },
@@ -203,10 +207,93 @@ describe("POST /api/teacher/points/analyze", () => {
     expect(mGenerateJson.mock.calls[0][0].systemInstruction).toContain(`in ${language}`);
   });
 
-  it.each([new AiInvalidResponseError(), new AiOutputTruncatedError()])("불완전한 응답은 원인을 구분해서 반환한다: %s", async error => {
+  it.each([
+    [new AiInvalidResponseError(), "invalid_response"],
+    [new AiOutputTruncatedError(), "output_truncated"],
+  ])("불완전한 응답은 원인을 구분해서 반환한다: %s", async (error, aiErrorType) => {
     mGenerateJson.mockRejectedValue(error);
     const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result).toMatchObject({ aiStatus: "failed", aiErrorType, createdPending: 0 });
+  });
+
+  it("시연 응답 예산을 사고에 소진하지 않고 채점을 완료한다", async () => {
+    mGenerateJson.mockImplementation(async options => {
+      if (options.thinkingBudget !== 0 || !options.maxOutputTokens) throw new AiOutputTruncatedError();
+      return { bonuses: [], summary: "분석 완료" };
+    });
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result.aiStatus).toBe("success");
+  });
+
+  it("출력이 잘리면 원문 맥락을 유지한 채 대상만 나누어 다시 채점한다", async () => {
+    mGenerateJson.mockImplementation(async options => {
+      const prompt = JSON.parse(options.prompt);
+      const targets = prompt.trustedEvaluationPolicy.analysisTargets;
+      if (!targets || targets.length > 1) throw new AiOutputTruncatedError();
+      expect(prompt.untrustedActivityData.questions[0].comments[0].content).toBe(questionRows[0].comments[0].content);
+      const target = targets[0];
+      return { bonuses: [{ ...target, studentId: target.targetType === "question" ? "student-1" : "student-2", bonusType: target.targetType === "question" ? "DEEP_QUESTION" : "APT_ANSWER", reason: "질문에 맞는 근거입니다." }], summary: "분석 완료" };
+    });
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result).toMatchObject({ aiStatus: "success", createdPending: 2 });
+    expect(mGenerateJson).toHaveBeenCalledTimes(3);
+  });
+
+  it("많은 활동을 빠짐없이 나누되 묶음 밖 원문과 작성 순서도 중복 비교에 전달한다", async () => {
+    const rows = Array.from({ length: 12 }, (_, index) => ({
+      ...questionRows[0], id: `q${index}`, content: index === 11 ? "유물이란 무엇인가요?" : `유물에 대한 질문 ${index}`,
+      normalizedContent: "", createdAt: new Date(2026, 8, 18, 9, index),
+      authorId: `student-${index + 1}`, author: { id: `student-${index + 1}`, name: `학생${index + 1}`, role: "STUDENT" },
+      comments: index === 0 ? questionRows[0].comments : [],
+    }));
+    questionMany.mockResolvedValue(rows);
+    mockLockedState({ studentIds: rows.map(q => q.authorId), lockedQuestions: rows.map(q => ({ ...q, sessionId: "session-1", source: "STUDENT" })), lockedComments: [{ ...rows[0].comments[0], questionId: "q0" }] });
+    const visited: string[] = [];
+    mGenerateJson.mockImplementation(async options => {
+      const prompt = JSON.parse(options.prompt);
+      const targets = prompt.trustedEvaluationPolicy.analysisTargets as Array<{ targetId: string; targetType: string }> | undefined;
+      if (!targets || targets.length > 6) throw new AiOutputTruncatedError();
+      expect(prompt.untrustedActivityData.questions).toHaveLength(12);
+      expect(prompt.untrustedActivityData.questions[0].createdAt).toBe(rows[0].createdAt.toISOString());
+      const bonuses = targets.map(target => {
+        visited.push(`${target.targetType}:${target.targetId}`);
+        return { ...target, studentId: target.targetType === "comment" ? "student-2" : rows.find(q => q.id === target.targetId)!.authorId, bonusType: target.targetId === "q11" ? "DUPLICATE_FLAGGED" : target.targetType === "comment" ? "APT_ANSWER" : "DEEP_QUESTION", reason: "전체 수업의 앞선 질문과 비교했습니다." };
+      });
+      if (!targets.some(target => target.targetId === "q0")) bonuses.push({ studentId: "student-1", targetId: "q0", targetType: "question", bonusType: "LOW_EFFORT_FLAGGED", reason: "범위 밖 판정" });
+      return { bonuses, summary: "분석 완료" };
+    });
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result).toMatchObject({ aiStatus: "success", createdPending: 13 });
+    expect(visited).toHaveLength(13);
+    expect(new Set(visited).size).toBe(13);
+    const saved = pointCreateMany.mock.calls.map(([input]) => input.data);
+    expect(saved.find(item => item.relatedQuestionId === "q0").bonusType).toBe("AI_DEEP_QUESTION");
+    expect(saved.find(item => item.relatedQuestionId === "q11").bonusType).toBe("AI_DUPLICATE_FLAGGED");
+  });
+
+  it("분할한 일부 응답만 성공하면 부분 채점 결과를 저장하지 않는다", async () => {
+    mGenerateJson.mockImplementation(async options => {
+      const targets = JSON.parse(options.prompt).trustedEvaluationPolicy.analysisTargets;
+      if (!targets || targets.length > 1) throw new AiOutputTruncatedError();
+      if (targets[0].targetType === "comment") throw new AiInvalidResponseError();
+      return { bonuses: [{ studentId: "student-1", targetId: "q1", targetType: "question", bonusType: "DEEP_QUESTION", reason: "유효한 근거" }] };
+    });
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
     expect(result).toMatchObject({ aiStatus: "failed", aiErrorType: "invalid_response", createdPending: 0 });
+    expect(pointCreateMany).not.toHaveBeenCalled();
+    expect(mGenerateJson.mock.calls.length).toBeLessThanOrEqual(4);
+  });
+
+  it("여러 묶음에 같은 학생의 추천이 있어도 수업 전체 15점 상한을 지킨다", async () => {
+    const rows = Array.from({ length: 13 }, (_, index) => ({ ...questionRows[0], id: `q${index}`, content: `서로 다른 질문 ${index}`, normalizedContent: "", comments: [] }));
+    questionMany.mockResolvedValue(rows);
+    mockLockedState({ lockedQuestions: rows.map(row => ({ ...row, sessionId: "session-1", source: "STUDENT" })), lockedComments: [] });
+    mGenerateJson.mockImplementation(async options => ({
+      bonuses: JSON.parse(options.prompt).trustedEvaluationPolicy.analysisTargets.map((target: { targetId: string; targetType: string }) => ({ ...target, studentId: "student-1", bonusType: "DEEP_QUESTION", reason: "주제를 깊이 탐구했습니다." })),
+    }));
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result).toMatchObject({ aiStatus: "success", createdPending: 3 });
+    expect(pointCreateMany.mock.calls.reduce((sum, [input]) => sum + input.data.points, 0)).toBe(15);
   });
 
   it.each([null, {}, { bonuses: "잘못된 결과" }])("잘못된 결과 구조를 채점 성공으로 처리하지 않는다: %j", async output => {
@@ -531,6 +618,7 @@ describe("POST /api/teacher/points/analyze", () => {
         comments: [
           {
             id: "teacher-comment",
+            createdAt: new Date("2026-07-05T01:02:00.000Z"),
             content: "교사가 남긴 안내입니다.",
             normalizedContent: "교사가남긴안내입니다",
             authorId: "teacher-1",

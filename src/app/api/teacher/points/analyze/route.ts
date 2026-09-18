@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
-import { generateJson } from "@/lib/ai";
-import { AiBusyError, AiInvalidResponseError, AiKeyMissingError, AiQuotaError } from "@/lib/ai-errors";
+import { analyzeActivityBonuses } from "@/lib/activity-bonus-analysis";
+import { AiBusyError, AiInvalidResponseError, AiKeyMissingError, AiOutputTruncatedError, AiQuotaError } from "@/lib/ai-errors";
+import { JsonExtractionError } from "@/lib/json-extract";
+import { logger } from "@/lib/logger";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
@@ -14,6 +16,8 @@ import {
 import { Prisma } from "@prisma/client";
 import { lockPointUserTransactions } from "@/lib/point-user-transaction-lock";
 import { isStudentInTeacherScope } from "@/lib/teacher-student-access";
+
+export const maxDuration = 300;
 
 const SYS = [
   "Evaluate elementary and middle-school inquiry activity warmly and fairly.",
@@ -31,6 +35,7 @@ const AI_ACTIVITY_BONUS_RESPONSE_SCHEMA = {
   properties: {
     bonuses: {
       type: "array",
+      maxItems: 12,
       items: {
         type: "object",
         additionalProperties: false,
@@ -39,12 +44,12 @@ const AI_ACTIVITY_BONUS_RESPONSE_SCHEMA = {
           targetId: { type: "string" },
           targetType: { type: "string", enum: ["question", "comment"] },
           bonusType: { type: "string", enum: VALID_ACTIVITY_BONUS },
-          reason: { type: "string", maxLength: 4_000 },
+          reason: { type: "string", maxLength: 160 },
         },
         required: ["studentId", "targetId", "targetType", "bonusType", "reason"],
       },
     },
-    summary: { type: "string", maxLength: 4_000 },
+    summary: { type: "string", maxLength: 300 },
   },
   required: ["bonuses"],
 } as const;
@@ -52,7 +57,7 @@ const AI_ACTIVITY_BONUS_RESPONSE_SCHEMA = {
 interface AIBonusItem { studentId: string; targetId: string; targetType: "question" | "comment"; bonusType: ActivityBonusKey; reason: string }
 interface AIResp { bonuses?: unknown; summary?: unknown }
 type AiStatus = "success" | "skipped" | "failed";
-type AiErrorType = "missing_key" | "busy" | "quota" | "invalid_response" | "unknown";
+type AiErrorType = "missing_key" | "busy" | "quota" | "output_truncated" | "invalid_response" | "unknown";
 
 const QUESTION_BONUS_TYPES = new Set<ActivityBonusKey>([
   "TOPIC_FIT_QUESTION",
@@ -75,7 +80,8 @@ function classifyAiError(error: unknown): AiErrorType {
   if (error instanceof AiKeyMissingError) return "missing_key";
   if (error instanceof AiQuotaError) return "quota";
   if (error instanceof AiBusyError) return "busy";
-  if (error instanceof AiInvalidResponseError || error instanceof SyntaxError) return "invalid_response";
+  if (error instanceof AiOutputTruncatedError) return "output_truncated";
+  if (error instanceof AiInvalidResponseError || error instanceof JsonExtractionError || error instanceof SyntaxError) return "invalid_response";
   const message = error instanceof Error ? error.message : String(error);
   if (/json|parse|unexpected token|invalid response/i.test(message)) return "invalid_response";
   return "unknown";
@@ -243,6 +249,7 @@ export async function POST(req: NextRequest) {
           studentName: question.author.name,
           authorRole: question.author.role,
           content: question.content,
+          createdAt: question.createdAt.toISOString(),
           comments: question.comments.map((comment) => ({
             targetId: comment.id,
             questionTargetId: question.id,
@@ -250,6 +257,7 @@ export async function POST(req: NextRequest) {
             studentName: comment.author.name,
             authorRole: comment.author.role,
             content: comment.content,
+            createdAt: comment.createdAt.toISOString(),
           })),
         })),
       },
@@ -259,7 +267,7 @@ export async function POST(req: NextRequest) {
       // AI 추천 포인트는 평가 품질이 중요하므로 탐구설계와 동일하게 quality 작업으로 호출한다.
       // 교사가 flash-lite를 설정했더라도 공통 AI 계층에서 gemini-2.5-flash로 올리고, pro 설정은 존중한다.
       // 키 없음·파싱 실패는 AI 결과 없이 진행(정규화 기반 중복 후보만 사용)
-      aiResp = await generateJson<AIResp>({
+      aiResp = await analyzeActivityBonuses({
         userId: teacherId,
         prompt,
         req,
@@ -269,7 +277,11 @@ export async function POST(req: NextRequest) {
         temperature: 0,
         responseMimeType: "application/json",
         responseJsonSchema: AI_ACTIVITY_BONUS_RESPONSE_SCHEMA,
-      });
+      }, questions.flatMap(question => [
+        ...(question.author.role === "STUDENT" ? [{ targetId: question.id, targetType: "question" as const }] : []),
+        ...question.comments.filter(comment => comment.author.role === "STUDENT")
+          .map(comment => ({ targetId: comment.id, targetType: "comment" as const })),
+      ]));
       if (!isRecord(aiResp) || !Array.isArray(aiResp.bonuses)) {
         throw new AiInvalidResponseError();
       }
@@ -277,6 +289,12 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       aiStatus = "failed";
       aiErrorType = classifyAiError(error);
+      // 학생 본문·이름·키·원본 오류 메시지 없이 실패 종류와 자료 규모만 기록한다.
+      logger.error("포인트 채점 분석 실패", {
+        aiErrorType,
+        questionCount: questions.length,
+        commentCount: questions.reduce((count, question) => count + question.comments.length, 0),
+      });
     }
   }
 
