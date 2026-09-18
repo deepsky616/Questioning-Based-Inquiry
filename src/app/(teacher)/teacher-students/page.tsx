@@ -533,7 +533,7 @@ export default function StudentsPage() {
                             {(() => { const r = lastActiveLabel(s.lastActivityAt); return r ? t(r.key, r.v) : "-"; })()}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                        <span className="inline-flex min-w-12 shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
                           {t("detailBtn")}
                         </span>
                       </div>
@@ -568,7 +568,7 @@ export default function StudentsPage() {
                       <TableHead className="text-center w-20 whitespace-nowrap">{t("colPoint")}</TableHead>
                       <TableHead className="w-44 whitespace-nowrap">{t("colSessionProgress")}</TableHead>
                       <TableHead className="text-center w-28 whitespace-nowrap hidden sm:table-cell">{t("colLastActive")}</TableHead>
-                      <TableHead className="text-center w-20 whitespace-nowrap">{t("colDetail")}</TableHead>
+                      <TableHead className="w-24 min-w-24 whitespace-nowrap px-3 text-center">{t("colDetail")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -598,8 +598,9 @@ export default function StudentsPage() {
                         <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                           {(() => { const r = lastActiveLabel(s.lastActivityAt); return r ? t(r.key, r.v) : "-"; })()}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="w-24 min-w-24 whitespace-nowrap px-3 text-center">
                           <Button size="sm" variant="outline"
+                            className="min-w-16 shrink-0 !whitespace-nowrap"
                             onClick={(e) => { e.stopPropagation(); setSelected(s); }}>
                             {t("detailBtn")}
                           </Button>
