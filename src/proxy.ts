@@ -5,12 +5,16 @@ import type { UserRole } from "@/types/user";
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+  const role = req.auth?.user?.role as UserRole | undefined;
+
+  // Resolve entry before rendering a page or loading server credential dependencies.
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL(getRedirectPath(role ?? null), req.url));
+  }
 
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
-
-  const role = req.auth?.user?.role as UserRole | undefined;
 
   if (!canAccess(role ?? null, pathname)) {
     const redirectTo = role ? getRedirectPath(role) : "/login";
