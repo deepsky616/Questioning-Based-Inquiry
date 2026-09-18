@@ -3,7 +3,8 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ThemeProvider } from "@/components/shared/theme-provider";
+import { usePathname } from "next/navigation";
+import { PublicThemeProvider, ThemeProvider } from "@/components/shared/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
 import { CurrentUserIdentityProvider } from "@/components/shared/current-user-identity";
@@ -42,6 +43,23 @@ function AuthQueryCacheBoundary({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Only these public screens are session-independent. Demo and protected pages
+  // retain the session-aware theme, identity and private-query cache boundary.
+  if (["/login", "/register", "/forgot-password", "/reset-password"].includes(pathname ?? "")) {
+    return (
+      <PublicThemeProvider>
+        <ConfirmProvider>
+          {children}
+          <Toaster />
+        </ConfirmProvider>
+      </PublicThemeProvider>
+    );
+  }
+  return <AuthenticatedProviders>{children}</AuthenticatedProviders>;
+}
+
+function AuthenticatedProviders({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({

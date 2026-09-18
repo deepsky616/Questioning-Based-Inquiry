@@ -42,18 +42,30 @@ function isThemeDisabledPath(pathname: string | null) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const { data: session, status } = useSession();
-  const isDemo = pathname === "/demo/launch" || session?.user?.isDemo === true;
+  return (
+    <PublicThemeProvider isDemoUser={session?.user?.isDemo === true} loading={status === "loading"}>
+      {children}
+    </PublicThemeProvider>
+  );
+}
+
+export function PublicThemeProvider({ children, isDemoUser = false, loading = false }: {
+  children: React.ReactNode;
+  isDemoUser?: boolean;
+  loading?: boolean;
+}) {
+  const pathname = usePathname();
+  const isDemo = pathname === "/demo/launch" || isDemoUser;
   const storageKey = isDemo ? DEMO_STORAGE_KEY : STORAGE_KEY;
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     // 계정을 확인하는 동안 일반 계정의 어두운 설정이 시연 화면에 나타나지 않게 한다.
-    const initialTheme = status === "loading" ? "light" : getInitialTheme(storageKey, isDemo);
+    const initialTheme = loading ? "light" : getInitialTheme(storageKey, isDemo);
     setThemeState(initialTheme);
     applyTheme(isThemeDisabledPath(pathname) ? "light" : initialTheme);
-  }, [pathname, status, storageKey, isDemo]);
+  }, [pathname, loading, storageKey, isDemo]);
 
   useEffect(() => {
     applyTheme(isThemeDisabledPath(pathname) ? "light" : theme);

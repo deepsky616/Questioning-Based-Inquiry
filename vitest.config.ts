@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // Auth.js uses Next.js extensionless imports that need Vite resolution in Node tests.
+    server: { deps: { inline: ["next-auth"] } },
     exclude: ["node_modules", "e2e/**"],
     // 컴포넌트 렌더 테스트는 파일 상단의 `// @vitest-environment jsdom` 지시어로 jsdom에서 실행
     // 커버리지 게이트(--coverage 실행 시) — 실측치 아래로 후퇴하면 실패
