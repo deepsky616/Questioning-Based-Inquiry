@@ -67,11 +67,11 @@ export function languageName(locale: string): string {
 
 /**
  * AI 프롬프트 끝에 덧붙일 출력 언어 지시문.
- * 한국어면 빈 문자열(기존 동작 유지). 그 외 언어면 사람이 읽는 텍스트만 번역하고
+ * 기본 한국어도 명시해 영어 지시문에 출력 언어가 끌려가지 않게 한다.
+ * 사람이 읽는 텍스트만 번역하고
  * JSON 키·고정 분류 코드는 그대로 두도록 지시한다.
  */
 export function languageDirective(locale: string): string {
-  if (!locale || locale === DEFAULT_LOCALE) return "";
   const name = languageName(locale);
   return `\n\n[OUTPUT LANGUAGE] Write ALL human-readable text in your response (explanations, feedback, questions, summaries, examples, titles) in ${name}. Keep JSON keys, field names, and fixed category codes such as "closed", "open", "factual", "conceptual", "controversial", "DUPLICATE_FLAGGED", "LOW_EFFORT_FLAGGED" exactly as given — never translate those. If the user's content is in another language, still write your explanations in ${name}.`;
 }

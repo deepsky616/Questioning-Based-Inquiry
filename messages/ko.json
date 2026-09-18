@@ -23,6 +23,7 @@
     "withdraw": "탈퇴",
     "studentManagement": "학생관리",
     "rankings": "순위",
+    "rankingsAndPoints": "순위와 포인트",
     "detailedReport": "상세 리포트",
     "gradeValue": "{grade}학년",
     "classValue": "{className}반",
@@ -693,8 +694,8 @@
   "pointReview": {
     "selectSessionFirst": "분석할 질문수업을 선택해 주세요",
     "analyzeDone": "🤖 AI 분석 완료: {created}개 후보 생성 (질문 {questions} · 답변 {comments})",
-    "analyzeDoneMulti": "🤖 {sessions}개 질문수업 분석 완료: {created}개 후보 생성 (질문 {questions} · 답변 {comments})",
-    "analyzePartialDone": "🤖 {sessions}개 질문수업 중 {failed}개는 완료하지 못했습니다. 생성 {created}개 (질문 {questions} · 답변 {comments})",
+    "analyzeDoneMulti": "🤖 {sessions}개 질문수업 분석 완료: 후보 생성 {created}개 · 근거 갱신 {updated}개 (질문 {questions} · 답변 {comments})",
+    "analyzePartialDone": "🤖 {sessions}개 질문수업 중 {failed}개는 완료하지 못했습니다. 후보 생성 {created}개 · 근거 갱신 {updated}개 (질문 {questions} · 답변 {comments}). 선택된 수업을 다시 실행해 주세요.",
     "analyzeFailed": "분석 실패",
     "aiErrorMissingKey": "Gemini API 키가 없어 AI 추천 분석을 실행하지 못했습니다. 교사 설정에서 API 키를 등록해 주세요.",
     "aiErrorBusy": "Gemini 모델이 혼잡해 AI 추천 분석을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",

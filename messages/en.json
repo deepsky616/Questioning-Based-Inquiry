@@ -23,6 +23,7 @@
     "withdraw": "Delete account",
     "studentManagement": "Student management",
     "rankings": "Rankings",
+    "rankingsAndPoints": "Rankings and points",
     "detailedReport": "Detailed report",
     "gradeValue": "Grade {grade}",
     "classValue": "Class {className}",
@@ -693,8 +694,8 @@
   "pointReview": {
     "selectSessionFirst": "Please select a question class to analyze",
     "analyzeDone": "🤖 AI analysis done: {created} candidates created ({questions} questions · {comments} answers)",
-    "analyzeDoneMulti": "🤖 Analyzed {sessions} question classes: {created} candidates created ({questions} questions · {comments} answers)",
-    "analyzePartialDone": "🤖 {failed} of {sessions} question classes could not finish. Created {created} candidates ({questions} questions · {comments} answers)",
+    "analyzeDoneMulti": "🤖 Analyzed {sessions} question classes: {created} candidates created · {updated} reasons refreshed ({questions} questions · {comments} answers)",
+    "analyzePartialDone": "🤖 {failed} of {sessions} question classes could not finish. Created {created} candidates · refreshed {updated} reasons ({questions} questions · {comments} answers). Run the selected classes again.",
     "analyzeFailed": "Analysis failed",
     "aiErrorMissingKey": "AI scoring could not run because the Gemini API key is missing. Add an API key in teacher settings.",
     "aiErrorBusy": "The Gemini model is busy, so AI scoring could not finish. Please try again shortly.",

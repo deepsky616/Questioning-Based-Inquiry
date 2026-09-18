@@ -39,6 +39,7 @@ export function AnalysisSessionPicker({ review }: { review: Review }) {
         <div className="space-y-3">
           <button
             type="button"
+            disabled={busy}
             aria-pressed={selectedAnalysisSessionIds.size === 0}
             onClick={clearAnalysisSelection}
             className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -60,6 +61,7 @@ export function AnalysisSessionPicker({ review }: { review: Review }) {
                     <span>{group.sessions.length}</span>
                     <button
                       type="button"
+                      disabled={busy}
                       onClick={() => toggleMonthSessions(group.sessions.map((session) => session.id))}
                       className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted"
                     >
@@ -75,6 +77,7 @@ export function AnalysisSessionPicker({ review }: { review: Review }) {
                       <button
                         key={session.id}
                         type="button"
+                        disabled={busy}
                         aria-pressed={active}
                         onClick={() => toggleAnalysisSession(session.id)}
                         className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -111,7 +114,7 @@ export function AnalysisSessionPicker({ review }: { review: Review }) {
         {selectedAnalysisSessionIds.size > 0 && (
           <div className="flex items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-200">
             <span>{t("selectedForAnalysis", { count: selectedAnalysisSessionIds.size, max: MAX_ANALYZE_SESSIONS })}</span>
-            <button type="button" onClick={clearAnalysisSelection} className="font-semibold underline-offset-2 hover:underline">
+            <button type="button" disabled={busy} onClick={clearAnalysisSelection} className="font-semibold underline-offset-2 hover:underline">
               {t("clearSelection")}
             </button>
           </div>

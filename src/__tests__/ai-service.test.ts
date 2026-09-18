@@ -138,6 +138,14 @@ describe("lib/ai 서비스 계층", () => {
     expect(sent).toContain("English");
   });
 
+  it("한국어 화면은 영어 지시문으로 분석해도 한국어 응답을 요청한다", async () => {
+    generateContent.mockResolvedValue(reply("{}"));
+    await generateJson({ userId: "u", prompt: "Evaluate these questions.", localize: true,
+      req: new Request("http://x", { headers: { cookie: "NEXT_LOCALE=ko", "accept-language": "en-US" } }),
+    });
+    expect(generateContent.mock.calls[0][0].contents).toContain("in Korean");
+  });
+
   it("localize 없으면 프롬프트 그대로", async () => {
     generateContent.mockResolvedValue(reply("{}"));
     await generateJson({ userId: "u", prompt: "ASK" });

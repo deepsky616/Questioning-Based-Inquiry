@@ -39,6 +39,7 @@ export interface AccountNavLinks {
   withdrawalHref?: string;
   studentManagementHref?: string;
   rankingsHref?: string;
+  rankingsLabel?: string;
   detailedReportHref?: string;
 }
 
@@ -291,7 +292,7 @@ export function AppNav({
                       className="flex items-center gap-2 rounded-md px-3 py-2 text-base text-foreground hover:bg-muted"
                     >
                       <Trophy className="h-4 w-4 text-muted-foreground" />
-                      {t("rankings")}
+                      {accountLinks.rankingsLabel ?? t("rankings")}
                     </Link>
                   )}
                   {accountLinks?.detailedReportHref && (
@@ -396,7 +397,7 @@ export function AppNav({
                     className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                   >
                     <Trophy className="h-4 w-4" />
-                    {t("rankings")}
+                    {accountLinks.rankingsLabel ?? t("rankings")}
                   </Link>
                 )}
                 {accountLinks.detailedReportHref && (

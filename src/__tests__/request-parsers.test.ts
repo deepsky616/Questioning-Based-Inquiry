@@ -26,8 +26,10 @@ describe("getRequestLocale — 번역 대상 언어 결정(쿠키 우선)", () =
     expect(parseAcceptLanguage("xx-YY")).toBe("ko");
   });
 
-  it("languageDirective는 ko면 비어 있고 그 외엔 출력 언어를 지시한다", () => {
-    expect(languageDirective("ko")).toBe("");
+  it("기본 한국어도 출력 언어를 명시하고 고정 코드는 보존한다", () => {
+    expect(languageDirective("ko")).toContain("Korean");
+    expect(languageDirective("")).toContain("Korean");
+    expect(languageDirective("ko")).toContain("never translate those");
     expect(languageDirective("en")).toContain("English");
   });
 });

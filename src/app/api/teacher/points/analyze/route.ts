@@ -3,7 +3,8 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
-import { AiBusyError, AiKeyMissingError, AiQuotaError } from "@/lib/ai-errors";
+import { AiBusyError, AiInvalidResponseError, AiKeyMissingError, AiQuotaError } from "@/lib/ai-errors";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
   MAX_ACTIVITY_BONUS_PER_STUDENT, TEACHER_ADJUSTED_BONUS,
@@ -74,7 +75,7 @@ function classifyAiError(error: unknown): AiErrorType {
   if (error instanceof AiKeyMissingError) return "missing_key";
   if (error instanceof AiQuotaError) return "quota";
   if (error instanceof AiBusyError) return "busy";
-  if (error instanceof SyntaxError) return "invalid_response";
+  if (error instanceof AiInvalidResponseError || error instanceof SyntaxError) return "invalid_response";
   const message = error instanceof Error ? error.message : String(error);
   if (/json|parse|unexpected token|invalid response/i.test(message)) return "invalid_response";
   return "unknown";
@@ -263,12 +264,15 @@ export async function POST(req: NextRequest) {
         prompt,
         req,
         localize: true,
-        systemInstruction: SYS,
+        systemInstruction: SYS + languageDirective(getRequestLocale(req)),
         quality: true,
         temperature: 0,
         responseMimeType: "application/json",
         responseJsonSchema: AI_ACTIVITY_BONUS_RESPONSE_SCHEMA,
       });
+      if (!isRecord(aiResp) || !Array.isArray(aiResp.bonuses)) {
+        throw new AiInvalidResponseError();
+      }
       aiStatus = "success";
     } catch (error) {
       aiStatus = "failed";
@@ -397,7 +401,7 @@ export async function POST(req: NextRequest) {
   // 3) 학생별 잠금 안에서 최신 상한을 다시 확인하고 PENDING으로 저장한다.
   // AI 호출은 잠금 밖에서 끝났으므로 거래 구간에는 자료베이스 작업만 남는다.
   const creationResult = allCandidates.length === 0
-    ? { state: "CREATED" as const, count: 0 }
+    ? { state: "CREATED" as const, count: 0, updated: 0 }
     : await prisma.$transaction(async (tx) => {
         const questionIds = Array.from(new Set(allCandidates.flatMap((candidate) => {
           if (candidate.targetType === "question") return [candidate.targetId];
@@ -595,6 +599,8 @@ export async function POST(req: NextRequest) {
             bonusType: { in: cappedBonusTypes },
           },
           select: {
+            id: true,
+            status: true,
             studentId: true,
             points: true,
             bonusType: true,
@@ -625,7 +631,27 @@ export async function POST(req: NextRequest) {
         });
 
         let createdCount = 0;
+        let updatedCount = 0;
         for (const candidate of eligibleCandidates) {
+          // 같은 판정을 다시 생성한 경우 대기 근거만 최신 언어로 갱신한다.
+          // 승인·교사 조정 내역과 점수는 재분석으로 바꾸지 않는다.
+          const existing = existingBonuses.find((log) =>
+            log.studentId === candidate.studentId &&
+            log.bonusType === `AI_${candidate.bonusType}` &&
+            (candidate.targetType === "question"
+              ? log.relatedQuestionId === candidate.targetId
+              : log.relatedCommentId === candidate.targetId),
+          );
+          if (existing) {
+            if (existing.status === "PENDING") {
+              const updated = await tx.pointLog.updateMany({
+                where: { id: existing.id, status: "PENDING" },
+                data: { reason: candidate.reason, aiAnalysis: readableSummary },
+              });
+              updatedCount += updated.count;
+            }
+            continue;
+          }
           if (
             isFlaggedBonus(candidate.bonusType) &&
             existingWarningTargetKeys.has(targetKeyOf(candidate))
@@ -661,7 +687,7 @@ export async function POST(req: NextRequest) {
           createdCount += inserted.count;
           perStudentSum.set(candidate.studentId, currentSum + def.points);
         }
-        return { state: "CREATED" as const, count: createdCount };
+        return { state: "CREATED" as const, count: createdCount, updated: updatedCount };
       });
   if (creationResult.state === "FORBIDDEN") {
     return NextResponse.json({ error: "현재 수업 권한이 없습니다" }, { status: 403 });
@@ -680,6 +706,7 @@ export async function POST(req: NextRequest) {
     questionCount: questions.length,
     commentCount: questions.reduce((a, q) => a + q.comments.length, 0),
     createdPending,
+    updatedPending: creationResult.updated ?? 0,
     summary: readableSummary,
     aiStatus,
     aiErrorType,
