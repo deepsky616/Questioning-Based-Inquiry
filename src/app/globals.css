@@ -663,10 +663,11 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     line-height: 1.2 !important;
   }
   .question-practice-print .qp-student-fields {
-    width: 100% !important;
-    max-width: none !important;
-    text-align: left !important;
-    gap: 2px 6px !important;
+    width: 104mm !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    text-align: right !important;
+    gap: 2mm !important;
     font-size: 10px !important;
     line-height: 1.1 !important;
   }
@@ -674,18 +675,18 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
   .question-practice-print .qp-student-row-name {
-    justify-content: flex-start !important;
+    justify-content: flex-end !important;
   }
   .question-practice-print .qp-field {
     gap: 3px !important;
   }
   .question-practice-print .qp-field .qp-write-line {
-    height: 11px !important;
-    min-width: 26px !important;
+    height: 6mm !important;
+    min-width: 12mm !important;
   }
   .question-practice-print .qp-student-row-name .qp-field {
-    width: 100% !important;
-    max-width: none !important;
+    width: 52mm !important;
+    max-width: 100% !important;
   }
   .question-practice-print .qp-student-row-name .qp-write-line {
     flex: 1 1 auto !important;

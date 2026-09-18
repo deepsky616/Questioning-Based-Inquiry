@@ -54,26 +54,26 @@ export default function TeacherPracticePrintGuidePage() {
       <article className="question-practice-print qp-paper rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none" style={{ colorScheme: "light" }}>
         <div className="qp-sheet qp-sheet-guide">
           <div className="qp-header border-b border-slate-300 pb-5">
-            <p className="qp-eyebrow text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">
+            <p className="qp-eyebrow text-center text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">
               {guide.eyebrow}
             </p>
-            <div className="qp-heading mt-2">
+            <div className="qp-heading mt-2 text-center">
               <h1 className="qp-title text-3xl font-extrabold leading-tight text-slate-950">{guide.title}</h1>
               <p className="qp-subtitle mt-2 text-sm leading-6 text-slate-700">{guide.subtitle}</p>
             </div>
-            <div className="qp-student-fields mt-4 flex w-full flex-col gap-3 text-left text-sm text-slate-700">
+            <div className="qp-student-fields ml-auto mt-4 flex w-full max-w-[104mm] flex-col gap-3 text-right text-sm text-slate-700">
               <div className="qp-student-row qp-student-row-meta grid grid-cols-3 gap-x-4 gap-y-2">
                 {[guide.gradeLabel, guide.classNameLabel, guide.numberLabel].map((label) => (
-                  <div key={label} className="qp-field flex items-center gap-2">
-                    <span className="w-10 shrink-0 font-semibold">{label}</span>
-                    <span className="qp-write-line h-7 min-w-12 flex-1 border-b border-slate-500" />
+                  <div key={label} className="qp-field flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 whitespace-nowrap font-semibold">{label}</span>
+                    <span className="qp-write-line h-7 min-w-0 flex-1 border-b border-slate-500" />
                   </div>
                 ))}
               </div>
-              <div className="qp-student-row qp-student-row-name flex">
-                <div className="qp-field flex w-full items-center gap-2">
-                  <span className="w-10 shrink-0 font-semibold">{guide.nameLabel}</span>
-                  <span className="qp-write-line h-7 min-w-24 flex-1 border-b border-slate-500" />
+              <div className="qp-student-row qp-student-row-name flex justify-end">
+                <div className="qp-field flex w-[52mm] max-w-full items-center gap-2">
+                  <span className="shrink-0 whitespace-nowrap font-semibold">{guide.nameLabel}</span>
+                  <span className="qp-write-line h-7 min-w-0 flex-1 border-b border-slate-500" />
                 </div>
               </div>
             </div>
