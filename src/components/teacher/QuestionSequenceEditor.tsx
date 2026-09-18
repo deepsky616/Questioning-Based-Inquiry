@@ -42,6 +42,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   const [runningKind, setRunningKind] = useState<AiLoadingKind | null>(null);
   const [teacherInput, setTeacherInput] = useState("");
   const [generatedBy, setGeneratedBy] = useState<"ai" | "rules" | "">("");
+  const [groupingFallback, setGroupingFallback] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortSummary, setSortSummary] = useState<{
     count: number;
@@ -52,6 +53,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   // 인라인 내용 편집 상태
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [editGroup, setEditGroup] = useState("");
   // 묶기 결과 검토: 항목별 '묶인 질문' 펼침 상태
   const [openMerged, setOpenMerged] = useState<Set<string>>(new Set());
   const toggleMerged = (id: string) =>
@@ -80,7 +82,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   function saveEdit(id: string) {
     const content = editValue.trim();
     if (content) {
-      update(sequenced.map((q) => (q.id === id ? { ...q, content } : q)));
+      update(sequenced.map((q) => (q.id === id ? { ...q, content, contentGroup: editGroup.trim() || q.contentGroup } : q)));
     }
     setEditingId(null);
     setEditValue("");
@@ -102,24 +104,21 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId, flowId, additionalQuestions: additional, subject, topic, mode,
-          currentQuestions: current?.map((q) => ({ content: q.content, type: q.type, source: q.source })),
+          currentQuestions: current?.map((q) => ({
+            id: q.id, content: q.content, type: q.type, source: q.source,
+            contentGroup: q.contentGroup, mergedFrom: q.mergedFrom,
+          })),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? t("sortFailed"));
-      let next: SequencedQuestion[] = data.sequencedQuestions ?? [];
-      if (mode === "sort" && current) {
-        // 정렬 응답에는 mergedFrom이 없으므로 내용 일치로 묶음 정보를 보존한다
-        const byContent = new Map(current.filter((q) => q.mergedFrom).map((q) => [q.content.trim(), q.mergedFrom!]));
-        next = next.map((q) => {
-          const kept = byContent.get(q.content.trim());
-          return kept ? { ...q, mergedFrom: kept } : q;
-        });
-      }
+      const next: SequencedQuestion[] = data.sequencedQuestions ?? [];
       update(next, mode === "sort");
       setGeneratedBy(data.generatedBy ?? "rules");
       if (mode === "merge") {
         setMerged(true);
+        setGroupingFallback(data.generatedBy !== "ai");
+        setOpenMerged(new Set());
       } else if (next.length > 0) {
         const completedFlow = UNIT_FLOW_OPTIONS.find((flow) => flow.id === flowId);
         setSortSummary({
@@ -138,6 +137,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   // ③ 교사 질문 추가 — 입력한 문장을 그대로 목록 맨 뒤에 추가(AI 재정리 없음).
   // AI 묶기·정렬은 아래 버튼으로만 실행한다(추가 시 자동으로 다른 질문이 생성되던 문제 수정).
   function handleAddTeacher() {
+    if (isRunning) return;
     const content = teacherInput.trim();
     if (!content) return;
     setTeacherInput("");
@@ -157,6 +157,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   }
 
   function handleDrop(targetIndex: number) {
+    if (isRunning || editingId !== null) return;
     if (dragIndex === null || dragIndex === targetIndex) { setDragIndex(null); return; }
     update(reorder(sequenced, dragIndex, targetIndex).map((q, i) => ({ ...q, priority: i + 1 })));
     setDragIndex(null);
@@ -174,7 +175,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   }
 
   const activeFlow = UNIT_FLOW_OPTIONS.find((x) => x.id === flowId);
-  const canSort = merged && !isRunning;
+  const canSort = merged && sequenced.length > 0 && !isRunning && editingId === null;
 
   return (
     <div className="space-y-4">
@@ -190,7 +191,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                   <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t("groupStepDesc")}</p>
                 </div>
               </div>
-              <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="h-9 w-full gap-1.5 font-semibold">
+              <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning || editingId !== null} className="h-9 w-full gap-1.5 font-semibold">
                 <Layers className="h-4 w-4" /> {t("groupBtn")}
               </Button>
             </div>
@@ -259,6 +260,11 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
       {isRunning && runningKind && <AiLoadingProcess kind={runningKind} />}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {groupingFallback && !isRunning && (
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          {t("groupingUnavailable")}
+        </p>
+      )}
 
       {/* 묶기 결과 요약 — 원본 몇 개가 대표 질문 몇 개로 묶였는지 */}
       {(() => {
@@ -290,6 +296,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
       <div className="flex gap-2">
         <Input
           value={teacherInput}
+          disabled={isRunning}
           onChange={(e) => setTeacherInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddTeacher(); } }}
           placeholder={t("addPlaceholder")}
@@ -309,7 +316,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
           return (
           <div
             key={q.id}
-            draggable={!isEditing}
+            draggable={!isEditing && !isRunning}
             onDragStart={() => setDragIndex(index)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(index)}
@@ -321,7 +328,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                 <button
                   type="button"
                   onClick={() => moveAt(index, -1)}
-                  disabled={index === 0 || isEditing}
+                  disabled={index === 0 || isEditing || isRunning}
                   className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                   title={t("moveUp")}
                 >
@@ -330,7 +337,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                 <button
                   type="button"
                   onClick={() => moveAt(index, 1)}
-                  disabled={index === sequenced.length - 1 || isEditing}
+                  disabled={index === sequenced.length - 1 || isEditing || isRunning}
                   className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                   title={t("moveDown")}
                 >
@@ -341,24 +348,30 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs text-background">{index + 1}</span>
             {isEditing ? (
               <div className="flex min-w-0 flex-1 items-center gap-2">
-                <Input
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); saveEdit(q.id); }
-                    if (e.key === "Escape") { setEditingId(null); setEditValue(""); }
-                  }}
-                  className="h-8"
-                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Input
+                    autoFocus
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); saveEdit(q.id); }
+                      if (e.key === "Escape") { setEditingId(null); setEditValue(""); }
+                    }}
+                    className="h-8"
+                    aria-label={t("editTitle")}
+                    disabled={isRunning}
+                  />
+                  <Input value={editGroup} onChange={(e) => setEditGroup(e.target.value)} aria-label={t("groupName")} className="h-8" disabled={isRunning} />
+                </div>
                 <button onClick={() => saveEdit(q.id)} className="shrink-0 text-emerald-600 hover:text-emerald-700" title={t("saveTitle")}><Check className="h-4 w-4" /></button>
                 <button onClick={() => { setEditingId(null); setEditValue(""); }} className="shrink-0 text-muted-foreground hover:text-foreground" title={t("cancelTitle")}><X className="h-4 w-4" /></button>
               </div>
             ) : (
               <>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{q.content}</p>
+                  <p className="break-words text-sm">{q.content}</p>
                   <p className="text-xs text-muted-foreground">{q.contentGroup}{q.source === "teacher" ? t("teacherAdded") : ""}</p>
+                  {q.rationale && <p className="mt-1 text-xs leading-5 text-muted-foreground">{q.rationale}</p>}
                   {/* 이 대표 질문에 묶인 학생 원본 질문들(검토용, 접기) */}
                   {(q.mergedFrom?.length ?? 0) > 1 && (
                     <div className="mt-1">
@@ -381,8 +394,8 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                     </div>
                   )}
                 </div>
-                <button onClick={() => { setEditingId(q.id); setEditValue(q.content); }} className="shrink-0 text-muted-foreground hover:text-indigo-600" title={t("editTitle")}><Pencil className="h-4 w-4" /></button>
-                <button onClick={() => removeAt(index)} className="shrink-0 text-muted-foreground hover:text-red-500" title={t("deleteTitle")}><Trash2 className="h-4 w-4" /></button>
+                <button disabled={isRunning} onClick={() => { setEditingId(q.id); setEditValue(q.content); setEditGroup(q.contentGroup); }} className="shrink-0 text-muted-foreground hover:text-indigo-600 disabled:opacity-30" title={t("editTitle")}><Pencil className="h-4 w-4" /></button>
+                <button disabled={isRunning} onClick={() => removeAt(index)} className="shrink-0 text-muted-foreground hover:text-red-500 disabled:opacity-30" title={t("deleteTitle")}><Trash2 className="h-4 w-4" /></button>
               </>
             )}
           </div>

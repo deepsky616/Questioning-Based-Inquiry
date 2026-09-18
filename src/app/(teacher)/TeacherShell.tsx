@@ -69,6 +69,7 @@ export function TeacherShell({ children }: { children: React.ReactNode }) {
           settingsType: "settings",
           studentManagementHref: "/teacher-students",
           rankingsHref: "/teacher-points",
+          rankingsLabel: t("rankingsAndPoints"),
           detailedReportHref: "/teacher-dashboard?tab=reports",
         }}
       />

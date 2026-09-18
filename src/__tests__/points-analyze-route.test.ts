@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { AiBusyError, AiKeyMissingError } from "@/lib/ai-errors";
+import { AiBusyError, AiKeyMissingError, AiInvalidResponseError, AiOutputTruncatedError } from "@/lib/ai-errors";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: vi.fn(() => null) }));
@@ -10,7 +10,7 @@ vi.mock("@/lib/db", () => ({
     questionSession: { findUnique: vi.fn() },
     question: { findMany: vi.fn(), update: vi.fn() },
     comment: { update: vi.fn() },
-    pointLog: { createMany: vi.fn(), findMany: vi.fn() },
+    pointLog: { createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     user: { findUnique: vi.fn() },
     $queryRaw: vi.fn(),
     $transaction: vi.fn(),
@@ -30,6 +30,7 @@ const questionUpdate = prisma.question.update as unknown as ReturnType<typeof vi
 const commentUpdate = prisma.comment.update as unknown as ReturnType<typeof vi.fn>;
 const pointCreateMany = prisma.pointLog.createMany as unknown as ReturnType<typeof vi.fn>;
 const pointFindMany = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
+const pointUpdateMany = prisma.pointLog.updateMany as unknown as ReturnType<typeof vi.fn>;
 const userFind = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const queryRaw = prisma.$queryRaw as unknown as ReturnType<typeof vi.fn>;
 const transaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
@@ -165,6 +166,7 @@ beforeEach(() => {
   commentUpdate.mockResolvedValue({});
   pointCreateMany.mockResolvedValue({ count: 1 });
   pointFindMany.mockResolvedValue([]);
+  pointUpdateMany.mockResolvedValue({ count: 1 });
   userFind.mockResolvedValue({ role: "TEACHER" });
   mockLockedState();
   transaction.mockImplementation(async (callback: unknown) => {
@@ -193,6 +195,52 @@ beforeEach(() => {
 });
 
 describe("POST /api/teacher/points/analyze", () => {
+  it.each([["ko", "Korean"], ["en", "English"]])("%s 화면의 채점 근거와 요약 언어를 시스템 지시에 고정한다", async (locale, language) => {
+    const request = req({ sessionId: "session-1" });
+    request.headers.set("cookie", `NEXT_LOCALE=${locale}`);
+    request.headers.set("accept-language", locale === "ko" ? "en-US" : "ko-KR");
+    await POST(request);
+    expect(mGenerateJson.mock.calls[0][0].systemInstruction).toContain(`in ${language}`);
+  });
+
+  it.each([new AiInvalidResponseError(), new AiOutputTruncatedError()])("불완전한 응답은 원인을 구분해서 반환한다: %s", async error => {
+    mGenerateJson.mockRejectedValue(error);
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result).toMatchObject({ aiStatus: "failed", aiErrorType: "invalid_response", createdPending: 0 });
+  });
+
+  it.each([null, {}, { bonuses: "잘못된 결과" }])("잘못된 결과 구조를 채점 성공으로 처리하지 않는다: %j", async output => {
+    mGenerateJson.mockResolvedValue(output);
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(result).toMatchObject({ aiStatus: "failed", aiErrorType: "invalid_response", createdPending: 0 });
+  });
+
+  it("재분석은 대기 중인 동일 판정의 근거만 갱신하고 승인된 결과와 점수를 보존한다", async () => {
+    pointFindMany.mockResolvedValue([
+      { id: "pending-1", status: "PENDING", studentId: "student-1", points: 5, bonusType: "AI_DEEP_QUESTION", relatedQuestionId: "q1", relatedCommentId: null },
+      { id: "approved-1", status: "APPROVED", studentId: "student-2", points: 2, bonusType: "AI_APT_ANSWER", relatedQuestionId: null, relatedCommentId: "c1" },
+    ]);
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(pointUpdateMany).toHaveBeenCalledTimes(1);
+    expect(pointUpdateMany).toHaveBeenCalledWith({
+      where: { id: "pending-1", status: "PENDING" },
+      data: { reason: "주제와 관련해 이유를 탐구하는 질문입니다.", aiAnalysis: "광합성의 의미와 에너지 전환을 잘 탐구했습니다." },
+    });
+    expect(pointCreateMany).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ createdPending: 0, updatedPending: 1 });
+  });
+
+  it("중복 경고도 다시 분석하면 대기 근거를 갱신한다", async () => {
+    pointFindMany.mockResolvedValue([{ id: "pending-warning", status: "PENDING", studentId: "student-1", points: 0,
+      bonusType: "AI_DUPLICATE_FLAGGED", relatedQuestionId: "q1", relatedCommentId: null }]);
+    mGenerateJson.mockResolvedValue({ bonuses: [{ studentId: "student-1", targetId: "q1", targetType: "question",
+      bonusType: "DUPLICATE_FLAGGED", reason: "앞서 작성된 질문과 의미가 비슷합니다." }] });
+    const result = await (await POST(req({ sessionId: "session-1" }))).json();
+    expect(pointUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { reason: "앞서 작성된 질문과 의미가 비슷합니다.", aiAnalysis: null } }));
+    expect(pointCreateMany).not.toHaveBeenCalled();
+    expect(result.updatedPending).toBe(1);
+  });
+
   it("로그인이 없으면 401을 반환한다", async () => {
     mAuth.mockResolvedValue(null);
 
@@ -552,6 +600,8 @@ describe("POST /api/teacher/points/analyze", () => {
         status: { in: ["PENDING", "APPROVED"] },
       }),
       select: {
+        id: true,
+        status: true,
         studentId: true,
         points: true,
         bonusType: true,

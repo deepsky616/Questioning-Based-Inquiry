@@ -46,6 +46,7 @@ export interface PendingLog {
 
 export type AnalyzeResponse = {
   createdPending?: number;
+  updatedPending?: number;
   questionCount?: number;
   commentCount?: number;
   aiStatus?: "success" | "skipped" | "failed";

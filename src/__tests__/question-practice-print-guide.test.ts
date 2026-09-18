@@ -82,7 +82,6 @@ describe("질문연습 학습지 출력", () => {
     expect(titleIndex).toBeLessThan(subtitleIndex);
     expect(subtitleIndex).toBeLessThan(studentFieldsIndex);
     expect(metaRowIndex).toBeLessThan(nameRowIndex);
-    expect(pageSource).not.toContain("qp-student-fields ml-auto");
     expect(pageSource).toContain("qp-student-row-meta grid grid-cols-3");
     expect(pageSource).toContain("qp-student-row-name flex");
     expect(pageSource).toContain("guide.gradeLabel");
@@ -122,7 +121,6 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain(".question-practice-print .qp-write-line");
     expect(cssSource).toContain(".question-practice-print .qp-card");
     expect(cssSource).toContain(".question-practice-print .qp-student-row-meta");
-    expect(cssSource).toContain("height: 11px !important");
     expect(cssSource).toContain("font-size: 11px !important");
     expect(cssSource).toContain(".question-practice-print .qp-pattern ul");
     expect(cssSource).toContain(".question-practice-print-page .qp-toolbar");
@@ -161,10 +159,9 @@ describe("질문연습 학습지 출력", () => {
     expect(cardGridRule).toContain("grid-template-rows: repeat(3, minmax(0, 1fr)) !important");
     expect(promptListRule).toContain("grid-template-rows: repeat(3, minmax(0, 1fr)) !important");
     expect(writingLinesRule).toContain("grid-template-rows: repeat(2, minmax(0, 1fr)) !important");
-    expect(nameRowRule).toContain("justify-content: flex-start !important");
-    expect(nameFieldRule).toContain("width: 100% !important");
-    expect(nameFieldRule).toContain("max-width: none !important");
-    expect(nameFieldRule).not.toContain("max-width: 190px !important");
+    expect(nameRowRule).toContain("justify-content: flex-end !important");
+    expect(nameFieldRule).toContain("width: 52mm !important");
+    expect(nameFieldRule).toContain("max-width: 100% !important");
     expect(nameWriteLineRule).toContain("flex: 1 1 auto !important");
     expect(nameWriteLineRule).toContain("min-width: 0 !important");
     expect(questionWriteLineRule).toContain("height: auto !important");

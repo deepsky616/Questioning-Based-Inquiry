@@ -87,6 +87,7 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
   useEffect(() => { setSelected(new Set()); }, [focusStudentId]);
 
   async function runAnalyze() {
+    if (busy) return;
     const sessionIds = Array.from(selectedAnalysisSessionIds);
     if (sessionIds.length === 0) {
       setMessage(t("selectSessionFirst"));
@@ -99,21 +100,30 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
     setBusy(true); setAiLoading(true); setMessage(null);
     try {
       const results: AnalyzeResponse[] = [];
+      const failedSessionIds = new Set<string>();
       for (const sessionId of sessionIds) {
-        const res = await fetch("/api/teacher/points/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId }),
-        });
-        const data = await res.json() as AnalyzeResponse;
-        if (!res.ok) {
-          setMessage(data.error || t("analyzeFailed"));
-          return;
+        let data: AnalyzeResponse;
+        try {
+          const res = await fetch("/api/teacher/points/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }),
+          });
+          const payload = await res.json().catch(() => null) as AnalyzeResponse | null;
+          if (!res.ok || !payload || !["success", "failed"].includes(payload.aiStatus ?? "")) {
+            data = { aiStatus: "failed", error: typeof payload?.error === "string" ? payload.error : t("analyzeFailed") };
+          } else {
+            data = payload;
+          }
+        } catch {
+          data = { aiStatus: "failed", error: t("networkError") };
         }
+        if (data.aiStatus === "failed") failedSessionIds.add(sessionId);
         results.push(data);
       }
       const failed = results.filter((data) => data.aiStatus === "failed");
       const created = results.reduce((sum, data) => sum + (data.createdPending ?? 0), 0);
+      const updated = results.reduce((sum, data) => sum + (data.updatedPending ?? 0), 0);
       const questions = results.reduce((sum, data) => sum + (data.questionCount ?? 0), 0);
       const comments = results.reduce((sum, data) => sum + (data.commentCount ?? 0), 0);
       if (failed.length === results.length && failed[0]) {
@@ -127,18 +137,22 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
           : failed[0].aiErrorType === "invalid_response"
           ? "aiErrorInvalidResponse"
           : "aiErrorUnknown";
-        setMessage(`${t(key)}${fallback}`);
+        setMessage(`${failed[0].error || t(key)}${fallback}`);
       } else if (failed.length > 0) {
-        setMessage(t("analyzePartialDone", { sessions: sessionIds.length, failed: failed.length, created, questions, comments }));
+        setMessage(t("analyzePartialDone", { sessions: sessionIds.length, failed: failed.length, created, updated, questions, comments }));
       } else {
-        setMessage(t("analyzeDoneMulti", { sessions: sessionIds.length, created, questions, comments }));
+        setMessage(t("analyzeDoneMulti", { sessions: sessionIds.length, created, updated, questions, comments }));
       }
       // 분석 후 전체 보기로 전환 — 기존 세션들의 대기 항목과 새 결과가 함께 보인다
       setLastAnalyzedSessionIds(new Set(sessionIds));
-      setSelectedAnalysisSessionIds(new Set());
-      loadPending();
+      setSelectedAnalysisSessionIds(failedSessionIds);
     } catch { setMessage(t("networkError")); }
-    finally { setBusy(false); setAiLoading(false); }
+    finally {
+      loadPending();
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.pendingPoints });
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
+      setBusy(false); setAiLoading(false);
+    }
   }
 
   async function decide(decision: "APPROVE" | "REJECT", ids?: string[]) {
