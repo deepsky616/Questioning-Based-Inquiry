@@ -439,10 +439,15 @@ function CurriculumWorkspace({ initialDraft, onDraftChange, onDraftComplete }: {
 
   const addCustomKeyword = () => {
     const kw = customKeyword.trim();
-    if (!kw || selectedKeywords.includes(kw)) return;
-    setSelectedKeywords((prev) => [...prev, kw]);
-    setRecommendedKeywords((prev) => [...prev, kw]);
+    if (!kw) return;
+    setSelectedKeywords((prev) => prev.includes(kw) ? prev : [...prev, kw]);
+    setRecommendedKeywords((prev) => prev.includes(kw) ? prev : [...prev, kw]);
     setCustomKeyword("");
+  };
+
+  const removeKeyword = (kw: string) => {
+    setRecommendedKeywords((prev) => prev.filter((keyword) => keyword !== kw));
+    setSelectedKeywords((prev) => prev.filter((keyword) => keyword !== kw));
   };
 
   const canSaveDesign = Boolean(
@@ -714,7 +719,7 @@ function CurriculumWorkspace({ initialDraft, onDraftChange, onDraftComplete }: {
           selectedCoreIdeaLines, setSelectedCoreIdeaLines, selectedKnowledge, setSelectedKnowledge,
           selectedProcess, setSelectedProcess, selectedValue, setSelectedValue, getFilteredAchievements,
           getSelectedAchievements, getFilteredAchievementGroups, handleGoStep2, loadingKeywords,
-          recommendedKeywords, selectedKeywords, customKeyword, loadingSentences, toggleKeyword,
+          recommendedKeywords, selectedKeywords, customKeyword, loadingSentences, toggleKeyword, removeKeyword,
           setCustomKeyword, addCustomKeyword, handleGoStep3, selectedCoreSentences, coreSentences,
           selectedCoreSentenceIndices, setSelectedCoreSentenceIndices, setCoreSentences, loadingQuestions,
           handleGoStep4, selectedEssentialQuestions, essentialQuestions, selectedEssentialQuestionIndices,

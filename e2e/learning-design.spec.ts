@@ -3,6 +3,73 @@ import { preparePage } from "./helpers/session-filter-page";
 import { expectNoHorizontalPageOverflow, expectTextContrast } from "./helpers/question-game-room";
 import { BUILT_IN_GAMES } from "../src/lib/question-games-data";
 
+test("추천·직접 추가 핵심어를 삭제하면 초안과 다음 생성 요청에서도 제외한다", async ({ page, baseURL }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 375, height: 900 });
+  const { errors } = await preparePage(page, "TEACHER", baseURL!);
+  await page.route("**/api/teacher/students**", route => route.fulfill({ json: { students: [], teacherClasses: [] } }));
+  await page.route("**/api/unit-design", route => route.fulfill({ json: [] }));
+  await page.route("**/api/curriculum**", route => {
+    const url = new URL(route.request().url());
+    const area = { id: "keyword-area", subject: "과학", gradeRange: "5-6", area: "생물과 환경", coreIdea: "생물은 환경과 관계를 맺는다.", knowledgeItems: [], processItems: [], valueItems: [], middleKnowledgeItems: [], middleProcessItems: [], middleValueItems: [], achievements: [], units: [] };
+    return route.fulfill({ json: url.pathname.endsWith("/enriched") ? {} : url.searchParams.has("areaId") ? area : { areas: [area] } });
+  });
+  const generatedKeywords: string[][] = [];
+  await page.route("**/api/unit-design/generate", async route => {
+    generatedKeywords.push(route.request().postDataJSON().selectedKeywords);
+    await route.fulfill({ json: { sentences: ["생태계는 생물과 환경의 관계로 이루어진다."] } });
+  });
+  await page.addInitScript(() => {
+    const teacherId = "filter-test-TEACHER";
+    const key = `question-lab:curriculum-draft:${teacherId}`;
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({
+      version: 1, teacherId, updatedAt: Date.now(),
+      value: { step: 2, selGrade: "5-6", selSubject: "과학", selAreaId: "keyword-area", recommendedKeywords: ["광합성", "먹이사슬", "생태계"], selectedKeywords: ["광합성", "먹이사슬", "생태계"] },
+    }));
+  });
+  await page.goto("/teacher-curriculum");
+  await page.getByRole("button", { name: "이어서 작성", exact: true }).click();
+  await page.getByRole("button", { name: "핵심어 광합성 삭제", exact: true }).click();
+  await expect(page.getByRole("button", { name: "광합성", exact: true })).toHaveCount(0);
+
+  // 선택 해제된 추천어를 다시 추가해도 같은 항목이 중복 생성되지 않는다.
+  await page.getByRole("button", { name: "먹이사슬", exact: true }).click();
+  const input = page.getByPlaceholder("핵심어 직접 추가...");
+  await input.fill("먹이사슬");
+  await input.press("Enter");
+  await expect(page.getByRole("button", { name: "먹이사슬", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "먹이사슬", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  await input.fill("환경");
+  await input.press("Enter");
+  const removeCustom = page.getByRole("button", { name: "핵심어 환경 삭제", exact: true });
+  await removeCustom.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "환경", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "핵심어 먹이사슬 삭제", exact: true }).click();
+  await page.getByRole("button", { name: "생태계", exact: true }).click();
+  await page.getByRole("button", { name: "핵심어 생태계 삭제", exact: true }).click();
+  await expect(page.getByRole("button", { name: /다음 단계: 핵심 문장/ })).toBeDisabled();
+  await input.fill("생태계");
+  await input.press("Enter");
+  await page.reload();
+  await page.getByRole("button", { name: "이어서 작성", exact: true }).click();
+  await expect(page.getByRole("button", { name: "핵심어 생태계 삭제", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /핵심어 .* 삭제/ })).toHaveCount(1);
+  await expectNoHorizontalPageOverflow(page);
+  await page.getByText("2단계 · 핵심어(개념) 선택", { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("핵심어-삭제-모바일.png") });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "어두운 테마로 변경" }).click();
+  await expectNoHorizontalPageOverflow(page);
+  await page.getByText("2단계 · 핵심어(개념) 선택", { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("핵심어-삭제-데스크톱-어두운화면.png") });
+  await page.getByRole("button", { name: /다음 단계: 핵심 문장/ }).click();
+  await expect(page.getByText("3단계 · 핵심 문장", { exact: true })).toBeVisible();
+  expect(generatedKeywords).toEqual([["생태계"]]);
+  expect(errors).toEqual([]);
+});
+
 async function expectClassCreationHelp(page: Page, browserName: string) {
   const nav = page.getByRole("navigation", { name: "질문수업 작업공간" });
   const floatingHelp = await page.evaluate(() => matchMedia("(min-width: 640px) and (hover: hover) and (pointer: fine)").matches);

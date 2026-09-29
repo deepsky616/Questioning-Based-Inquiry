@@ -57,6 +57,7 @@ interface CurriculumCreateFlowProps {
   customKeyword: string;
   loadingSentences: boolean;
   toggleKeyword: (keyword: string) => void;
+  removeKeyword: (keyword: string) => void;
   setCustomKeyword: (value: string) => void;
   addCustomKeyword: () => void;
   handleGoStep3: () => void;
@@ -164,6 +165,7 @@ export function CurriculumCreateFlow({
   customKeyword,
   loadingSentences,
   toggleKeyword,
+  removeKeyword,
   setCustomKeyword,
   addCustomKeyword,
   handleGoStep3,
@@ -276,6 +278,7 @@ export function CurriculumCreateFlow({
         customKeyword={customKeyword}
         loadingSentences={loadingSentences}
         onToggleKeyword={toggleKeyword}
+        onRemoveKeyword={removeKeyword}
         onCustomKeywordChange={setCustomKeyword}
         onAddCustomKeyword={addCustomKeyword}
         onGoNext={handleGoStep3}

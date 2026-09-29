@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { X } from "lucide-react";
 
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ interface CurriculumKeywordStepProps {
   customKeyword: string;
   loadingSentences: boolean;
   onToggleKeyword: (keyword: string) => void;
+  onRemoveKeyword: (keyword: string) => void;
   onCustomKeywordChange: (value: string) => void;
   onAddCustomKeyword: () => void;
   onGoNext: () => void;
@@ -26,6 +28,7 @@ export function CurriculumKeywordStep({
   customKeyword,
   loadingSentences,
   onToggleKeyword,
+  onRemoveKeyword,
   onCustomKeywordChange,
   onAddCustomKeyword,
   onGoNext,
@@ -42,17 +45,34 @@ export function CurriculumKeywordStep({
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
           {recommendedKeywords.map((keyword) => (
-            <button
+            <div
               key={keyword}
-              onClick={() => onToggleKeyword(keyword)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              className={`inline-flex max-w-full rounded-full text-sm font-medium border transition-colors ${
                 selectedKeywords.includes(keyword)
                   ? "bg-indigo-600 text-white border-indigo-600"
                   : "bg-card text-muted-foreground border-input hover:border-indigo-400"
               }`}
             >
-              {keyword}
-            </button>
+              <button
+                type="button"
+                aria-pressed={selectedKeywords.includes(keyword)}
+                disabled={loadingSentences}
+                onClick={() => onToggleKeyword(keyword)}
+                className="min-h-11 min-w-0 rounded-l-full px-3 py-1.5 text-left [overflow-wrap:anywhere] hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {keyword}
+              </button>
+              <button
+                type="button"
+                aria-label={t("removeKeywordAria", { keyword })}
+                title={t("removeKeywordAria", { keyword })}
+                disabled={loadingSentences}
+                onClick={() => onRemoveKeyword(keyword)}
+                className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-r-full border-l border-current/20 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           ))}
         </div>
 
@@ -60,11 +80,12 @@ export function CurriculumKeywordStep({
           <Input
             placeholder={t("keywordPlaceholder")}
             value={customKeyword}
+            disabled={loadingSentences}
             onChange={(event) => onCustomKeywordChange(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && onAddCustomKeyword()}
-            className="max-w-xs"
+            className="min-w-0 max-w-xs"
           />
-          <Button variant="outline" size="sm" onClick={onAddCustomKeyword}>
+          <Button variant="outline" size="sm" className="shrink-0 whitespace-nowrap" disabled={loadingSentences} onClick={onAddCustomKeyword}>
             {t("addBtn")}
           </Button>
         </div>
