@@ -15,6 +15,7 @@ import { runStudentSessionAnalysis } from '@/lib/student-session-analysis';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  generateContent.mockReset();
   vi.mocked(prisma.questionSession.findUnique).mockResolvedValue({ subject: '수학', topic: '평균으로 자료 비교하기' } as never);
   vi.mocked(prisma.user.findUnique).mockResolvedValue({ name: '김질문', role: 'STUDENT' } as never);
   vi.mocked(prisma.question.findMany).mockResolvedValueOnce([{ content: '평균이 같으면 개인별 기록도 같을까요?', closure: 'open', cognitive: 'conceptual', _count: { likes: 2, comments: 1 } }] as never).mockResolvedValueOnce([]);
@@ -23,6 +24,15 @@ beforeEach(() => {
 });
 
 describe('시연 학생의 완성된 분석 응답', () => {
+  it('학생별 수업 분석에서도 빠진 성장 항목을 Flash로 복구한 뒤 저장한다', async () => {
+    const complete = { summary: '자료의 특징을 탐구했습니다.', insights: '다른 예도 비교해 봐요.', relevanceInsights: '자료 비교에 맞는 질문이에요.', growthInsights: '근거를 더 확인해 봐요.', rewriteExample: '평균이 같아도 자료가 다를 수 있는 이유는 무엇일까요?' };
+    generateContent.mockResolvedValueOnce({ text: JSON.stringify({ ...complete, growthInsights: '' }) })
+      .mockResolvedValueOnce({ text: JSON.stringify(complete) });
+    const result = await runStudentSessionAnalysis({ studentId: 'student-report-fallback', sessionId: 'lesson', req: new Request('http://localhost') });
+    expect(result?.result).toMatchObject({ ...complete, analysisModel: 'gemini-3-flash-preview' });
+    expect(generateContent.mock.calls.map(([input]) => input.model)).toEqual(['gemini-3.1-flash-lite', 'gemini-3-flash-preview']);
+    expect(prisma.sessionAnalysis.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: expect.objectContaining({ result: expect.objectContaining({ growthInsights: complete.growthInsights, analysisModel: 'gemini-3-flash-preview' }) }) }));
+  });
   it.each([{}, { summary: '' }, { summary: { text: '잘못된 요약' } }, { summary: '요약', insights: ['잘못된 문장'] }])('파싱 가능한 JSON이라도 잘못된 항목은 기존 리포트를 덮어쓰지 않는다: %j', async (data) => {
     generateContent.mockResolvedValue({ text: JSON.stringify(data) });
     await expect(runStudentSessionAnalysis({ studentId: 'demo-invalid-report', sessionId: 'lesson', req: new Request('http://localhost') })).rejects.toThrow('AI_INVALID_RESPONSE');

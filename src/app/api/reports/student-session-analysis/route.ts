@@ -18,6 +18,8 @@ const bodySchema = z.object({
   studentId: z.string().min(1),
 });
 
+export const maxDuration = 300;
+
 // 한 수업 세션에서 한 학생의 질문·좋아요·댓글 활동을 AI가 분석(저장 포함)
 // POST body: { sessionId, studentId? }  — 분석 생성은 교사만, 학생은 저장된 결과를 보기만 함
 export async function POST(req: NextRequest) {

@@ -389,6 +389,7 @@ export function TeacherReportsView() {
   const students = report?.perStudent ?? [];
   const studentReportSubtitle = studentReport
     ? [
+        studentReport.student.name,
         studentReport.student.grade && t("gradeLabel", { grade: studentReport.student.grade }),
         studentReport.student.className && t("classLabel", { className: studentReport.student.className }),
         studentReport.student.studentNumber && t("numberLabel", { n: studentReport.student.studentNumber }),
@@ -481,8 +482,8 @@ export function TeacherReportsView() {
           <ReportView
             referenceDate={report.referenceDate}
             scope="class"
-            title={t("classReportTitle", { grade: report.klass.grade, className: report.klass.className })}
-            subtitle={t("classReportSubtitle", { count: report.klass.studentCount })}
+            title={t("classActivityTitle")}
+            subtitle={`${t("gradeClass", { grade: report.klass.grade, className: report.klass.className })} · ${t("classReportSubtitle", { count: report.klass.studentCount })}`}
             totals={report.totals}
             weekly={report.weekly}
             monthly={report.monthly}
@@ -506,7 +507,7 @@ export function TeacherReportsView() {
             renderSessionGrowth={(sessionId) => <QuestionGrowthJournal studentId={studentId} sessionId={sessionId} />}
             referenceDate={studentReport.referenceDate}
             scope="student"
-            title={t("studentReportTitle", { name: studentReport.student.name })}
+            title={t("studentActivityTitle")}
             subtitle={studentReportSubtitle}
             totals={studentReport.totals}
             weekly={studentReport.weekly}
