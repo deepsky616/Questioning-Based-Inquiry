@@ -3,14 +3,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { isAllowedGeminiModel } from "@/lib/api-config";
+import { isSupportedGeminiModelInput, resolveGeminiModel } from "@/lib/api-config";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { classifyGeminiError } from "@/lib/gemini-error";
 import { generateText } from "@/lib/ai";
 
 const testSchema = z.object({
   apiKey: z.string().optional(),
-  model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다"),
+  model: z.string().refine(isSupportedGeminiModelInput, "지원하지 않는 Gemini 모델입니다").transform(resolveGeminiModel),
 });
 
 const TEST_PROMPT = "안녕하세요. 이 메시지를 읽으면 응답해주세요.";

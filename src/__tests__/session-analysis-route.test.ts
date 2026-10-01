@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGenerateContent = vi.hoisted(() => vi.fn());
-const aiState = vi.hoisted(() => ({ apiKey: "test-api-key" as string | null, model: "gemini-2.5-flash" }));
+const aiState = vi.hoisted(() => ({ apiKey: "test-api-key" as string | null, model: "gemini-3.1-flash-lite" }));
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/resolve-ai-config", () => ({
@@ -13,7 +13,8 @@ vi.mock("@/lib/db", () => ({
     systemConfig: { findUnique: vi.fn() },
   },
 }));
-vi.mock("@google/genai", () => ({
+vi.mock("@google/genai", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@google/genai")>(),
   GoogleGenAI: class {
     models = { generateContent: mockGenerateContent };
   },
@@ -91,7 +92,7 @@ describe("POST /api/sessions/[id]/analysis", () => {
     });
     mockFindConfig
       .mockResolvedValueOnce({ value: "test-api-key" })
-      .mockResolvedValueOnce({ value: "gemini-2.5-flash" });
+      .mockResolvedValueOnce({ value: "gemini-3.1-flash-lite" });
     mockGenerateContent.mockResolvedValue({
       text: JSON.stringify({
         summary: "질문과 댓글이 광합성의 장소와 에너지 전환에 집중되어 있습니다.",
@@ -123,10 +124,10 @@ describe("POST /api/sessions/[id]/analysis", () => {
     expect(body.totalComments).toBe(2);
     expect(body.commentInsights).toContain("학생 댓글");
     expect(body.engagementInsights).toContain("좋아요");
-    expect(body.analysisModel).toBe("gemini-2.5-flash");
+    expect(body.analysisModel).toBe("gemini-3.1-flash-lite");
     expect(typeof body.analyzedAt).toBe("string");
     const output = mockGenerateContent.mock.calls[0][0].config;
-    expect(output.thinkingConfig).toEqual({ thinkingBudget: 512 });
+    expect(output.thinkingConfig).toEqual({ thinkingLevel: "LOW" });
     expect(output.responseMimeType).toBe('application/json');
     expect(output.responseJsonSchema.required).toEqual(expect.arrayContaining(['summary', 'commentInsights', 'bestQuestion', 'nextQuestions', 'themes']));
     expect(prompt).toContain('각 설명은 80자 이내');

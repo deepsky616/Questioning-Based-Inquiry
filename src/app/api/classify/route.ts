@@ -4,7 +4,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { CLASSIFICATION_PROMPT, fallbackClassification, parseClassificationResponse } from "@/lib/classify";
-import { isAllowedGeminiModel } from "@/lib/api-config";
+import { isSupportedGeminiModelInput, resolveGeminiModel } from "@/lib/api-config";
 import {
   AiBusyError,
   AiKeyMissingError,
@@ -17,7 +17,7 @@ import { getQuestionContentIssue, UNCLASSIFIABLE_QUESTION_CODE } from "@/lib/que
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
-  model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다").optional(),
+  model: z.string().refine(isSupportedGeminiModelInput, "지원하지 않는 Gemini 모델입니다").transform(resolveGeminiModel).optional(),
   content: z.string().trim().min(1).max(200),
 });
 
@@ -98,6 +98,7 @@ export async function POST(req: Request) {
       modelOverride: requestModel,
       responseMimeType: "application/json",
       responseJsonSchema: CLASSIFICATION_RESPONSE_JSON_SCHEMA,
+      validateResponse: (data) => parseClassificationResponse(JSON.stringify(data)) !== null,
       maxOutputTokens: 1_024,
       thinkingBudget: 0,
     });

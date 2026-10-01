@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { generateUnitDesignData } from "@/lib/unit-design-ai-generation";
 import { unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
-import { AiOutputTruncatedError } from "@/lib/ai-errors";
+import { AiInvalidResponseError, AiOutputTruncatedError, AiSafetyBlockedError } from "@/lib/ai-errors";
 
 const keywords = [{ term: "평균", meaning: "자료를 고르게 나눈 값" }, { term: "자료", meaning: "모아서 살펴보는 값" }];
 const guide = (index: number, label = "질문") => ({ index, meaning: `${label}의 뜻을 알아봐요.`, thinkingStart: "자료를 비교해 보세요.", keywords });
@@ -22,6 +22,21 @@ const bundle = (batch: number, achievements: number, sentences: number, question
 });
 
 describe("긴 학생용 설명을 나누어 완성하기", () => {
+  it("공통 계층의 형식 검사 실패 뒤에도 안내 보완 기회를 유지한다", async () => {
+    const data = input("student_guides");
+    data.inquiryQuestions = data.inquiryQuestions!.slice(0, 2);
+    const generate = vi.fn().mockRejectedValueOnce(new AiInvalidResponseError())
+      .mockResolvedValueOnce(JSON.stringify({ guides: [guide(0), guide(1)] }));
+    await expect(generateUnitDesignData(data, generate)).resolves.toMatchObject({ guides: [guide(0), guide(1)] });
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[1][0]).toContain("필수 항목");
+  });
+
+  it("안내 생성에서도 안전 차단을 보완 요청으로 우회하지 않는다", async () => {
+    const generate = vi.fn().mockRejectedValue(new AiSafetyBlockedError());
+    await expect(generateUnitDesignData(input("student_guides"), generate)).rejects.toBeInstanceOf(AiSafetyBlockedError);
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
   it.each([{ keywords: [{}] }, { keywords: "평균" }, { keywords: [] }])("핵심어가 잘못된 형식이면 화면에 전달하지 않는다: %j", async (response) => {
     await expect(generateUnitDesignData(input("keywords"), vi.fn().mockResolvedValue(JSON.stringify(response)))).rejects.toThrow("AI_INVALID_RESPONSE");
   });

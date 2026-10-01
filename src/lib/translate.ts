@@ -53,6 +53,8 @@ Texts:
 ${JSON.stringify(texts)}`;
 
   const parsed = await generateJsonArray<unknown>({
+    validateResponse: (data) => Array.isArray(data) && data.length === texts.length &&
+      data.every((value) => typeof value === "string" && !!value.trim()),
     userId,
     prompt,
     apiKeyOverride: apiKey,

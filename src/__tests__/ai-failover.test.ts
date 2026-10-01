@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const generateContent = vi.hoisted(() => vi.fn());
-vi.mock("@google/genai", () => ({
+vi.mock("@google/genai", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@google/genai")>(),
   GoogleGenAI: class {
     models = { generateContent };
   },
@@ -29,29 +30,30 @@ const calledModels = () => generateContent.mock.calls.map(([request]) => request
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mResolve.mockResolvedValue({ apiKey: "k", model: "gemini-2.5-flash-lite" });
+  mResolve.mockResolvedValue({ apiKey: "k", model: "gemini-3.1-flash-lite" });
 });
 
 describe("callGemini — 재시도·페일오버·모델 선택", () => {
   it("키가 없으면 AiKeyMissingError", async () => {
-    mResolve.mockResolvedValue({ apiKey: null, model: "gemini-2.5-flash" });
+    mResolve.mockResolvedValue({ apiKey: null, model: "gemini-3.1-flash-lite" });
     await expect(generateText({ userId: "u1", prompt: "짧은 작업" })).rejects.toBeInstanceOf(AiKeyMissingError);
   });
 
   it("짧은 프롬프트는 flash-lite로 호출한다(자동 선택)", async () => {
     generateContent.mockResolvedValue(ok("답"));
     await generateText({ userId: "u1", prompt: "짧은 작업" });
-    expect(calledModels()).toEqual(["gemini-2.5-flash-lite"]);
+    expect(calledModels()).toEqual(["gemini-3.1-flash-lite"]);
   });
 
-  it("선택 설정이 없으면 기존 요청 모양을 유지한다", async () => {
+  it("선택 설정이 없으면 새 모델의 빠른 사고 수준과 통신 제한을 적용한다", async () => {
     generateContent.mockResolvedValue(ok("{}"));
 
     await generateJson({ userId: "u1", prompt: "기본 제이슨" });
 
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.1-flash-lite",
       contents: "기본 제이슨",
+      config: { thinkingConfig: { thinkingLevel: "MINIMAL" }, httpOptions: { timeout: 45_000 } },
     });
   });
 
@@ -77,12 +79,12 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
     });
 
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.1-flash-lite",
       contents: "구조화 제이슨",
       config: {
         httpOptions: { timeout: 8_000 },
         maxOutputTokens: 32,
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig: { thinkingLevel: "MINIMAL" },
         responseMimeType: "application/json",
         responseJsonSchema,
       },
@@ -100,7 +102,7 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
     const pending = generateJson({
       userId: "u1",
       prompt: "짧은 구조화 분류",
-      modelOverride: "gemini-2.5-flash-lite",
+      modelOverride: "gemini-3.1-flash-lite",
       thinkingBudget: 0,
       maxOutputTokens: 32,
     });
@@ -108,16 +110,17 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
 
     await expect(pending).resolves.toEqual({});
     expect(calledModels()).toEqual([
-      "gemini-2.5-flash-lite",
-      "gemini-2.5-flash-lite",
-      "gemini-2.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-3-flash-preview",
     ]);
     for (let callNumber = 1; callNumber <= 3; callNumber += 1) {
       expect(generateContent).toHaveBeenNthCalledWith(
         callNumber,
         expect.objectContaining({
           config: {
-            thinkingConfig: { thinkingBudget: 0 },
+            thinkingConfig: { thinkingLevel: "MINIMAL" },
+            httpOptions: { timeout: 45_000 },
             maxOutputTokens: 32,
           },
         }),
@@ -126,13 +129,13 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
     vi.useRealTimers();
   });
 
-  it("quality 작업은 크기와 무관하게 flash + 낮은 온도로 호출한다", async () => {
+  it("품질 작업도 경량 모델과 권장 온도로 호출한다", async () => {
     generateContent.mockResolvedValue(ok("분석"));
     await generateText({ userId: "u1", prompt: "짧아도 품질", quality: true });
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-flash-lite",
       contents: "짧아도 품질",
-      config: { temperature: CONSISTENT_TEMPERATURE },
+      config: { temperature: CONSISTENT_TEMPERATURE, thinkingConfig: { thinkingLevel: "LOW" }, httpOptions: { timeout: 45_000 } },
     });
   });
 
@@ -155,9 +158,9 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
     await vi.runAllTimersAsync();
     await expect(p).resolves.toBe("대체 성공");
     expect(calledModels()).toEqual([
-      "gemini-2.5-flash-lite",
-      "gemini-2.5-flash-lite",
-      "gemini-2.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-3-flash-preview",
     ]);
     vi.useRealTimers();
   });
@@ -186,13 +189,13 @@ describe("callGemini — 무료 일일 한도(quota) 처리", () => {
       .mockResolvedValueOnce(ok("대체 성공"));
     const text = await generateText({ userId: "u1", prompt: "짧은 작업" });
     expect(text).toBe("대체 성공");
-    expect(calledModels()).toEqual(["gemini-2.5-flash-lite", "gemini-2.5-flash"]);
+    expect(calledModels()).toEqual(["gemini-3.1-flash-lite", "gemini-3-flash-preview"]);
   });
 
   it("두 모델 모두 일일 한도면 AiQuotaError로 사용자에게 정확히 안내한다", async () => {
     generateContent.mockRejectedValue(quotaErr());
     await expect(generateText({ userId: "u1", prompt: "짧은 작업" })).rejects.toBeInstanceOf(AiQuotaError);
-    expect(calledModels()).toEqual(["gemini-2.5-flash-lite", "gemini-2.5-flash"]);
+    expect(calledModels()).toEqual(["gemini-3.1-flash-lite", "gemini-3-flash-preview"]);
   });
 
   it("분당 한도(PerDay 아님) 429는 기존대로 재시도한다", async () => {
@@ -201,6 +204,6 @@ describe("callGemini — 무료 일일 한도(quota) 처리", () => {
       .mockResolvedValueOnce(ok("재시도 성공"));
     const text = await generateText({ userId: "u1", prompt: "짧은 작업" });
     expect(text).toBe("재시도 성공");
-    expect(calledModels()).toEqual(["gemini-2.5-flash-lite", "gemini-2.5-flash-lite"]);
+    expect(calledModels()).toEqual(["gemini-3.1-flash-lite", "gemini-3.1-flash-lite"]);
   });
 });

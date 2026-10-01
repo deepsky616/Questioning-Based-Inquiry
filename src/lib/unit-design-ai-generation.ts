@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { AiInvalidResponseError } from "./ai-errors";
-import { extractJsonObject } from "./json-extract";
+import { AiInvalidResponseError, AiOutputTruncatedError, AiSafetyBlockedError } from "./ai-errors";
+import { extractJsonObject, JsonExtractionError } from "./json-extract";
 import { buildPrompt, unitDesignGenerateSchema } from "./unit-design-prompt";
 import { buildStudentGuideRepairPrompt, validateStudentGuideBundle, type CompleteStudentGuideBundle } from "./student-guide-completeness";
 
 type DesignInput = z.infer<typeof unitDesignGenerateSchema>;
-type Generate = (prompt: string, responseJsonSchema?: unknown) => Promise<string>;
+type Generate = (prompt: string, responseJsonSchema?: unknown, validateResponse?: (value: unknown) => boolean) => Promise<string>;
 
 const textField = { type: "string", minLength: 1, maxLength: 60 };
 const objectField = (properties: Record<string, unknown>) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
@@ -60,11 +60,33 @@ function expectedCounts(data: DesignInput) {
   };
 }
 
+function isValidPart(data: DesignInput, value: unknown): boolean {
+  if (data.step === "learning_guides") return validateStudentGuideBundle(value, expectedCounts(data)).ok;
+  if (data.step === "student_guides") {
+    const checked = inquiryGuidesSchema.safeParse(value);
+    return checked.success && checked.data.guides.length === (data.inquiryQuestions?.length ?? 0) &&
+      checked.data.guides.map(guide => guide.index).sort((a, b) => a - b).every((index, position) => index === position);
+  }
+  return designResultSchemas[data.step].safeParse(value).success;
+}
+
 async function generatePart(data: DesignInput, generate: Generate): Promise<unknown> {
   const prompt = `${buildPrompt(data)}\n\n[응답 길이]\n설명과 생각 단서는 각각 60자 이내, 낱말 뜻과 관점은 각각 30자 이내로 간결하게 쓰세요. 핵심 아이디어 낱말은 3개, 탐구 질문별 낱말은 2개로 작성하세요. 항목을 빠뜨리지 말고 닫는 괄호까지 완성된 JSON만 출력하세요.`;
   let nextPrompt = prompt;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await generate(nextPrompt, guideResponseSchema(data));
+    let raw: string;
+    try {
+      raw = await generate(nextPrompt, guideResponseSchema(data), (value) => isValidPart(data, value));
+    } catch (error) {
+      // 두 모델의 형식 검사 뒤에도 실패하면 안내 생성의 기존 수정 요청 기회를 유지한다.
+      if (attempt === 0 && (data.step === "learning_guides" || data.step === "student_guides") &&
+        !(error instanceof AiOutputTruncatedError || error instanceof AiSafetyBlockedError) &&
+        (error instanceof AiInvalidResponseError || error instanceof JsonExtractionError)) {
+        nextPrompt = buildStudentGuideRepairPrompt(prompt, "", ["필수 항목과 원래 번호를 모두 포함한 완성된 응답이 필요합니다."]);
+        continue;
+      }
+      throw error;
+    }
     let parsed: unknown;
     try { parsed = extractJsonObject(raw); } catch { parsed = null; }
     let issues: string[];

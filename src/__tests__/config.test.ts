@@ -45,24 +45,23 @@ describe("resolveApiKey", () => {
 });
 
 describe("Gemini model config", () => {
-  it("허용 모델은 Gemini 2.5 계열 3개뿐이다", () => {
+  it("새 기본 모델과 대체 모델을 선택할 수 있다", () => {
     expect(GEMINI_MODELS.map((model) => model.value)).toEqual([
-      "gemini-2.5-pro",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-3-flash-preview",
     ]);
   });
 
   it("허용된 모델만 true를 반환한다", () => {
-    expect(isAllowedGeminiModel("gemini-2.5-pro")).toBe(true);
-    expect(isAllowedGeminiModel("gemini-2.5-flash")).toBe(true);
-    expect(isAllowedGeminiModel("gemini-2.5-flash-lite")).toBe(true);
+    expect(isAllowedGeminiModel("gemini-3.1-flash-lite")).toBe(true);
+    expect(isAllowedGeminiModel("gemini-3-flash-preview")).toBe(true);
+    expect(isAllowedGeminiModel("gemini-2.5-flash")).toBe(false);
     expect(isAllowedGeminiModel("gemini-2.0-flash")).toBe(false);
   });
 
   it("저장값이 없거나 허용되지 않으면 기본 모델을 사용한다", () => {
     expect(resolveGeminiModel(undefined)).toBe(DEFAULT_GEMINI_MODEL);
     expect(resolveGeminiModel("gemini-2.0-flash")).toBe(DEFAULT_GEMINI_MODEL);
-    expect(resolveGeminiModel("gemini-2.5-pro")).toBe("gemini-2.5-pro");
+    expect(resolveGeminiModel("gemini-2.5-pro")).toBe(DEFAULT_GEMINI_MODEL);
   });
 });

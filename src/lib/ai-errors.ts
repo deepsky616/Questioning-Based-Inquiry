@@ -33,6 +33,27 @@ export class AiOutputTruncatedError extends AiInvalidResponseError {
   }
 }
 
+/** 안전 차단은 모델을 바꿔 재요청하지 않는다. */
+export class AiSafetyBlockedError extends AiInvalidResponseError {
+  constructor() {
+    super();
+    this.message = "AI_SAFETY_BLOCKED";
+    this.name = "AiSafetyBlockedError";
+  }
+}
+
+/** 모델 종료·모델별 기능 미지원은 같은 요청을 대체 모델에서 시도할 수 있다. */
+export function isModelUnavailableError(err: unknown): boolean {
+  const status = typeof err === "object" && err !== null && "status" in err
+    ? Number((err as { status: unknown }).status) : undefined;
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/API[_ ]?KEY|UNAUTHENTICATED|PERMISSION_DENIED|credentials/i.test(msg)) return false;
+  if (status === 404 || /\b404\b|NOT_FOUND|model.*(?:not found|no longer available|retired)/i.test(msg)) return true;
+  return (status === 400 || status === undefined) &&
+    /not supported|unsupported|not available/i.test(msg) &&
+    /model|thinking|response[_ ]?(?:mime|json|schema)/i.test(msg);
+}
+
 /** 무료 티어 일일 한도 초과(재시도 무의미 — 내일 리셋 또는 유료 키 필요). */
 export class AiQuotaError extends Error {
   constructor() {
@@ -66,8 +87,9 @@ export function isTransientAiError(err: unknown): boolean {
     typeof err === "object" && err !== null && "status" in err
       ? (err as { status?: unknown }).status
       : undefined;
-  if (status === 429 || status === 503) return true;
+  if ([429, 500, 502, 503, 504].includes(Number(status))) return true;
 
   const msg = err instanceof Error ? err.message : String(err);
-  return /\b(503|429)\b|Service Unavailable|high demand|overloaded|Resource has been exhausted|Too Many Requests/i.test(msg);
+  return /\b(500|502|503|504|429)\b|Service Unavailable|high demand|overloaded|Resource has been exhausted|Too Many Requests|fetch failed|network error|timed?\s*out|ETIMEDOUT|ECONNRESET/i.test(msg) ||
+    (err instanceof Error && ["AbortError", "TimeoutError"].includes(err.name));
 }

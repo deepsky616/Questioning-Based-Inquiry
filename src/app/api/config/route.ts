@@ -3,13 +3,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { isAllowedGeminiModel, maskApiKey, resolveGeminiModel } from "@/lib/api-config";
+import { isSupportedGeminiModelInput, maskApiKey, resolveGeminiModel } from "@/lib/api-config";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { protectDemoAccountSettings } from "@/lib/demo-account-protection";
 
 const saveConfigSchema = z.object({
   apiKey: z.string().optional(),
-  model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다"),
+  model: z.string().refine(isSupportedGeminiModelInput, "지원하지 않는 Gemini 모델입니다").transform(resolveGeminiModel),
 });
 
 // 교사: 본인 AI 설정 / 학생: 담당 교사의 설정 적용 여부만 확인

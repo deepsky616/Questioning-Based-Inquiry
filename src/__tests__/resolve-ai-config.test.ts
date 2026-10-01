@@ -24,14 +24,14 @@ describe("resolveUserAiConfig — AI 키/모델 3단계 결정", () => {
   it("교사 본인 키가 있으면 그 키·모델을 쓴다", async () => {
     mUser.mockResolvedValue({ role: "TEACHER", isDemo: false, aiApiKey: "t-key", aiModel: "gemini-2.5-flash-lite" });
     const cfg = await resolveUserAiConfig("t1");
-    expect(cfg).toEqual({ apiKey: "t-key", model: "gemini-2.5-flash-lite", isDemo: false });
+    expect(cfg).toEqual({ apiKey: "t-key", model: "gemini-3.1-flash-lite", isDemo: false });
     expect(mFirst).not.toHaveBeenCalled();
   });
 
   it("교사의 허용 외 모델은 기본 모델로 보정된다", async () => {
     mUser.mockResolvedValue({ role: "TEACHER", isDemo: false, aiApiKey: "t-key", aiModel: "gpt-4" });
     const cfg = await resolveUserAiConfig("t1");
-    expect(cfg.model).toBe("gemini-2.5-flash");
+    expect(cfg.model).toBe("gemini-3.1-flash-lite");
   });
 
   it("학생은 같은 학교·담당 학급 교사의 키를 물려받는다", async () => {
@@ -41,7 +41,7 @@ describe("resolveUserAiConfig — AI 키/모델 3단계 결정", () => {
     });
     mFirst.mockResolvedValue({ aiApiKey: "teacher-key", aiModel: "gemini-2.5-pro" });
     const cfg = await resolveUserAiConfig("s1");
-    expect(cfg).toEqual({ apiKey: "teacher-key", model: "gemini-2.5-pro", isDemo: false });
+    expect(cfg).toEqual({ apiKey: "teacher-key", model: "gemini-3.1-flash-lite", isDemo: false });
     const where = mFirst.mock.calls[0][0].where;
     expect(where).toMatchObject({
       role: "TEACHER",
@@ -61,13 +61,13 @@ describe("resolveUserAiConfig — AI 키/모델 3단계 결정", () => {
       ),
     );
     const cfg = await resolveUserAiConfig("s1");
-    expect(cfg).toEqual({ apiKey: "global-key", model: "gemini-2.5-flash-lite", isDemo: false });
+    expect(cfg).toEqual({ apiKey: "global-key", model: "gemini-3.1-flash-lite", isDemo: false });
   });
 
   it("어디에도 키가 없으면 apiKey null + 기본 모델", async () => {
     mUser.mockResolvedValue({ role: "TEACHER", isDemo: false, aiApiKey: null, aiModel: null });
     const cfg = await resolveUserAiConfig("t1");
-    expect(cfg).toEqual({ apiKey: null, model: "gemini-2.5-flash", isDemo: false });
+    expect(cfg).toEqual({ apiKey: null, model: "gemini-3.1-flash-lite", isDemo: false });
   });
 
   it("학년·반이 없는 학생은 교사 탐색 없이 전역 폴백으로 간다", async () => {
@@ -97,7 +97,7 @@ describe("resolveUserAiConfig — AI 키/모델 3단계 결정", () => {
 
     expect(cfg).toEqual({
       apiKey: "server-only-key",
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.1-flash-lite",
       isDemo: true,
     });
     expect(mFirst).toHaveBeenCalledWith({
