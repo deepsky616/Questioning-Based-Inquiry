@@ -10,6 +10,8 @@ import { conciseReportPrompt, reportAnalysisOutput, validateReportAnalysis } fro
 
 type Params = { params: Promise<{ id: string }> };
 
+export const maxDuration = 300;
+
 // 저장된 학급 세션 분석 조회(AI 호출 없음) — 질문조회/대시보드가 공유한 결과를 불러온다.
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;

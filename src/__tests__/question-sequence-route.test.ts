@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: () => null }));
 vi.mock("@/lib/db", () => ({ prisma: { questionSession: { findFirst: mocks.session }, question: { findMany: mocks.questions } } }));
-vi.mock("@/lib/ai", () => ({ generateJson: mocks.generate }));
+vi.mock("@/lib/ai", () => ({ createJsonGenerationSession: async () => mocks.generate }));
 vi.mock("@/lib/resolve-ai-config", () => ({ resolveUserAiConfig: mocks.config }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 
@@ -45,7 +45,7 @@ describe("탐구설계 질문 분류 경로", () => {
   });
 
   it("원본이 누락된 결과를 반복하면 원본 전체를 남기고 규칙 결과로 알린다", async () => {
-    mocks.generate.mockResolvedValue({ sequencedQuestions: [{ mergedFrom: ["a"], content: questions[0].content, contentGroup: "빛" }] });
+    mocks.generate.mockResolvedValue({ sequencedQuestions: [{ mergedFrom: ["q1"], content: questions[0].content, contentGroup: "빛" }] });
     const response = await POST(request());
     const data = await response.json();
     expect(response.status).toBe(200);
@@ -68,7 +68,7 @@ describe("탐구설계 질문 분류 경로", () => {
       { id: "묶음-1", content: "어떤 영향을 줄까?", contentGroup: "빛", type: "conceptual", mergedFrom: ["빛의 영향은?", "햇빛의 역할은?"] },
       { id: "묶음-2", content: "어떤 영향을 줄까?", contentGroup: "물", type: "conceptual", mergedFrom: ["물의 영향은?", "물을 주는 까닭은?"] },
     ];
-    mocks.generate.mockResolvedValue({ sequencedQuestions: [{ id: "묶음-2", priority: 1, content: "임의 수정" }, { id: "묶음-1", priority: 2 }] });
+    mocks.generate.mockResolvedValue({ sequencedQuestions: [{ id: "q2", priority: 1, content: "임의 수정" }, { id: "q1", priority: 2 }] });
     const data = await (await POST(request({ mode: "sort", currentQuestions }))).json();
     expect(data.generatedBy).toBe("ai");
     expect(data.sequencedQuestions.map((q: { id: string }) => q.id)).toEqual(["묶음-2", "묶음-1"]);

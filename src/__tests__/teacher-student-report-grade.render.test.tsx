@@ -97,8 +97,8 @@ describe("교사 학생별 상세리포트 학년", () => {
     fireEvent.click(screen.getByRole("button", { name: "학생별" }));
 
     expect(
-      screen.getByRole("heading", { name: "김질문 학생 활동 리포트" }),
+      screen.getByRole("heading", { name: "학생 활동 리포트" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("4학년 1반 1번")).toBeInTheDocument();
+    expect(screen.getByText("김질문 4학년 1반 1번")).toBeInTheDocument();
   });
 });

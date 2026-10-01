@@ -14,7 +14,8 @@ import {
 import { sessionTargetsStudent } from "@/lib/session-targeting";
 
 // 한 번의 요청에서 실행할 최대 AI 분석 수(서버리스 타임아웃 회피). 클라이언트가 cursor로 반복 호출한다.
-const ANALYSES_PER_CALL = 3;
+const ANALYSES_PER_CALL = 1;
+export const maxDuration = 300;
 
 const bodySchema = z.object({
   grade: z.string().min(1),
@@ -26,7 +27,7 @@ const bodySchema = z.object({
 /**
  * 교사용 일괄 학생 분석: 선택한 기간의 세션들 × 반 전체 학생을 나눠서 분석한다.
  * - 참여한 (학생, 세션) 쌍만 대상으로 하고, 이미 분석된 쌍은 건너뛴다.
- * - 한 번에 ANALYSES_PER_CALL건만 처리하고 cursor를 돌려준다(클라이언트가 done까지 반복 호출).
+ * - 모델 재시도·전환 시간까지 확보하기 위해 한 번에 한 건 처리하고 다음 위치를 돌려준다.
  * POST body: { grade, className, sessionIds: string[], cursor: number }
  */
 export async function POST(req: NextRequest) {

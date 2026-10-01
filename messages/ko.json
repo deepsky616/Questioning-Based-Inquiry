@@ -188,7 +188,7 @@
       "description": "교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문"
     },
     "teacherReports": {
-      "title": "학급 활동 리포트",
+      "title": "상세 리포트",
       "description": "학급별 또는 학생별로 질문·좋아요·댓글 추세와 AI 분석을 볼 수 있어요"
     },
     "teacherSettings": {
@@ -1479,6 +1479,8 @@
     "lastUpdated": "마지막 갱신 {time}",
     "autoRefreshNote": "60초마다 자동 갱신",
     "classReportTitle": "{grade}학년 {className}반 활동 리포트",
+    "classActivityTitle": "학급 활동 리포트",
+    "studentActivityTitle": "학생 활동 리포트",
     "classReportSubtitle": "학생 {count}명",
     "participationClass": "학급이 만든 활동",
     "receptionClass": "학급 질문이 받은 반응",

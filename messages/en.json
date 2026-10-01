@@ -188,7 +188,7 @@
       "description": "Curriculum analysis → achievement standards → key terms → key sentences → key questions → inquiry questions"
     },
     "teacherReports": {
-      "title": "Class Activity Report",
+      "title": "Detailed Report",
       "description": "View question, like, and comment trends and AI analysis by class or by student"
     },
     "teacherSettings": {
@@ -1479,6 +1479,8 @@
     "lastUpdated": "Last updated {time}",
     "autoRefreshNote": "Auto-refreshes every 60 seconds",
     "classReportTitle": "Grade {grade} Class {className} activity report",
+    "classActivityTitle": "Class Activity Report",
+    "studentActivityTitle": "Student Activity Report",
     "classReportSubtitle": "{count} students",
     "participationClass": "Activity the class created",
     "receptionClass": "Responses the class's questions received",

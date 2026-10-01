@@ -8,9 +8,8 @@ const classFields = ['summary', 'insights', 'commentInsights', 'engagementInsigh
 export function validateReportAnalysis(data: unknown, scope: 'student' | 'class'): void {
   const fields = scope === 'student' ? studentFields : classFields;
   const schema = z.object({
-    ...Object.fromEntries(fields.map(field => [field, z.string().optional()])),
-    summary: z.string().trim().min(1),
-    ...(scope === 'class' ? { themes: z.array(z.string()).optional() } : {}),
+    ...Object.fromEntries(fields.map(field => [field, z.string().trim().min(1)])),
+    ...(scope === 'class' ? { themes: z.array(z.string().trim().min(1)).min(1).max(3) } : {}),
   });
   if (!schema.safeParse(data).success) throw new AiInvalidResponseError();
 }
@@ -22,6 +21,8 @@ export function reportAnalysisOutput(scope: 'student' | 'class') {
   const fields = scope === 'student' ? studentFields : classFields;
   return {
     thinkingBudget: 512,
+    timeoutMs: 60_000,
+    maxOutputTokens: 4096,
     validateResponse: (data: unknown) => validateReportAnalysis(data, scope),
     responseMimeType: 'application/json',
     responseJsonSchema: {
@@ -31,7 +32,7 @@ export function reportAnalysisOutput(scope: 'student' | 'class') {
           type: 'string',
           description: field === 'rewriteExample' || field === 'bestQuestion' || field === 'nextQuestions'
             ? '질문 예시 하나와 간단한 설명. 160자 이내.'
-            : '제공된 활동에 근거한 핵심 내용. 80자 이내의 한두 문장.',
+            : '제공된 활동에 근거한 핵심 내용. 80자 이내의 한두 문장. 자료가 없으면 없다는 사실과 분석 한계를 설명하세요.',
         }])),
         ...(scope === 'class' ? { themes: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 } } : {}),
       },

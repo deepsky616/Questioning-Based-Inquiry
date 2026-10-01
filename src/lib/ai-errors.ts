@@ -42,13 +42,14 @@ export class AiSafetyBlockedError extends AiInvalidResponseError {
   }
 }
 
-/** 모델 종료·모델별 기능 미지원은 같은 요청을 대체 모델에서 시도할 수 있다. */
+/** 모델 종료·기능 미지원·모델별 요청 거절은 대체 모델에서 한 번 시도한다. */
 export function isModelUnavailableError(err: unknown): boolean {
   const status = typeof err === "object" && err !== null && "status" in err
     ? Number((err as { status: unknown }).status) : undefined;
   const msg = err instanceof Error ? err.message : String(err);
   if (/API[_ ]?KEY|UNAUTHENTICATED|PERMISSION_DENIED|credentials/i.test(msg)) return false;
   if (status === 404 || /\b404\b|NOT_FOUND|model.*(?:not found|no longer available|retired)/i.test(msg)) return true;
+  if (status === 400 && /INVALID_ARGUMENT|Request contains an invalid argument/i.test(msg)) return true;
   return (status === 400 || status === undefined) &&
     /not supported|unsupported|not available/i.test(msg) &&
     /model|thinking|response[_ ]?(?:mime|json|schema)/i.test(msg);

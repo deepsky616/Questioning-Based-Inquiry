@@ -74,6 +74,20 @@ beforeEach(() => {
 });
 
 describe("묶음 학생 분석 접근 경계", () => {
+  it("모델 전환 시간이 길어도 요청마다 한 학생을 분석하고 다음 위치를 반환한다", async () => {
+    mStudentsFind.mockResolvedValue([{ id: "student-1" }, { id: "student-2" }, { id: "student-3" }]);
+    mSessionsFind.mockResolvedValue([{ id: "session-1", targetType: "ALL" }]);
+    mQuestionFind.mockResolvedValue([
+      { sessionId: "session-1", authorId: "student-1" },
+      { sessionId: "session-1", authorId: "student-2" },
+      { sessionId: "session-1", authorId: "student-3" },
+    ]);
+    mRunAnalysis.mockResolvedValue({ result: { summary: "분석" }, totals: { questions: 1, comments: 0, likesGiven: 0 } });
+    const body = await (await POST(request())).json();
+    expect(body).toMatchObject({ total: 3, nextCursor: 1, done: false, analyzedThisCall: 1 });
+    expect(mRunAnalysis).toHaveBeenCalledTimes(1);
+  });
+
   it("학교가 없는 교사는 학생 조회와 분석 전에 거부한다", async () => {
     teacherRecord = {
       role: "TEACHER",
