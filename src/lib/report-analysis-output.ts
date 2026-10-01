@@ -22,6 +22,7 @@ export function reportAnalysisOutput(scope: 'student' | 'class') {
   const fields = scope === 'student' ? studentFields : classFields;
   return {
     thinkingBudget: 512,
+    validateResponse: (data: unknown) => validateReportAnalysis(data, scope),
     responseMimeType: 'application/json',
     responseJsonSchema: {
       type: 'object',

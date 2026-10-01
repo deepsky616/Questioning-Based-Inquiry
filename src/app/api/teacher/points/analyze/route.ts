@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
 
     try {
       // AI 추천 포인트는 평가 품질이 중요하므로 탐구설계와 동일하게 quality 작업으로 호출한다.
-      // 교사가 flash-lite를 설정했더라도 공통 AI 계층에서 gemini-2.5-flash로 올리고, pro 설정은 존중한다.
+      // 새 경량 모델로 시작하고 검증에 실패하면 공통 AI 계층에서 대체 모델로 전환한다.
       // 키 없음·파싱 실패는 AI 결과 없이 진행(정규화 기반 중복 후보만 사용)
       aiResp = await analyzeActivityBonuses({
         userId: teacherId,

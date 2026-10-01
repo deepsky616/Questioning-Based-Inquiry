@@ -1,9 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { resolveUserAiConfig, type ResolvedAiConfig } from "@/lib/resolve-ai-config";
-import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
+import { extractJsonArray, extractJsonObject, JsonExtractionError } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
-import { AiBusyError, AiInvalidResponseError, AiKeyMissingError, AiOutputTruncatedError, AiQuotaError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
+import { AiBusyError, AiInvalidResponseError, AiKeyMissingError, AiOutputTruncatedError, AiQuotaError, AiSafetyBlockedError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError, isModelUnavailableError } from "@/lib/ai-errors";
 import type { GeminiModel } from "@/lib/api-config";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -23,7 +23,7 @@ export interface GenerateOptions {
   localize?: boolean;
   /** 모델 system instruction (역할·규칙 고정용) */
   systemInstruction?: string;
-  /** true면 크기와 무관하게 품질 우선 모델(flash 이상)을 사용 — 분석·수업자료 생성 등 */
+  /** 분석·수업자료 생성처럼 사고가 필요한 작업에 사용한다. */
   quality?: boolean;
   /** 특정 요청에서만 사용할 AI 키. 없으면 사용자/담당 교사 설정을 사용한다. */
   apiKeyOverride?: string;
@@ -31,17 +31,20 @@ export interface GenerateOptions {
   modelOverride?: string;
   /** 특정 요청의 최대 응답 토큰 수. 없으면 모델 기본값을 쓴다. */
   maxOutputTokens?: number;
-  /** 특정 요청의 사고 토큰 예산. 없으면 모델 기본값을 쓴다. */
+  /** 이전 호출부 호환용 사고 예산. 0은 최소 수준, 그 외 값은 낮은 수준으로 변환한다. */
   thinkingBudget?: number;
+  /** Gemini 3의 사고 수준. 기존 사고 예산보다 우선한다. */
+  thinkingLevel?: ThinkingLevel;
   /** 특정 요청의 통신 시간 제한. 밀리초 단위이다. */
   timeoutMs?: number;
   /** 구조화 응답에 사용할 응답 형식. */
   responseMimeType?: string;
   /** 구조화 응답에 사용할 제이슨 틀. */
   responseJsonSchema?: unknown;
+  /** 파싱된 응답을 기능별로 검사한다. false 또는 예외이면 대체 모델로 전환한다. */
+  validateResponse?: (data: unknown) => boolean | void;
   /**
-   * 샘플링 온도(0~2). 미지정 시 quality 작업은 0.1(같은 입력 → 최대한 일관된 결과),
-   * 그 외에는 모델 기본값을 쓴다. 다양성이 필요한 작업(질문 게임 등)은 명시적으로 높인다.
+   * 샘플링 온도(0~2). Gemini 3 권장값 1 미만인 기존 설정은 1로 보정한다.
    */
   temperature?: number;
 }
@@ -51,8 +54,8 @@ export interface GenerateTextResult {
   model: GeminiModel;
 }
 
-/** 분석·수업자료 생성 등 일관성이 중요한 작업의 기본 온도 */
-export const CONSISTENT_TEMPERATURE = 0.1;
+/** Gemini 3 권장 온도. 낮은 온도에 따른 반복·추론 품질 저하를 방지한다. */
+export const CONSISTENT_TEMPERATURE = 1;
 
 function checkDemoRateLimit(userId: string): void {
   const { success } = rateLimit(`demo-ai:${userId}`, { limit: 10, windowMs: 60_000 });
@@ -67,9 +70,9 @@ interface GenerationSession {
 
 /**
  * 통합 AI 호출 계층. resolveUserAiConfig로 키를 결정하고 Gemini를 호출한다.
- * - 모델은 프롬프트 크기에 따라 자동 선택(짧은 작업 flash-lite / 긴 작업 flash, pro 설정은 존중)
- * - quality 작업은 낮은 온도로 호출해 같은 입력에 최대한 같은 분석이 나오게 한다
- * - 모델 혼잡(503/429)은 백오프 재시도 후 대체 모델(lite↔flash)로 자동 전환
+ * - 기본 모델은 Gemini 3.1 Flash-Lite, 대체 모델은 Gemini 3 Flash
+ * - 기존 사고 예산은 Gemini 3의 사고 수준으로 변환한다
+ * - 혼잡·모델 종료·비어 있거나 잘린 응답·제이슨 오류는 제한된 재시도와 모델 전환으로 복구한다
  * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
 async function callGeminiWithMetadata({
@@ -85,10 +88,12 @@ async function callGeminiWithMetadata({
   modelOverride,
   maxOutputTokens,
   thinkingBudget,
+  thinkingLevel,
   timeoutMs,
   responseMimeType,
   responseJsonSchema,
-}: GenerateOptions, session?: GenerationSession): Promise<GenerateTextResult> {
+  validateResponse,
+}: GenerateOptions, session?: GenerationSession, responseKind: "text" | "object" | "array" = "text"): Promise<GenerateTextResult> {
   const resolved = session?.config ?? await resolveUserAiConfig(userId);
   const cfg = resolved.isDemo || !apiKeyOverride
     ? resolved
@@ -109,7 +114,11 @@ async function callGeminiWithMetadata({
     cfg.isDemo ? cfg.model : modelOverride ?? cfg.model,
   );
   const primary = quality ? chooseQualityModel(configuredModel) : chooseModelAuto(configuredModel, fullPrompt.length);
-  const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
+  const temp = temperature === undefined ? (quality ? CONSISTENT_TEMPERATURE : undefined)
+    : Math.max(1, temperature);
+  const modelThinkingLevel = thinkingLevel ?? (thinkingBudget === 0
+    ? ThinkingLevel.MINIMAL
+    : thinkingBudget !== undefined || quality ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL);
   let effectiveMaxOutputTokens = cfg.isDemo
     ? Math.min(maxOutputTokens ?? 2_048, 2_048)
     : maxOutputTokens;
@@ -121,24 +130,16 @@ async function callGeminiWithMetadata({
       try {
         const requestTimeout = session
           ? Math.min(timeoutMs ?? 45_000, session.deadline - Date.now())
-          : timeoutMs;
+          : timeoutMs ?? 45_000;
         if (requestTimeout !== undefined && requestTimeout <= 0) throw new AiBusyError();
-        // Pro는 사고를 끌 수 없다. 대체 모델에는 원래 요청한 값을 사용한다.
-        // https://ai.google.dev/gemini-api/docs/generate-content/thinking
-        const requiresThinking = modelName === "gemini-2.5-pro" && thinkingBudget === 0;
-        const modelThinkingBudget = requiresThinking ? 128 : thinkingBudget;
-        const modelOutputLimit = requiresThinking && effectiveMaxOutputTokens !== undefined
-          ? Math.max(effectiveMaxOutputTokens, 256)
-          : effectiveMaxOutputTokens;
+        const modelOutputLimit = effectiveMaxOutputTokens;
         const config = {
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(temp != null ? { temperature: temp } : {}),
           ...(modelOutputLimit !== undefined
             ? { maxOutputTokens: modelOutputLimit }
             : {}),
-          ...(modelThinkingBudget !== undefined
-            ? { thinkingConfig: { thinkingBudget: modelThinkingBudget } }
-            : {}),
+          thinkingConfig: { thinkingLevel: modelThinkingLevel },
           ...(requestTimeout !== undefined
             ? { httpOptions: { timeout: requestTimeout } }
             : {}),
@@ -150,6 +151,12 @@ async function callGeminiWithMetadata({
           contents: fullPrompt,
           ...(Object.keys(config).length > 0 ? { config } : {}),
         });
+        const finishReason = response.candidates?.[0]?.finishReason;
+        const blockReason = response.promptFeedback?.blockReason;
+        if ((blockReason && String(blockReason) !== "BLOCKED_REASON_UNSPECIFIED") ||
+          ["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY", "RECITATION"].includes(finishReason ?? "")) {
+          throw new AiSafetyBlockedError();
+        }
         if (response.candidates?.[0]?.finishReason === "MAX_TOKENS") {
           const expandedLimit = modelOutputLimit === undefined ? undefined
             : Math.min(modelOutputLimit * 2, cfg.isDemo ? 2_048 : 8_192);
@@ -162,6 +169,23 @@ async function callGeminiWithMetadata({
         }
         const text = (response.text ?? "").trim();
         if (!text) throw new AiInvalidResponseError();
+        if (finishReason && finishReason !== "STOP") throw new AiInvalidResponseError();
+        const normalizedText = text.replace(/^```(?:json)?\s*/i, "").trimStart();
+        const kind = responseKind === "text" && responseMimeType === "application/json"
+          ? (normalizedText.startsWith("[") ? "array" : "object")
+          : responseKind;
+        if (kind !== "text") {
+          if ((kind === "object" && normalizedText.startsWith("[")) ||
+            (kind === "array" && normalizedText.startsWith("{"))) throw new AiInvalidResponseError();
+          const data = kind === "array" ? extractJsonArray(text) : extractJsonObject(text);
+          if (validateResponse) {
+            try {
+              if (validateResponse(data) === false) throw new AiInvalidResponseError();
+            } catch {
+              throw new AiInvalidResponseError();
+            }
+          }
+        }
         return { text, model: modelName };
       } catch (err) {
         // 일일 한도 초과는 같은 모델 재시도가 무의미(잔여 한도만 소모) — 즉시 중단
@@ -176,9 +200,9 @@ async function callGeminiWithMetadata({
   try {
     return await runWith(primary, 2);
   } catch (err) {
-    // 주 모델이 혼잡하거나 일일 한도를 소진하면 대체 모델로 페일오버
-    // (모델별 용량·무료 한도 풀이 달라 대개 성공)
-    if (!(err instanceof AiBusyError || err instanceof AiQuotaError)) throw err;
+    if (err instanceof AiSafetyBlockedError) throw err;
+    if (!(err instanceof AiBusyError || err instanceof AiQuotaError ||
+      err instanceof AiInvalidResponseError || err instanceof JsonExtractionError || isModelUnavailableError(err))) throw err;
     return runWith(alternateModel(primary), 2);
   }
 }
@@ -191,7 +215,7 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
 
 /** JSON 응답을 공통 파서(extractJsonObject)로 파싱해 반환한다. */
 export async function generateJson<T = unknown>(opts: GenerateOptions): Promise<T> {
-  const result = await callGeminiWithMetadata(opts);
+  const result = await callGeminiWithMetadata(opts, undefined, "object");
   return extractJsonObject(result.text) as T;
 }
 
@@ -215,14 +239,14 @@ export async function createJsonGenerationSession(userId: string) {
     const result = await callGeminiWithMetadata({
       ...opts,
       timeoutMs: Math.min(opts.timeoutMs ?? 45_000, remaining),
-    }, session);
+    }, session, "object");
     return extractJsonObject(result.text) as T;
   };
 }
 
 /** JSON 배열 응답을 공통 파서(extractJsonArray)로 파싱해 반환한다. */
 export async function generateJsonArray<T = unknown>(opts: GenerateOptions): Promise<T[]> {
-  const result = await callGeminiWithMetadata(opts);
+  const result = await callGeminiWithMetadata(opts, undefined, "array");
   return extractJsonArray(result.text) as T[];
 }
 
@@ -231,7 +255,7 @@ export async function generateJsonWithMetadata<T = unknown>(opts: GenerateOption
   data: T;
   model: GeminiModel;
 }> {
-  const result = await callGeminiWithMetadata(opts);
+  const result = await callGeminiWithMetadata(opts, undefined, "object");
   return {
     data: extractJsonObject(result.text) as T,
     model: result.model,

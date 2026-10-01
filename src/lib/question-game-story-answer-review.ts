@@ -85,8 +85,9 @@ export async function generateStoryDiceAnswerReview(
     throw new Error("이야기 주사위 대답 작성자가 일치하지 않습니다");
   }
   const response = reviewSchema.parse(await generateJson<unknown>({
+    validateResponse: (data) => reviewSchema.safeParse(data).success,
     userId,
-    modelOverride: "gemini-2.5-flash-lite",
+    modelOverride: "gemini-3.1-flash-lite",
     prompt: JSON.stringify({
       locale: request.locale,
       story: request.story,

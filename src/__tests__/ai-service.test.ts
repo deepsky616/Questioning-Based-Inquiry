@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const generateContent = vi.hoisted(() => vi.fn());
 const constructorCall = vi.hoisted(() => vi.fn());
-const aiState = vi.hoisted(() => ({ apiKey: "k" as string | null, model: "gemini-2.5-flash", isDemo: false }));
+const aiState = vi.hoisted(() => ({ apiKey: "k" as string | null, model: "gemini-3.1-flash-lite", isDemo: false }));
 const consumeQuota = vi.hoisted(() => vi.fn(async () => 1));
 vi.mock("@/lib/demo-ai-quota", () => ({ consumeDemoAiQuota: consumeQuota }));
 
 vi.mock("@/lib/resolve-ai-config", () => ({ resolveUserAiConfig: vi.fn(async () => ({ ...aiState })) }));
-vi.mock("@google/genai", () => ({
+vi.mock("@google/genai", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@google/genai")>(),
   GoogleGenAI: class {
     models = { generateContent };
     constructor(options: { apiKey: string }) {
@@ -26,7 +27,7 @@ beforeEach(() => {
   generateContent.mockReset();
   constructorCall.mockClear();
   aiState.apiKey = "k";
-  aiState.model = "gemini-2.5-flash";
+  aiState.model = "gemini-3.1-flash-lite";
   aiState.isDemo = false;
   consumeQuota.mockClear();
 });
@@ -105,28 +106,28 @@ describe("lib/ai 서비스 계층", () => {
   it.each([undefined, false])("출력 상한을 더 늘릴 수 없어도 잘린 응답을 성공으로 반환하지 않는다: %s", async (retryTruncatedOutput) => {
     generateContent.mockResolvedValue({ text: '중간 답변', candidates: [{ finishReason: "MAX_TOKENS" }] });
     await expect(generateText({ userId: "u", prompt: "p", retryTruncatedOutput })).rejects.toBeInstanceOf(AiOutputTruncatedError);
-    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(generateContent).toHaveBeenCalledTimes(2);
   });
 
   it.each([undefined, '', '  \n  '])("빈 응답을 저장 가능한 답변으로 반환하지 않는다: %s", async (text) => {
     generateContent.mockResolvedValue({ text });
     await expect(generateText({ userId: "u", prompt: "p" })).rejects.toBeInstanceOf(AiInvalidResponseError);
-    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(generateContent).toHaveBeenCalledTimes(2);
   });
 
-  it("Pro에 필요한 사고 예산과 출력 여유를 확보한다", async () => {
+  it("이전 Pro 설정도 새 기본 모델과 최소 사고 수준으로 변환한다", async () => {
     aiState.model = "gemini-2.5-pro";
     generateContent.mockResolvedValue(reply('{}'));
     await generateJson({ userId: "u", prompt: "p", thinkingBudget: 0, maxOutputTokens: 128 });
-    expect(generateContent.mock.calls[0][0]).toMatchObject({ model: "gemini-2.5-pro", config: { thinkingConfig: { thinkingBudget: 128 }, maxOutputTokens: 256 } });
+    expect(generateContent.mock.calls[0][0]).toMatchObject({ model: "gemini-3.1-flash-lite", config: { thinkingConfig: { thinkingLevel: "MINIMAL" }, maxOutputTokens: 128 } });
   });
 
-  it("Pro에서 대체 모델로 전환하면 해당 모델의 원래 사고 설정을 사용한다", async () => {
+  it("이전 설정의 대체 모델에도 동일한 새 사고 수준을 사용한다", async () => {
     aiState.model = "gemini-2.5-pro";
     generateContent.mockRejectedValueOnce(new Error('429 quota PerDay')).mockResolvedValueOnce(reply('{}'));
     await generateJson({ userId: "u", prompt: "p", thinkingBudget: 0, maxOutputTokens: 128 });
-    expect(generateContent.mock.calls.map(([request]) => request.config.thinkingConfig.thinkingBudget)).toEqual([128, 0]);
-    expect(generateContent.mock.calls.map(([request]) => request.config.maxOutputTokens)).toEqual([256, 128]);
+    expect(generateContent.mock.calls.map(([request]) => request.config.thinkingConfig.thinkingLevel)).toEqual(["MINIMAL", "MINIMAL"]);
+    expect(generateContent.mock.calls.map(([request]) => request.config.maxOutputTokens)).toEqual([128, 128]);
   });
 
   it("시연 계정은 재시도해도 응답 상한을 넘기지 않고 한 번의 요청으로 계산한다", async () => {
@@ -143,7 +144,7 @@ describe("lib/ai 서비스 계층", () => {
     aiState.isDemo = true;
     generateContent.mockResolvedValue({ text: '{', candidates: [{ finishReason: "MAX_TOKENS" }] });
     await expect(generateJson({ userId: "demo-limit", prompt: "p", maxOutputTokens: 2048, retryTruncatedOutput: true })).rejects.toBeInstanceOf(AiOutputTruncatedError);
-    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(generateContent).toHaveBeenCalledTimes(2);
     expect(consumeQuota).toHaveBeenCalledTimes(1);
   });
   it("질문놀이의 잘린 응답은 한 번만 예산을 늘려 처음부터 다시 받는다", async () => {
@@ -159,13 +160,13 @@ describe("lib/ai 서비스 계층", () => {
   it("두 번 연속 잘리면 부분 응답을 성공으로 반환하지 않고 중단한다", async () => {
     generateContent.mockResolvedValue({ text: '{"a":1}', candidates: [{ finishReason: "MAX_TOKENS" }] });
     await expect(generateJson({ userId: "u", prompt: "p", maxOutputTokens: 128, retryTruncatedOutput: true })).rejects.toBeInstanceOf(AiOutputTruncatedError);
-    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(generateContent).toHaveBeenCalledTimes(3);
   });
 
   it("일반 텍스트 질문도 잘린 문장을 저장하지 않는다", async () => {
     generateContent.mockResolvedValue({ text: "어떤 이유로", candidates: [{ finishReason: "MAX_TOKENS" }] });
     await expect(generateText({ userId: "u", prompt: "p", maxOutputTokens: 256, retryTruncatedOutput: true })).rejects.toBeInstanceOf(AiOutputTruncatedError);
-    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(generateContent).toHaveBeenCalledTimes(3);
   });
   it("키 없으면 AiKeyMissingError", async () => {
     aiState.apiKey = null;
@@ -184,12 +185,12 @@ describe("lib/ai 서비스 계층", () => {
   });
 
   it("generateJsonWithMetadata는 실제 사용 모델을 함께 반환", async () => {
-    aiState.model = "gemini-2.5-flash-lite";
+    aiState.model = "gemini-3.1-flash-lite";
     generateContent.mockResolvedValue(reply('{ "a": 1 }'));
 
     const result = await generateJsonWithMetadata<{ a: number }>({ userId: "u", prompt: "p", quality: true });
 
-    expect(result).toEqual({ data: { a: 1 }, model: "gemini-2.5-flash" });
+    expect(result).toEqual({ data: { a: 1 }, model: "gemini-3.1-flash-lite" });
   });
 
   it("localize+en이면 출력 언어 지시문이 프롬프트에 덧붙는다", async () => {
@@ -214,17 +215,17 @@ describe("lib/ai 서비스 계층", () => {
     expect(generateContent.mock.calls[0][0].contents).toBe("ASK");
   });
 
-  it("quality 작업은 flash-lite 설정이어도 gemini-2.5-flash와 낮은 온도로 호출", async () => {
-    aiState.model = "gemini-2.5-flash-lite";
+  it("품질 작업은 새 경량 모델과 권장 온도로 호출", async () => {
+    aiState.model = "gemini-3.1-flash-lite";
     generateContent.mockResolvedValue(reply("{}"));
 
     await generateJson({ userId: "u", prompt: "ASK", quality: true });
 
     expect(constructorCall).toHaveBeenCalledWith({ apiKey: "k" });
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-flash-lite",
       contents: "ASK",
-      config: { temperature: 0.1 },
+      config: { temperature: 1, thinkingConfig: { thinkingLevel: "LOW" }, httpOptions: { timeout: 45_000 } },
     });
   });
 
@@ -235,26 +236,26 @@ describe("lib/ai 서비스 계층", () => {
       userId: "u",
       prompt: "ASK",
       systemInstruction: "SYSTEM",
-      temperature: 0.4,
+      temperature: 1,
     });
 
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.1-flash-lite",
       contents: "ASK",
-      config: { systemInstruction: "SYSTEM", temperature: 0.4 },
+      config: { systemInstruction: "SYSTEM", temperature: 1, thinkingConfig: { thinkingLevel: "MINIMAL" }, httpOptions: { timeout: 45_000 } },
     });
   });
 
-  it("quality 작업에서 교사가 pro를 명시하면 pro 모델은 존중", async () => {
+  it("품질 작업에서도 이전 Pro 설정을 새 경량 모델로 전환한다", async () => {
     aiState.model = "gemini-2.5-pro";
     generateContent.mockResolvedValue(reply("{}"));
 
     await generateJson({ userId: "u", prompt: "ASK", quality: true });
 
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-pro",
+      model: "gemini-3.1-flash-lite",
       contents: "ASK",
-      config: { temperature: 0.1 },
+      config: { temperature: 1, thinkingConfig: { thinkingLevel: "LOW" }, httpOptions: { timeout: 45_000 } },
     });
   });
 });

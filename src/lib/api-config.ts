@@ -1,10 +1,10 @@
 export const GEMINI_MODELS = [
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+  { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite" },
+  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash" },
 ] as const;
 
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
+export const FALLBACK_GEMINI_MODEL = "gemini-3-flash-preview";
 
 export type GeminiModel = (typeof GEMINI_MODELS)[number]["value"];
 
@@ -16,37 +16,26 @@ export function resolveGeminiModel(value: string | null | undefined): GeminiMode
   return value && isAllowedGeminiModel(value) ? value : DEFAULT_GEMINI_MODEL;
 }
 
-/**
- * 자동 모델 선택 임계값(프롬프트 문자 수).
- * 짧고 구조화된 작업(질문 1개 분류·짧은 번역 등)은 flash-lite가 빠르고 저렴하며 충분하고,
- * 이보다 긴 작업(세션 분석·질문 묶기·리포트 등)은 flash가 품질·일관성이 좋다.
- */
-export const AUTO_MODEL_CHAR_THRESHOLD = 5000;
-
-/**
- * 프롬프트 크기에 따라 가장 효율적인 모델을 자동 선택한다.
- * - 교사가 명시적으로 pro를 설정했으면 그대로 존중(프리미엄 선택)
- * - 그 외에는 짧은 작업 → gemini-2.5-flash-lite, 긴 작업 → gemini-2.5-flash
- */
-export function chooseModelAuto(configured: string | null | undefined, promptChars: number): GeminiModel {
-  const base = resolveGeminiModel(configured);
-  if (base === "gemini-2.5-pro") return base;
-  return promptChars > AUTO_MODEL_CHAR_THRESHOLD ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
+/** 이미 열린 설정 화면의 이전 모델 값도 받아 새 기본값으로 저장한다. */
+export function isSupportedGeminiModelInput(value: string): boolean {
+  return isAllowedGeminiModel(value) || [
+    "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+  ].includes(value);
 }
 
-/** 혼잡(503) 시 전환할 대체 모델 — lite↔flash (pro는 flash로) */
+/** 모든 작업에서 경량 모델을 먼저 사용하되, 새 Flash를 직접 선택한 설정은 존중한다. */
+export function chooseModelAuto(configured: string | null | undefined, _promptChars: number): GeminiModel {
+  return resolveGeminiModel(configured);
+}
+
+/** 모델별 장애·한도·응답 실패 시 한 번만 다른 모델로 전환한다. */
 export function alternateModel(model: GeminiModel): GeminiModel {
-  return model === "gemini-2.5-flash-lite" ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
+  return model === DEFAULT_GEMINI_MODEL ? FALLBACK_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
 }
 
-/**
- * 품질 우선 작업용 모델 선택 — 크기와 무관하게 항상 flash 이상을 쓴다.
- * 의미 군집화·문장 재작성처럼 결과물이 수업 자료로 직결되는 작업(비슷한 질문 묶기 등)에 사용.
- * 교사가 pro를 명시했으면 그대로 존중.
- */
+/** 품질 작업도 경량 모델로 시작하고 사고 수준·응답 검증으로 품질을 확보한다. */
 export function chooseQualityModel(configured: string | null | undefined): GeminiModel {
-  const base = resolveGeminiModel(configured);
-  return base === "gemini-2.5-pro" ? base : "gemini-2.5-flash";
+  return resolveGeminiModel(configured);
 }
 
 export function maskApiKey(key: string): string {

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const generateContent = vi.hoisted(() => vi.fn());
-vi.mock('@google/genai', () => ({ GoogleGenAI: class { models = { generateContent }; } }));
-vi.mock('@/lib/resolve-ai-config', () => ({ resolveUserAiConfig: vi.fn(async () => ({ apiKey: 'test-key', model: 'gemini-2.5-flash', isDemo: true })) }));
+vi.mock('@google/genai', async (importOriginal) => ({ ...await importOriginal<typeof import('@google/genai')>(), GoogleGenAI: class { models = { generateContent }; } }));
+vi.mock('@/lib/resolve-ai-config', () => ({ resolveUserAiConfig: vi.fn(async () => ({ apiKey: 'test-key', model: 'gemini-3.1-flash-lite', isDemo: true })) }));
 vi.mock('@/lib/demo-ai-quota', () => ({ consumeDemoAiQuota: vi.fn(async () => 1) }));
 vi.mock('@/lib/db', () => ({ prisma: {
   questionSession: { findUnique: vi.fn() }, user: { findUnique: vi.fn() },
@@ -34,13 +34,13 @@ describe('시연 학생의 완성된 분석 응답', () => {
     const result = await runStudentSessionAnalysis({ studentId: 'demo-output-student', sessionId: 'lesson', req: new Request('http://localhost', { headers: { cookie: 'NEXT_LOCALE=ko' } }) });
     const request = generateContent.mock.calls[0][0];
     expect(request.config.maxOutputTokens).toBe(2048);
-    expect(request.config.thinkingConfig).toEqual({ thinkingBudget: 512 });
+    expect(request.config.thinkingConfig).toEqual({ thinkingLevel: "LOW" });
     expect(request.config.responseMimeType).toBe('application/json');
     expect(request.config.responseJsonSchema.required).toEqual(Object.keys(data));
     expect(request.contents).toContain('각 설명은 80자 이내');
     expect(request.contents).toContain('평균이 같으면 개인별 기록도 같을까요?');
-    expect(result?.result).toMatchObject({ ...data, analysisModel: 'gemini-2.5-flash' });
-    expect(prisma.sessionAnalysis.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { sessionId_scope_studentId: { sessionId: 'lesson', scope: 'student', studentId: 'demo-output-student' } }, create: expect.objectContaining({ result: expect.objectContaining({ summary: data.summary, analysisModel: 'gemini-2.5-flash' }) }) }));
+    expect(result?.result).toMatchObject({ ...data, analysisModel: 'gemini-3.1-flash-lite' });
+    expect(prisma.sessionAnalysis.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { sessionId_scope_studentId: { sessionId: 'lesson', scope: 'student', studentId: 'demo-output-student' } }, create: expect.objectContaining({ result: expect.objectContaining({ summary: data.summary, analysisModel: 'gemini-3.1-flash-lite' }) }) }));
   });
 
   it('불완전한 응답은 빈 분석으로 기존 결과를 덮어쓰지 않는다', async () => {

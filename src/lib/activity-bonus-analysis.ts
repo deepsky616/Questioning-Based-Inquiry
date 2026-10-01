@@ -40,11 +40,13 @@ export async function analyzeActivityBonuses(
           },
         }),
         // 시연의 2,048토큰 상한에서도 사고가 결과 예산을 소진하지 않도록 한다.
-        // Pro 사용 시 공통 계층에서 필수 최소 사고 예산을 보장한다.
+        // 공통 계층에서 새 모델의 최소 사고 수준으로 변환한다.
         thinkingBudget: 0,
         maxOutputTokens: 4_096,
         retryTruncatedOutput: false,
         timeoutMs: 45_000,
+        validateResponse: (data) => !!data && typeof data === "object" &&
+          "bonuses" in data && Array.isArray(data.bonuses),
       });
       if (!response || typeof response !== "object" || !("bonuses" in response) || !Array.isArray(response.bonuses)) {
         throw new AiInvalidResponseError();

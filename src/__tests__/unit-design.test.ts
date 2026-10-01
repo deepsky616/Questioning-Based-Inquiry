@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // vi.hoisted로 생성자 mock을 팩토리 밖에서 접근 가능하게 선언
 const mockGenerateContent = vi.hoisted(() => vi.fn());
-const aiState = vi.hoisted(() => ({ apiKey: "test-api-key" as string | null, model: "gemini-2.5-flash" }));
+const aiState = vi.hoisted(() => ({ apiKey: "test-api-key" as string | null, model: "gemini-3.1-flash-lite" }));
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/resolve-ai-config", () => ({
@@ -23,7 +23,8 @@ vi.mock("@/lib/db", () => ({
     question: { create: vi.fn() },
   },
 }));
-vi.mock("@google/genai", () => ({
+vi.mock("@google/genai", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@google/genai")>(),
   GoogleGenAI: class {
     models = { generateContent: mockGenerateContent };
   },
@@ -626,7 +627,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockFindUnique
       .mockResolvedValueOnce({ value: "test-api-key" })
-      .mockResolvedValueOnce({ value: "gemini-2.5-flash" });
+      .mockResolvedValueOnce({ value: "gemini-3.1-flash-lite" });
 
     setAiResponse('{"keywords": ["광합성", "엽록체", "에너지 전환"]}');
 
@@ -759,7 +760,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     await expect(res.json()).resolves.toEqual(COMPLETE_GENERATED_GUIDES);
   });
 
-  it("보완 결과도 불완전하면 부분 결과를 반환하지 않는다", async () => {
+  it("두 모델의 응답과 보완 결과도 불완전하면 부분 결과를 반환하지 않는다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockGenerateContent.mockResolvedValue({
       text: JSON.stringify({ learningGuides: {}, guides: [] }),
@@ -771,7 +772,11 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     }));
 
     expect(res.status).toBe(502);
-    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(4);
+    expect(mockGenerateContent.mock.calls.map(([request]) => request.model)).toEqual([
+      "gemini-3.1-flash-lite", "gemini-3-flash-preview",
+      "gemini-3.1-flash-lite", "gemini-3-flash-preview",
+    ]);
     expect(await res.json()).toMatchObject({ error: expect.stringContaining("완전") });
   });
 

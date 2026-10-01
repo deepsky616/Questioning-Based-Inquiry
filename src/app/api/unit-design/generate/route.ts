@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = unitDesignGenerateSchema.parse(body);
 
-    const generate = (nextPrompt: string, responseJsonSchema?: unknown) => generateText({
+    const generate = (nextPrompt: string, responseJsonSchema?: unknown, validateResponse?: (value: unknown) => boolean) => generateText({
       userId: (session.user as { id: string }).id,
       prompt: nextPrompt,
       req,
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       maxOutputTokens: 2_048,
       responseMimeType: "application/json",
       responseJsonSchema,
+      validateResponse,
     });
     const aiFailureResponse = (aiErr: unknown) => {
       if (aiErr instanceof AiKeyMissingError) {

@@ -130,6 +130,7 @@ export async function POST(req: Request) {
     if (mode === "transform") {
       const target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
       const generated = await generateJsonWithMetadata<unknown>({
+        validateResponse: (data) => transformResponseSchema.safeParse(data).success,
         userId,
         prompt: buildTransformPrompt(target, locale),
         req,
@@ -153,6 +154,7 @@ export async function POST(req: Request) {
     }
 
     const generated = await generateJsonWithMetadata<unknown>({
+      validateResponse: (data) => createResponseSchema.safeParse(data).success,
       userId,
       prompt: locale === "en" ? CREATE_PROMPT_EN : CREATE_PROMPT,
       req,

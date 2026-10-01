@@ -29,7 +29,7 @@ export function classifyGeminiError(raw: unknown): GeminiErrorClass {
     return {
       status: 404,
       hint: "선택한 모델 이름을 현재 사용할 수 없어요.",
-      action: "다른 Gemini 모델(예: Pro ↔ Flash)을 선택해 다시 테스트해주세요.",
+      action: "Gemini 3.1 Flash-Lite 또는 Gemini 3 Flash를 선택해 다시 테스트해주세요.",
     };
   }
   // 선불 크레딧 소진 (429 안에서 가장 명확한 신호)

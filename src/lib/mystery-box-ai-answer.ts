@@ -187,8 +187,12 @@ async function generateDynamicMysteryAnswer(
   }));
   const primaryResponse = dynamicPrimarySchema.parse(
     await generateJson<unknown>({
+      validateResponse: (data) => {
+        const parsed = dynamicPrimarySchema.parse(data);
+        return parsed.decision === "unsupported" || validatedAnswerMap(parsed.answers, itemIds) !== null;
+      },
       userId,
-      modelOverride: "gemini-2.5-flash-lite",
+      modelOverride: "gemini-3.1-flash-lite",
       prompt: JSON.stringify({
         locale: request.locale,
         untrustedQuestion: request.question,
@@ -217,8 +221,12 @@ async function generateDynamicMysteryAnswer(
 
   const verifierResponse = dynamicVerifierSchema.parse(
     await generateJson<unknown>({
+      validateResponse: (data) => {
+        const parsed = dynamicVerifierSchema.parse(data);
+        return parsed.decision === "unsupported" || validatedAnswerMap(parsed.answers, itemIds) !== null;
+      },
       userId,
-      modelOverride: "gemini-2.5-flash-lite",
+      modelOverride: "gemini-3.1-flash-lite",
       prompt: JSON.stringify({
         locale: request.locale,
         untrustedQuestion: request.question,
@@ -324,8 +332,9 @@ export async function generateMysteryAiAnswer(
   } as const;
 
   const response = await generateJson<unknown>({
+    validateResponse: (data) => legacyMysteryAiAnswerSchema.safeParse(data).success,
     userId,
-    modelOverride: "gemini-2.5-flash-lite",
+    modelOverride: "gemini-3.1-flash-lite",
     prompt: JSON.stringify({
       locale: request.locale,
       allowedAttributes,
